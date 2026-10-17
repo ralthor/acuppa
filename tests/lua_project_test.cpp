@@ -48,6 +48,13 @@ int main(int argc, char* argv[]) {
     expect(std::abs(hdr.step(0.0).exposure - 1.0f) < 0.001f &&
            std::abs(hdr_dim.step(0.0).exposure - 0.15f) < 0.001f,
            "source-authored scene exposure did not reach the render frame");
+    threepoint::LuaProject ssao(argv[1], "ssao"), ssao_off(argv[1], "ssao_off");
+    const auto ao = ssao.step(0.0);
+    expect(ao.ssao_quality == 3 && std::abs(ao.ssao_radius - 0.35f) < 0.001f &&
+           std::abs(ao.ssao_strength - 2.0f) < 0.001f &&
+           ssao_off.step(0.0).ssao_quality == 0 &&
+           project.step(0.0).ssao_quality == 0,
+           "Lua SSAO settings did not reach the frame or reset for a new scene");
     threepoint::LuaProject ibl(argv[1], "ibl"), ibl_off(argv[1], "ibl_off");
     const auto environment = ibl.step(0.0);
     const auto no_environment = ibl_off.step(0.0);

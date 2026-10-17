@@ -55,6 +55,7 @@ struct LuaProject::Impl {
     static int ray(lua_State* lua);
     static int set_camera(lua_State* lua);
     static int set_exposure(lua_State* lua);
+    static int set_ssao(lua_State* lua);
     static int set_environment(lua_State* lua);
     static int entity_create(lua_State* lua);
     static int entity_destroy(lua_State* lua);
@@ -358,6 +359,9 @@ std::shared_ptr<const GltfAsset> LuaProject::Impl::ensure_asset(const std::strin
 SceneFrame LuaProject::Impl::snapshot() {
     SceneFrame scene = world.snapshot(frame.camera);
     scene.exposure = frame.exposure;
+    scene.ssao_quality = frame.ssao_quality;
+    scene.ssao_radius = frame.ssao_radius;
+    scene.ssao_strength = frame.ssao_strength;
     scene.environment = frame.environment;
     scene.environment_intensity = frame.environment_intensity;
     for (auto& instance : scene.imported) instance.asset = ensure_asset(instance.source);
@@ -462,6 +466,9 @@ void LuaProject::Impl::load_scene(const std::string& name) {
     clear_callbacks();
     world = World{};
     frame.exposure = 1.0f;
+    frame.ssao_quality = 0;
+    frame.ssao_radius = 0.35f;
+    frame.ssao_strength = 2.0f;
     frame.environment.reset();
     frame.environment_intensity = 0.0f;
     current_scene = name;
@@ -599,6 +606,7 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("screen_ray", &ray);
     add_function("set_camera", &set_camera);
     add_function("set_exposure", &set_exposure);
+    add_function("set_ssao", &set_ssao);
     add_function("set_environment", &set_environment);
     add_function("entity_create", &entity_create);
     add_function("entity_destroy", &entity_destroy);
@@ -770,6 +778,35 @@ int LuaProject::Impl::set_exposure(lua_State* lua) {
     if (!std::isfinite(exposure) || exposure < 0.01 || exposure > 32.0)
         return luaL_error(lua, "exposure must be finite and between 0.01 and 32");
     context(lua).frame.exposure = float(exposure);
+    return 0;
+}
+
+int LuaProject::Impl::set_ssao(lua_State* lua) {
+    const int count = lua_gettop(lua);
+    if (count < 1 || count > 3 || !lua_isinteger(lua, 1))
+        return luaL_error(lua, "set_ssao() expects quality 0..3 and optional radius/strength");
+    const lua_Integer quality = lua_tointeger(lua, 1);
+    if (quality < 0 || quality > 3)
+        return luaL_error(lua, "SSAO quality must be an integer from 0 to 3");
+    auto& frame = context(lua).frame;
+    double radius = frame.ssao_radius;
+    double strength = frame.ssao_strength;
+    if (count >= 2) {
+        if (lua_type(lua, 2) != LUA_TNUMBER)
+            return luaL_error(lua, "SSAO radius must be a number");
+        radius = lua_tonumber(lua, 2);
+    }
+    if (count == 3) {
+        if (lua_type(lua, 3) != LUA_TNUMBER)
+            return luaL_error(lua, "SSAO strength must be a number");
+        strength = lua_tonumber(lua, 3);
+    }
+    if (!std::isfinite(radius) || radius < 0.05 || radius > 5.0 ||
+        !std::isfinite(strength) || strength < 0.0 || strength > 4.0)
+        return luaL_error(lua, "SSAO radius must be 0.05..5 and strength 0..4");
+    frame.ssao_quality = int(quality);
+    frame.ssao_radius = float(radius);
+    frame.ssao_strength = float(strength);
     return 0;
 }
 

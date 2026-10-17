@@ -39,6 +39,7 @@ private:
     nvrhi::ShaderHandle shadow_pbr_fragment_shader_;
     nvrhi::ShaderHandle tonemap_vertex_shader_;
     nvrhi::ShaderHandle tonemap_fragment_shader_;
+    nvrhi::ShaderHandle ssao_fragment_shader_;
     nvrhi::InputLayoutHandle pbr_input_layout_;
     nvrhi::BindingLayoutHandle pbr_binding_layout_;
     nvrhi::BindingLayoutHandle environment_binding_layout_;
@@ -47,12 +48,15 @@ private:
     nvrhi::BindingSetHandle shadow_binding_set_;
     nvrhi::BindingLayoutHandle tonemap_binding_layout_;
     nvrhi::BindingSetHandle tonemap_binding_set_;
+    nvrhi::BindingLayoutHandle ssao_binding_layout_;
+    nvrhi::BindingSetHandle ssao_binding_set_;
     nvrhi::BufferHandle pbr_frame_buffer_;
     nvrhi::BufferHandle shadow_frame_buffer_;
     nvrhi::SamplerHandle pbr_sampler_;
     nvrhi::SamplerHandle environment_sampler_;
     nvrhi::SamplerHandle shadow_sampler_;
     nvrhi::SamplerHandle tonemap_sampler_;
+    nvrhi::SamplerHandle depth_sampler_;
     nvrhi::TextureHandle white_texture_;
     nvrhi::TextureHandle environment_texture_;
     nvrhi::TextureHandle shadow_atlas_;
@@ -78,10 +82,13 @@ private:
     std::map<const GltfAsset*, GpuAsset> imported_;
     nvrhi::TextureHandle depth_;
     nvrhi::TextureHandle hdr_color_;
+    nvrhi::TextureHandle ssao_color_;
     nvrhi::GraphicsPipelineHandle pipeline_;
     nvrhi::GraphicsPipelineHandle pbr_pipeline_;
     nvrhi::GraphicsPipelineHandle tonemap_pipeline_;
+    nvrhi::GraphicsPipelineHandle ssao_pipeline_;
     nvrhi::FramebufferHandle hdr_framebuffer_;
+    nvrhi::FramebufferHandle ssao_framebuffer_;
     std::vector<nvrhi::FramebufferHandle> framebuffers_;
 };
 

@@ -41,6 +41,9 @@ struct LightInstance {
 struct SceneFrame {
     PerspectiveCamera camera;
     float exposure = 1.0f;
+    int ssao_quality = 0;
+    float ssao_radius = 0.35f;
+    float ssao_strength = 2.0f;
     std::shared_ptr<const HdrImage> environment;
     float environment_intensity = 0.0f;
     std::vector<CubeInstance> cubes;

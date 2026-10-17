@@ -7,6 +7,7 @@
 #include "pbr_frag_spv.hpp"
 #include "tonemap_vert_spv.hpp"
 #include "tonemap_frag_spv.hpp"
+#include "ssao_frag_spv.hpp"
 #include "shadow_cube_vert_spv.hpp"
 #include "shadow_cube_frag_spv.hpp"
 #include "shadow_pbr_vert_spv.hpp"
@@ -15,6 +16,7 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 #include <glm/geometric.hpp>
 
 #include <array>
@@ -71,6 +73,16 @@ struct ShadowFrame {
     float settings[8][4]{};
 };
 static_assert(sizeof(ShadowFrame) == 3200);
+
+struct TonemapSettings {
+    float exposure = 1.0f;
+    int32_t ssao_quality = 0;
+    float ssao_radius = 0.35f;
+    float ssao_strength = 2.0f;
+    glm::mat4 inverse_view_projection{1.0f};
+    glm::vec4 camera_focal{0.0f};
+};
+static_assert(sizeof(TonemapSettings) == 96);
 
 constexpr uint32_t shadow_tile = 512;
 constexpr uint32_t shadow_columns = 6;
@@ -252,16 +264,32 @@ CubeDemo::CubeDemo(nvrhi::IDevice* device) : device_(device) {
     tonemap_fragment_shader_ = device_->createShader(
         nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Pixel).setDebugName("tonemap fragment"),
         tonemap_frag_spv, sizeof(tonemap_frag_spv));
+    ssao_fragment_shader_ = device_->createShader(
+        nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Pixel).setDebugName("SSAO fragment"),
+        ssao_frag_spv, sizeof(ssao_frag_spv));
+    ssao_binding_layout_ = device_->createBindingLayout(
+        nvrhi::BindingLayoutDesc().setVisibility(nvrhi::ShaderType::AllGraphics)
+            .setBindingOffsets(nvrhi::VulkanBindingOffsets().setSamplerOffset(0))
+            .addItem(nvrhi::BindingLayoutItem::PushConstants(0, sizeof(TonemapSettings)))
+            .addItem(nvrhi::BindingLayoutItem::Texture_SRV(0))
+            .addItem(nvrhi::BindingLayoutItem::Sampler(1)));
     tonemap_binding_layout_ = device_->createBindingLayout(
         nvrhi::BindingLayoutDesc().setVisibility(nvrhi::ShaderType::AllGraphics)
             .setBindingOffsets(nvrhi::VulkanBindingOffsets().setSamplerOffset(0))
-            .addItem(nvrhi::BindingLayoutItem::PushConstants(0, sizeof(float)))
+            .addItem(nvrhi::BindingLayoutItem::PushConstants(0, sizeof(TonemapSettings)))
             .addItem(nvrhi::BindingLayoutItem::Texture_SRV(0))
-            .addItem(nvrhi::BindingLayoutItem::Sampler(1)));
+            .addItem(nvrhi::BindingLayoutItem::Sampler(1))
+            .addItem(nvrhi::BindingLayoutItem::Texture_SRV(2))
+            .addItem(nvrhi::BindingLayoutItem::Sampler(3))
+            .addItem(nvrhi::BindingLayoutItem::Texture_SRV(4))
+            .addItem(nvrhi::BindingLayoutItem::Sampler(5)));
     tonemap_sampler_ = device_->createSampler(nvrhi::SamplerDesc()
         .setAllAddressModes(nvrhi::SamplerAddressMode::Clamp));
+    depth_sampler_ = device_->createSampler(nvrhi::SamplerDesc()
+        .setAllAddressModes(nvrhi::SamplerAddressMode::Clamp).setAllFilters(false));
     require(tonemap_vertex_shader_ && tonemap_fragment_shader_ && tonemap_binding_layout_ &&
-            tonemap_sampler_, "create tonemap resources");
+            ssao_fragment_shader_ && ssao_binding_layout_ &&
+            tonemap_sampler_ && depth_sampler_, "create tonemap resources");
 
     const CubeMesh mesh = make_cube();
     nvrhi::BufferDesc vertex_desc;
@@ -489,12 +517,16 @@ void CubeDemo::prepare(const SceneFrame& scene) {
 void CubeDemo::release_size_dependent() {
     framebuffers_.clear();
     hdr_framebuffer_ = nullptr;
+    ssao_framebuffer_ = nullptr;
+    ssao_binding_set_ = nullptr;
     tonemap_binding_set_ = nullptr;
     pipeline_ = nullptr;
     pbr_pipeline_ = nullptr;
     tonemap_pipeline_ = nullptr;
+    ssao_pipeline_ = nullptr;
     depth_ = nullptr;
     hdr_color_ = nullptr;
+    ssao_color_ = nullptr;
 }
 
 void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t width,
@@ -506,7 +538,7 @@ void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t 
     depth_desc.width = width;
     depth_desc.height = height;
     depth_desc.format = nvrhi::Format::D32;
-    depth_desc.isShaderResource = false;
+    depth_desc.isShaderResource = true;
     depth_desc.isRenderTarget = true;
     depth_desc.debugName = "cube depth";
     depth_desc.enableAutomaticStateTracking(nvrhi::ResourceStates::DepthWrite);
@@ -525,6 +557,19 @@ void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t 
     hdr_framebuffer_ = device_->createFramebuffer(
         nvrhi::FramebufferDesc().addColorAttachment(hdr_color_).setDepthAttachment(depth_));
     require(hdr_framebuffer_, "create HDR scene framebuffer");
+    nvrhi::TextureDesc ssao_desc;
+    ssao_desc.width = width;
+    ssao_desc.height = height;
+    ssao_desc.format = nvrhi::Format::R16_FLOAT;
+    ssao_desc.isShaderResource = true;
+    ssao_desc.isRenderTarget = true;
+    ssao_desc.debugName = "SSAO factor";
+    ssao_desc.enableAutomaticStateTracking(nvrhi::ResourceStates::RenderTarget);
+    ssao_color_ = device_->createTexture(ssao_desc);
+    require(ssao_color_, "create SSAO image");
+    ssao_framebuffer_ = device_->createFramebuffer(
+        nvrhi::FramebufferDesc().addColorAttachment(ssao_color_));
+    require(ssao_framebuffer_, "create SSAO framebuffer");
     for (const auto& color : colors) {
         auto framebuffer = device_->createFramebuffer(
             nvrhi::FramebufferDesc().addColorAttachment(color));
@@ -532,11 +577,22 @@ void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t 
         framebuffers_.push_back(framebuffer);
     }
     require(!framebuffers_.empty(), "create display framebuffers");
+    ssao_binding_set_ = device_->createBindingSet(
+        nvrhi::BindingSetDesc()
+            .addItem(nvrhi::BindingSetItem::PushConstants(0, sizeof(TonemapSettings)))
+            .addItem(nvrhi::BindingSetItem::Texture_SRV(0, depth_))
+            .addItem(nvrhi::BindingSetItem::Sampler(1, depth_sampler_)),
+        ssao_binding_layout_);
+    require(ssao_binding_set_, "create SSAO binding set");
     tonemap_binding_set_ = device_->createBindingSet(
         nvrhi::BindingSetDesc()
-            .addItem(nvrhi::BindingSetItem::PushConstants(0, sizeof(float)))
+            .addItem(nvrhi::BindingSetItem::PushConstants(0, sizeof(TonemapSettings)))
             .addItem(nvrhi::BindingSetItem::Texture_SRV(0, hdr_color_))
-            .addItem(nvrhi::BindingSetItem::Sampler(1, tonemap_sampler_)),
+            .addItem(nvrhi::BindingSetItem::Sampler(1, tonemap_sampler_))
+            .addItem(nvrhi::BindingSetItem::Texture_SRV(2, depth_))
+            .addItem(nvrhi::BindingSetItem::Sampler(3, depth_sampler_))
+            .addItem(nvrhi::BindingSetItem::Texture_SRV(4, ssao_color_))
+            .addItem(nvrhi::BindingSetItem::Sampler(5, depth_sampler_)),
         tonemap_binding_layout_);
     require(tonemap_binding_set_, "create tonemap binding set");
     nvrhi::GraphicsPipelineDesc pipeline_desc;
@@ -559,6 +615,14 @@ void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t 
     pbr_pipeline_ = device_->createGraphicsPipeline(
         pbr_desc, hdr_framebuffer_->getFramebufferInfo());
     require(pbr_pipeline_, "create PBR graphics pipeline");
+    nvrhi::GraphicsPipelineDesc ssao_pipeline_desc;
+    ssao_pipeline_desc.setVertexShader(tonemap_vertex_shader_)
+        .setFragmentShader(ssao_fragment_shader_)
+        .addBindingLayout(ssao_binding_layout_);
+    ssao_pipeline_desc.renderState.rasterState.setCullNone();
+    ssao_pipeline_ = device_->createGraphicsPipeline(
+        ssao_pipeline_desc, ssao_framebuffer_->getFramebufferInfo());
+    require(ssao_pipeline_, "create SSAO graphics pipeline");
     nvrhi::GraphicsPipelineDesc tonemap_desc;
     tonemap_desc.setVertexShader(tonemap_vertex_shader_)
         .setFragmentShader(tonemap_fragment_shader_)
@@ -696,13 +760,31 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
             commands->drawIndexed(nvrhi::DrawArguments().setVertexCount(primitive.index_count));
         }
     }
+    TonemapSettings settings;
+    settings.exposure = scene.exposure;
+    settings.ssao_quality = scene.ssao_quality;
+    settings.ssao_radius = scene.ssao_radius;
+    settings.ssao_strength = scene.ssao_strength;
+    settings.inverse_view_projection = glm::inverse(view_projection);
+    settings.camera_focal = glm::vec4(scene.camera.eye,
+        float(height_) / (2.0f * std::tan(glm::radians(scene.camera.vertical_fov_degrees) * 0.5f)));
+    if (scene.ssao_quality > 0 && scene.ssao_strength > 0.0f) {
+        nvrhi::GraphicsState ssao_state;
+        ssao_state.setPipeline(ssao_pipeline_).setFramebuffer(ssao_framebuffer_);
+        ssao_state.viewport.addViewportAndScissorRect(
+            nvrhi::Viewport(float(width_), float(height_)));
+        ssao_state.addBindingSet(ssao_binding_set_);
+        commands->setGraphicsState(ssao_state);
+        commands->setPushConstants(&settings, sizeof(settings));
+        commands->draw(nvrhi::DrawArguments().setVertexCount(3));
+    }
     nvrhi::GraphicsState tonemap_state;
     tonemap_state.setPipeline(tonemap_pipeline_).setFramebuffer(framebuffers_[image_index]);
     tonemap_state.viewport.addViewportAndScissorRect(
         nvrhi::Viewport(float(width_), float(height_)));
     tonemap_state.addBindingSet(tonemap_binding_set_);
     commands->setGraphicsState(tonemap_state);
-    commands->setPushConstants(&scene.exposure, sizeof(scene.exposure));
+    commands->setPushConstants(&settings, sizeof(settings));
     commands->draw(nvrhi::DrawArguments().setVertexCount(3));
 }
 

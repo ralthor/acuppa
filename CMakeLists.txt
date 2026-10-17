@@ -69,6 +69,17 @@ foreach(shader IN ITEMS cube pbr tonemap shadow_cube shadow_pbr)
     list(APPEND THREEPOINT_SHADER_HEADERS "${shader_header}")
   endforeach()
 endforeach()
+set(shader_source "${PROJECT_SOURCE_DIR}/src/render/shaders/ssao.frag")
+set(shader_binary "${PROJECT_BINARY_DIR}/shaders/ssao.frag.spv")
+set(shader_header "${PROJECT_BINARY_DIR}/generated/ssao_frag_spv.hpp")
+add_custom_command(OUTPUT "${shader_header}"
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${PROJECT_BINARY_DIR}/shaders" "${PROJECT_BINARY_DIR}/generated"
+  COMMAND "${THREEPOINT_GLSLANG_VALIDATOR}" -V "${shader_source}" -o "${shader_binary}"
+  COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/embed_spirv.py"
+          "${shader_binary}" "${shader_header}" "ssao_frag_spv"
+  DEPENDS "${shader_source}" "${PROJECT_SOURCE_DIR}/scripts/embed_spirv.py"
+  VERBATIM)
+list(APPEND THREEPOINT_SHADER_HEADERS "${shader_header}")
 
 add_library(threepoint_core STATIC src/core/project.cpp src/core/camera.cpp src/core/input.cpp
             src/core/world.cpp
@@ -199,6 +210,12 @@ if(BUILD_TESTING)
     add_test(NAME shadow_capture COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/shadow_capture_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+    add_test(NAME ssao_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/ssao_capture_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+    add_test(NAME ssao_live_startup COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene" "ssao")
     add_test(NAME shadow_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene" "shadow")
