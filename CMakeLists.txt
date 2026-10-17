@@ -25,6 +25,29 @@ FetchContent_Declare(glm
   GIT_TAG 0af55ccecd98d4e5a8d1fad7de25ba429d60e863)
 FetchContent_MakeAvailable(glm)
 
+set(OVERRIDE_CXX_FLAGS OFF CACHE BOOL "" FORCE)
+set(INTERPROCEDURAL_OPTIMIZATION OFF CACHE BOOL "" FORCE)
+set(ENABLE_OBJECT_STREAM OFF CACHE BOOL "" FORCE)
+set(ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+set(ENABLE_ALL_WARNINGS OFF CACHE BOOL "" FORCE)
+set(CROSS_PLATFORM_DETERMINISTIC ON CACHE BOOL "" FORCE)
+set(JPH_USE_VK OFF CACHE BOOL "" FORCE)
+set(JPH_USE_DX12 OFF CACHE BOOL "" FORCE)
+set(JPH_USE_MTL OFF CACHE BOOL "" FORCE)
+set(USE_SSE4_1 OFF CACHE BOOL "" FORCE)
+set(USE_SSE4_2 OFF CACHE BOOL "" FORCE)
+set(USE_AVX OFF CACHE BOOL "" FORCE)
+set(USE_AVX2 OFF CACHE BOOL "" FORCE)
+set(USE_LZCNT OFF CACHE BOOL "" FORCE)
+set(USE_TZCNT OFF CACHE BOOL "" FORCE)
+set(USE_F16C OFF CACHE BOOL "" FORCE)
+set(USE_FMADD OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(jolt
+  GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
+  GIT_TAG e77f175595e64cb44218cc9d9d56fc365ad0e36a
+  SOURCE_SUBDIR Build)
+FetchContent_MakeAvailable(jolt)
+
 FetchContent_Declare(cgltf
   GIT_REPOSITORY https://github.com/jkuhlmann/cgltf.git
   GIT_TAG 360db1a95480fe102ae9c69b27c5d101167ff5ba)
@@ -82,13 +105,13 @@ add_custom_command(OUTPUT "${shader_header}"
 list(APPEND THREEPOINT_SHADER_HEADERS "${shader_header}")
 
 add_library(threepoint_core STATIC src/core/project.cpp src/core/camera.cpp src/core/input.cpp
-            src/core/world.cpp
+            src/core/world.cpp src/core/physics_world.cpp
             src/core/gltf_asset.cpp src/core/cgltf_impl.c src/core/stb_image_impl.c
             src/core/hdr_image.cpp src/core/lua_project.cpp)
 target_compile_features(threepoint_core PUBLIC cxx_std_17)
 target_include_directories(threepoint_core PUBLIC include PRIVATE "${cgltf_SOURCE_DIR}"
                            "${stb_SOURCE_DIR}")
-target_link_libraries(threepoint_core PUBLIC glm::glm threepoint_lua)
+target_link_libraries(threepoint_core PUBLIC glm::glm threepoint_lua PRIVATE Jolt)
 target_compile_definitions(threepoint_core PUBLIC THREEPOINT_VERSION="${PROJECT_VERSION}")
 
 add_executable(threepoint src/runtime/main.cpp)
@@ -107,6 +130,9 @@ target_link_libraries(threepoint_editor PRIVATE threepoint_core)
 include(CTest)
 option(THREEPOINT_ENABLE_GPU_TESTS "Run live Vulkan display checks" OFF)
 if(BUILD_TESTING)
+  add_executable(threepoint_physics_test tests/feature_scene/physics_core_test.cpp)
+  target_link_libraries(threepoint_physics_test PRIVATE threepoint_core)
+  add_test(NAME physics_core COMMAND threepoint_physics_test)
   add_executable(threepoint_core_test tests/core_test.cpp)
   target_link_libraries(threepoint_core_test PRIVATE threepoint_core)
   add_executable(threepoint_camera_test tests/camera_test.cpp)
