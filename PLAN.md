@@ -8,6 +8,8 @@ The earlier commits built a **2D SDL3/Lua prototype** with project creation, Lua
 
 The core will be a C++ static library with separate game runtime and editor executables. Projects remain source files: `game.lua`, literal `scenes/*.scene.lua` data, `scripts/*.lua`, and referenced assets. The editor edits the same files; it must not introduce hidden game state. `threepoint run`, `test`, and `build` must work without opening the editor. Exported games include a runtime without editing tools. Lua remains the scripting language. Choose and pin one 3D physics dependency during its integration phase; **Jolt Physics** is the initial choice.
 
+**Priority update (2026-10-17):** Build a playable 3D falling-block game next, using 2D grid rules displayed with 3D meshes. The existing Lua loop, action input, entities, prefabs, and scene files are enough for its core gameplay. Game code handles grid collisions and key edges/repeat; no physics, advanced graphics, sound, editor action, or export is needed to run the first demo. Phases 10–12 are small game milestones. HDR, IBL, shadows, SSAO, physics, editor, packaging, and sound remain requirements, but move after the playable source-only game. Keep the game as a separate checked-in project; retain `tests/feature_scene` for engine API coverage.
+
 ## Small, testable phases
 
 Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implementation phase adds relevant unit or integration tests, runs them, and extends that scene for each new component and Lua API. Never claim a phase complete until its check passes. Keep the feature scene runnable from source once the 3D Lua runtime exists and, once export exists, from a packaged build.
@@ -28,7 +30,7 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 
 **Phase 8 status (2026-10-17):** Pinned cgltf v1.15 loads static triangle geometry, `POSITION`, optional `COLOR_0`, indices, default-scene nodes, and composed parent transforms from embedded/external-buffer `.gltf` and `.glb`. Mesh components and `tp.spawn` accept project-relative asset paths. The Vulkan renderer uploads/caches imported geometry; the checked-in triangle fixture visibly renders from a source scene via `--scene imported`. Core tests check node hierarchy, all three buffer forms, missing/outside files, unsafe external URIs, and out-of-bounds accessors. All seventeen local Release tests pass with Vulkan validation. The importer intentionally rejects sparse/compressed/skinned/morphed geometry, nontriangle primitives, required extensions, and unsupported external URI syntax; material/texture rendering is Phase 9. Hosted CI remains unverified without a Git remote.
 
-**Phase 9 status (2026-10-17):** The importer reads `NORMAL`, `TEXCOORD_0`, glTF metallic/roughness/base-color/emissive factors, and base-color, metallic-roughness, normal, occlusion, and emissive image references. Pinned stb_image decodes bounded PNG/JPEG data into RGBA pixels. Imported geometry uses a direct-light GGX PBR shader, texture sampling, and scene-authored directional/point lights (up to eight). Checked-in textured quad and three reference spheres visibly respond to light; image checks and the prior glTF capture pass under Vulkan validation. All eighteen local Release tests pass. Unsupported sampler modes, alternate UV sets, texture transforms, alpha blending, and material extensions are rejected; the current renderer has one texture mip and bright values clip until Phase 10 HDR/tonemapping. Hosted CI remains unverified without a Git remote.
+**Phase 9 status (2026-10-17):** The importer reads `NORMAL`, `TEXCOORD_0`, glTF metallic/roughness/base-color/emissive factors, and base-color, metallic-roughness, normal, occlusion, and emissive image references. Pinned stb_image decodes bounded PNG/JPEG data into RGBA pixels. Imported geometry uses a direct-light GGX PBR shader, texture sampling, and scene-authored directional/point lights (up to eight). Checked-in textured quad and three reference spheres visibly respond to light; image checks and the prior glTF capture pass under Vulkan validation. All eighteen local Release tests pass. Unsupported sampler modes, alternate UV sets, texture transforms, alpha blending, and material extensions are rejected; the current renderer has one texture mip and bright values clip until Phase 13 HDR/tonemapping. Hosted CI remains unverified without a Git remote.
 
 | Phase | Deliverable | Check before commit |
 | --- | --- | --- |
@@ -42,32 +44,35 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 | 7 | Add source-defined scenes and reusable prefabs, including runtime spawn, destroy, and scene switch. | Reloading a scene and spawning a prefab reproduce the same entities with no editor database. |
 | 8 | Import glTF geometry, node transforms, and scene hierarchy. | A checked-in glTF fixture renders in the feature scene; bad asset errors name the file. |
 | 9 | Import glTF textures/materials and implement direct-light PBR. | Reference material spheres and textured glTF fixtures pass image checks. |
-| 10 | Render into an HDR target and add exposure and tonemapping. | Bright highlights retain detail; exposure changes are measurable in captured frames. |
-| 11 | Add image-based lighting from project HDRIs, including a documented Poly Haven HDRI example. | A PBR fixture responds to the HDRI, and missing/invalid HDRIs fail clearly. |
-| 12 | Add soft shadow maps for the supported light types. | Occluder tests show stable, softened shadows across camera movement. |
-| 13 | Add SSAO with adjustable quality and a disable path. | A corner/contact fixture darkens appropriately without large halos or temporal flicker. |
-| 14 | Integrate pinned Jolt Physics with rigid bodies, colliders, triggers, and fixed-step simulation. | Falling, resting, collision, and trigger cases pass deterministic core tests. |
-| 15 | Expose physics creation, forces, motion, queries, and contact events to Lua and scene components. | The feature scene drives and inspects physics entirely from Lua. |
-| 16 | Add miniaudio playback, spatial sound, and script control. | Automated audio-state tests pass; the feature scene plays a 3D sound on contact. |
-| 17 | Add script-defined UI, timers, and save/load needed by complete games. | A source-only menu starts play and a save restores the same state. |
-| 18 | Build the editor scene tree and component inspector against project source files. | A human can open, create, and change entities; saved files run identically from CLI. |
-| 19 | Add viewport selection and transform gizmos. | Moving an entity with the gizmo writes the expected scene transform and survives reopen. |
-| 20 | Add editor script/source view and round-trip checks; expose any editor action through files or CLI. | Hand edit, editor edit, save, and reopen preserve behavior; an agent can author the same result without clicks. |
-| 21 | Implement `threepoint test` and `threepoint build` to run tests headlessly and export a standalone, non-editable game. | A small source-only fixture exports and runs without the installed editor or development files. |
-| 22 | Build a complete 3D falling-block game from Lua and source assets only. | A match can finish with `threepoint run`; rule tests and export smoke test pass. |
-| 23 | Build a small 3D room/puzzle game from Lua and source assets only. | It exercises glTF, PBR, HDRI, shadows, SSAO, physics, audio, UI, save/load, and export. |
-| 24 | Harden and release: automated feature-scene coverage audit, sanitizers, asset-failure cases, performance budgets, Linux packaging, and documentation. | Ubuntu 24+ release builds pass unit, integration, visual, packaged-game, and stability gates. |
+| 10 | Write a pure Lua 10×20 board with the seven block shapes, spawn, move, rotate, collide, lock, and line clear. | Deterministic rule tests cover each shape, walls/floor, blocked movement, lock, and single/multiple clears without a window. |
+| 11 | Make the first **playable 3D game** from source: draw board/current piece with existing meshes, bind left/right/rotate/drop, add gravity, score, top-out, and restart. | `threepoint run <game>` opens a controllable match without editor clicks; rule tests, automated input, live startup, and Vulkan captures verify movement, drop, clear, and restart. |
+| 12 | Finish the falling-block rules and feedback: seven-bag queue, wall kicks, hold/next/ghost pieces, levels, pause, visible score and game-over state, and a control guide. Use source-authored 3D elements or a minimal text overlay only if needed. | A full match can reach game over and restart; deterministic rules and interactive captures pass at variable frame timing. |
+| 13 | Render into an HDR target and add exposure and tonemapping. | Bright highlights retain detail; exposure changes are measurable in captured frames. |
+| 14 | Add image-based lighting from project HDRIs, including a documented Poly Haven HDRI example. | A PBR fixture responds to the HDRI, and missing/invalid HDRIs fail clearly. |
+| 15 | Add soft shadow maps for the supported light types. | Occluder tests show stable, softened shadows across camera movement. |
+| 16 | Add SSAO with adjustable quality and a disable path. | A corner/contact fixture darkens appropriately without large halos or temporal flicker. |
+| 17 | Integrate pinned Jolt Physics with rigid bodies, colliders, triggers, and fixed-step simulation. | Falling, resting, collision, and trigger cases pass deterministic core tests. |
+| 18 | Expose physics creation, forces, motion, queries, and contact events to Lua and scene components. | The feature scene drives and inspects physics entirely from Lua. |
+| 19 | Add script-defined UI, timers, and save/load for games that need them beyond the early falling-block demo. | A source-only menu starts play and a save restores the same state. |
+| 20 | Build the editor scene tree and component inspector against project source files. | A human can open, create, and change entities; saved files run identically from CLI. |
+| 21 | Add viewport selection and transform gizmos. | Moving an entity with the gizmo writes the expected scene transform and survives reopen. |
+| 22 | Add editor script/source view and round-trip checks; expose any editor action through files or CLI. | Hand edit, editor edit, save, and reopen preserve behavior; an agent can author the same result without clicks. |
+| 23 | Implement `threepoint test` and `threepoint build` to run tests headlessly and export a standalone, non-editable game. | A small source-only fixture exports and runs without the installed editor or development files. |
+| 24 | Package and harden the falling-block game built in Phases 10–12. | The same game passes an export smoke test without editor or development files. |
+| 25 | Add miniaudio playback, spatial sound, and script control. | Automated audio-state tests pass; the feature scene plays a 3D sound on contact. |
+| 26 | Build a small 3D room/puzzle game from Lua and source assets only. | It exercises glTF, PBR, HDRI, shadows, SSAO, physics, audio, UI, save/load, and export. |
+| 27 | Harden and release: automated feature-scene coverage audit, sanitizers, asset-failure cases, performance budgets, Linux packaging, and documentation. | Ubuntu 24+ release builds pass unit, integration, visual, packaged-game, and stability gates. |
 
-Phases 3–9 are locally complete: the engine can display a 3D cube, run Lua-authored 3D scenes, react to named input, manage entities and components, reproduce worlds from source scene and prefab files, and render imported glTF geometry with direct-light PBR materials. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
+Phases 3–9 are locally complete: the engine can display a 3D cube, run Lua-authored 3D scenes, react to named input, manage entities and components, reproduce worlds from source scene and prefab files, and render imported glTF geometry with direct-light PBR materials. Phase 10 starts the game itself. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
 
 | README requirement | Covered in phases |
 | --- | --- |
-| Ubuntu 24+, production testing, all-feature scene | 0–1, every feature phase, 24 |
-| C++/CMake static core, runtime/editor, GLFW, nvrhi, Vulkan, glm | 1–4, 18–20 |
-| miniaudio and Lua behavior | 4, 6–7, 16 |
-| AI-authored source-only games, human editor, distributable export | 4, 7, 18–23 |
-| glTF, materials/textures, PBR, HDRI/IBL, shadows, SSAO, HDR tonemapping | 8–13 |
-| Scriptable, component-authored 3D physics | 14–15 |
+| Ubuntu 24+, production testing, all-feature scene | 0–1, every feature phase, 27 |
+| C++/CMake static core, runtime/editor, GLFW, nvrhi, Vulkan, glm | 1–4, 20–22 |
+| miniaudio and Lua behavior | 4, 6–7, 10–12, 25 |
+| AI-authored source-only games, human editor, distributable export | 4, 7, 10–12, 20–24, 26 |
+| glTF, materials/textures, PBR, HDRI/IBL, shadows, SSAO, HDR tonemapping | 8–9, 13–16 |
+| Scriptable, component-authored 3D physics | 17–18 |
 | Entity/component control, update loop, spawn/destroy, prefabs | 4, 6–7 |
 
 ## 3D Lua contract to complete and test
@@ -88,7 +93,7 @@ Phases 3–9 are locally complete: the engine can display a 3D cube, run Lua-aut
 
 For each public call, add a runnable Lua example, invalid-input behavior, and an automated test in the feature scene. The editor must be able to author the same component values, while handwritten scripts can create or change them at runtime.
 
-**Sample design check:** The falling-block game uses prefabs for 3D cubes, named input, timed movement, scene spawning/destruction, UI score, audio, and save data. The room/puzzle game uses glTF meshes, PBR materials, an HDRI, lights/shadows/SSAO/HDR, physics triggers, Lua contact logic, spatial audio, UI, and scene switching. Every named capability appears above; if implementation reveals a missing operation, add it to this checklist and test it before building an editor control for it.
+**Sample design check:** The early falling-block game uses source-authored 3D blocks, named input, timed movement, scene spawning/destruction, visible score/next/hold/game-over state, and restart. It runs without physics, audio, an editor, or an exported build. Packaging follows in Phase 24. The room/puzzle game uses glTF meshes, PBR materials, an HDRI, lights/shadows/SSAO/HDR, physics triggers, Lua contact logic, spatial audio, UI, save/load, and scene switching. Every named capability appears above; if implementation reveals a missing operation, add it to this checklist and test it before building an editor control for it.
 
 ## Release rules
 
