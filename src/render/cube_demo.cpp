@@ -690,11 +690,13 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
                         .setFormat(nvrhi::Format::R16_UINT).setOffset(0));
                 commands->setGraphicsState(cube_state);
                 for (const CubeInstance& cube : scene.cubes) {
+                    if (!cube.casts_shadows) continue;
                     const glm::mat4 mvp = light_matrix * cube_model(cube);
                     commands->setPushConstants(glm::value_ptr(mvp), sizeof(mvp));
                     commands->drawIndexed(nvrhi::DrawArguments().setVertexCount(36));
                 }
                 for (const auto& instance : scene.imported) {
+                    if (!instance.casts_shadows) continue;
                     const auto found = imported_.find(instance.asset.get());
                     if (found == imported_.end())
                         throw std::runtime_error("shadow caster mesh was not prepared");

@@ -46,6 +46,8 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 
 **Phase 16 status (2026-10-17):** Lua now sets SSAO quality (0–3), radius, and strength, with a disabled default and range validation. A depth-based full-screen pass writes the occlusion factor, and depth-aware filtering confines it near visible contacts. The source-authored contact fixture has on/off, low/high quality, and camera-shift cases. Lua integration checks settings and invalid values; Vulkan captures check contact darkening, distant pixels, halo limits, quality differences, and identical repeated frames. Interactive startup passed under Vulkan validation. This screen-space technique cannot account for hidden surfaces; performance tuning for high quality remains Phase 27 work.
 
+**Falling Blocks Lit visual follow-up (2026-10-17):** The game's previous 1.15-unit SSAO radius caused blocky halos around stacked and ghost pieces. The game now uses restrained SSAO plus directional shadow maps for actual colored tiles. Meshes expose a `casts_shadows` switch to source scenes and Lua; the game turns it off for HUD, border, and ghost cubes. A dropped-piece Vulkan capture checks that tile shadows remain visible without dark title or ghost artifacts. The feature scene checks the new Lua setting and invalid input.
+
 | Phase | Deliverable | Check before commit |
 | --- | --- | --- |
 | 0 | Restore this 3D brief, this roadmap, `AGENTS.md`, and project-local development skills. | Requirements for every item in README map to a phase; no 2D plan is presented as the goal. |

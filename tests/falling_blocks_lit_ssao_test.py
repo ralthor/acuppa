@@ -9,10 +9,10 @@ binary = Path(sys.argv[1]).resolve()
 project = Path(sys.argv[2]).resolve()
 
 
-def capture(scene, path):
+def capture(scene, path, *options):
     result = subprocess.run(
         [str(binary), "run", str(project), "--scene", scene, "--frames", "2",
-         "--capture", str(path)], capture_output=True, text=True, timeout=20,
+         "--capture", str(path), *options], capture_output=True, text=True, timeout=20,
     )
     assert result.returncode == 0 and "Validation Error" not in result.stderr, (
         result.stdout + result.stderr
@@ -31,16 +31,23 @@ with tempfile.TemporaryDirectory() as directory:
     root = Path(directory)
     enabled = capture("main", root / "ssao.ppm")
     disabled = capture("ssao_off", root / "off.ppm")
+    dropped = capture("main", root / "dropped.ppm", "--hold-key", "space")
     assert enabled != disabled, "SSAO made no visible change to the game"
-    assert color(enabled, 640, 185)[0] < color(disabled, 640, 185)[0] - 5, (
-        "active piece did not gain ambient contact shading"
-    )
     assert color(enabled, 500, 300)[0] < color(disabled, 500, 300)[0] - 10, (
-        "board edge did not gain ambient shading"
+        "board edge did not gain restrained ambient shading"
+    )
+    assert color(dropped, 640, 200)[0] < color(dropped, 640, 300)[0] - 12, (
+        "a colored tile did not cast a directional shadow on the board"
+    )
+    assert color(dropped, 540, 95)[0] >= 58, (
+        "the decorative title cast an unwanted shadow on the board"
+    )
+    assert color(dropped, 640, 560)[0] >= 54, (
+        "the ghost piece left a dark, blocky halo on the board"
     )
     for x, y in [(100, 100), (350, 300), (950, 300), (640, 350)]:
         assert color(enabled, x, y) == color(disabled, x, y), (
             "SSAO changed the background or unoccluded board"
         )
 
-print("Falling Blocks Lit SSAO darkened contacts and preserved distant pixels")
+print("Falling Blocks Lit kept short tile shadows without title or ghost artifacts")

@@ -21,7 +21,10 @@ return {
     assert(not pcall(threepoint.set_environment, "../outside.hdr"))
     assert(not pcall(threepoint.set_environment, "assets/test_gradient.hdr", math.huge))
     threepoint.set_environment(nil)
-    cube = threepoint.spawn({mesh = "builtin:cube", rotation = {0.3, 0, 0}})
+    assert(not pcall(threepoint.spawn, {mesh = "builtin:cube", casts_shadows = 1}))
+    cube = threepoint.spawn({mesh = "builtin:cube", rotation = {0.3, 0, 0},
+                             casts_shadows = false})
+    assert(not threepoint.component_get(cube, "mesh").casts_shadows)
     local entity = threepoint.entity_create("component fixture")
     assert(threepoint.entity_exists(entity))
     assert(threepoint.entity_name(entity) == "component fixture")
@@ -48,9 +51,13 @@ return {
     assert(threepoint.component_get(entity, "light").shadow_range == 12)
     threepoint.component_set(entity, "light", {shadows = false})
 
-    threepoint.component_set(entity, "mesh", {mesh = "builtin:cube", visible = false})
+    threepoint.component_set(entity, "mesh", {mesh = "builtin:cube", visible = false,
+                                               casts_shadows = false})
     threepoint.component_set(entity, "mesh", {visible = false})
     assert(not threepoint.component_get(entity, "mesh").visible)
+    assert(not threepoint.component_get(entity, "mesh").casts_shadows)
+    assert(not pcall(threepoint.component_set, entity, "mesh", {casts_shadows = 1}))
+    assert(not threepoint.component_get(entity, "mesh").casts_shadows)
 
     threepoint.component_set(entity, "script", {path = "scripts/main.lua", enabled = false})
     threepoint.component_set(entity, "script", {enabled = true})

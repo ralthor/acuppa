@@ -6,7 +6,8 @@ local gravity, score, lines, level, paused
 
 local function block(x, y, z, sx, sy, sz)
   return tp.spawn({mesh = "builtin:cube", position = {x, y, z},
-                   scale = {sx or 0.46, sy or 0.46, sz or 0.38}})
+                   scale = {sx or 0.46, sy or 0.46, sz or 0.38},
+                   casts_shadows = false})
 end
 
 local function piece_block(kind, x, y, z, sx, sy, sz)
@@ -131,7 +132,7 @@ return {
     tp.set_camera({eye = {0, 0, 24}, target = {0, 0, 0}, fov = 60})
     tp.set_exposure(0.85)
     tp.set_environment("assets/studio.hdr", 0.7)
-    if tp.scene_name() ~= "ssao_off" then tp.set_ssao(2, 1.15, 0.6) end
+    if tp.scene_name() ~= "ssao_off" then tp.set_ssao(3, 0.65, 0.15) end
     rendered, status, message, previous, hold_time = {}, {}, {}, {}, {}
     local border = {}
     for y = 0, Board.height - 1 do

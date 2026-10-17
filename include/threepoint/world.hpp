@@ -37,6 +37,7 @@ struct LightComponent {
 struct MeshComponent {
     std::string mesh = "builtin:cube";
     bool visible = true;
+    bool casts_shadows = true;
 };
 
 struct ScriptComponent {

@@ -229,9 +229,10 @@ SceneFrame World::snapshot(const PerspectiveCamera& fallback_camera) const {
             const glm::mat4 parent = transform.parent
                 ? world_matrix(*transform.parent) : glm::mat4(1.0f);
             frame.cubes.push_back({id, transform.position, transform.rotation, transform.scale,
-                                   parent});
+                                   parent, entity.mesh->casts_shadows});
         } else if (entity.mesh && entity.mesh->visible) {
-            frame.imported.push_back({id, entity.mesh->mesh, world_matrix(id), {}});
+            frame.imported.push_back({id, entity.mesh->mesh, world_matrix(id), {},
+                                      entity.mesh->casts_shadows});
         }
     }
     return frame;

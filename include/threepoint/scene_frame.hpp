@@ -19,6 +19,7 @@ struct CubeInstance {
     glm::vec3 rotation{0.0f}; // Euler angles in radians, applied Y, X, then Z.
     glm::vec3 scale{1.0f};
     glm::mat4 parent_transform{1.0f};
+    bool casts_shadows = true;
 };
 
 struct ImportedInstance {
@@ -26,6 +27,7 @@ struct ImportedInstance {
     std::string source;
     glm::mat4 transform{1.0f};
     std::shared_ptr<const GltfAsset> asset;
+    bool casts_shadows = true;
 };
 
 struct LightInstance {

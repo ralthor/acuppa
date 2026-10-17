@@ -669,9 +669,10 @@ int LuaProject::Impl::spawn(lua_State* lua) {
         transform.position = vector_field(lua, 1, "position", glm::vec3(0), false);
         transform.rotation = vector_field(lua, 1, "rotation", glm::vec3(0), false);
         transform.scale = vector_field(lua, 1, "scale", glm::vec3(1), true);
+        const bool casts_shadows = optional_boolean(lua, 1, "casts_shadows", true);
         const EntityId id = state.world.create();
         state.world.set_transform(id, transform);
-        state.world.set_mesh(id, {mesh, true});
+        state.world.set_mesh(id, {mesh, true, casts_shadows});
         lua_pushinteger(lua, lua_Integer(id));
     } catch (const std::exception& error) {
         return luaL_error(lua, "%s", error.what());
@@ -946,6 +947,7 @@ int LuaProject::Impl::component_set(lua_State* lua) {
             }
             lua_pop(lua, 1);
             value.visible = optional_boolean(lua, 3, "visible", value.visible);
+            value.casts_shadows = optional_boolean(lua, 3, "casts_shadows", value.casts_shadows);
             state.ensure_asset(value.mesh);
             state.world.set_mesh(id, value);
         } else if (std::strcmp(kind, "script") == 0) {
@@ -1017,9 +1019,10 @@ int LuaProject::Impl::component_get(lua_State* lua) {
         } else if (std::strcmp(kind, "mesh") == 0) {
             const auto value = world.mesh(id);
             if (!value) { lua_pushnil(lua); return 1; }
-            lua_createtable(lua, 0, 2);
+            lua_createtable(lua, 0, 3);
             lua_pushstring(lua, value->mesh.c_str()); lua_setfield(lua, -2, "mesh");
             lua_pushboolean(lua, value->visible); lua_setfield(lua, -2, "visible");
+            lua_pushboolean(lua, value->casts_shadows); lua_setfield(lua, -2, "casts_shadows");
         } else if (std::strcmp(kind, "script") == 0) {
             const auto value = world.script(id);
             if (!value) { lua_pushnil(lua); return 1; }

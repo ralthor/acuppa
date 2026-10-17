@@ -30,11 +30,17 @@ int main(int argc, char* argv[]) {
     if (argc != 2) throw std::runtime_error("lit game path required");
     threepoint::LuaProject game(argv[1]);
     auto frame = game.step(0);
-    expect(frame.environment && frame.lights.size() == 1 &&
+    expect(frame.environment && frame.lights.size() == 1 && frame.lights[0].shadows &&
+           std::abs(frame.lights[0].shadow_range - 11.0f) < 0.001f &&
            std::abs(frame.exposure - 0.85f) < 0.001f &&
-           frame.ssao_quality == 2 && std::abs(frame.ssao_radius - 1.15f) < 0.001f &&
-           std::abs(frame.ssao_strength - 0.6f) < 0.001f,
-           "copied game did not configure the HDRI, exposure, light, and SSAO");
+           frame.ssao_quality == 3 && std::abs(frame.ssao_radius - 0.65f) < 0.001f &&
+           std::abs(frame.ssao_strength - 0.15f) < 0.001f,
+           "copied game did not configure the HDRI, exposure, shadows, and SSAO");
+    for (const auto& cube : frame.cubes)
+        expect(!cube.casts_shadows, "HUD, border, or ghost cube casts a board shadow");
+    for (const auto& mesh : frame.imported)
+        if (mesh.source != "assets/panel.gltf")
+            expect(mesh.casts_shadows, "colored tile stopped casting shadows");
     threepoint::LuaProject unoccluded(argv[1], "ssao_off");
     expect(unoccluded.step(0).ssao_quality == 0,
            "game's SSAO comparison scene did not disable the effect");
