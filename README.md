@@ -1,6 +1,6 @@
 # ThreePoint game engine
 
-**First release:** a 2D desktop engine with a code-first project format. Games use Lua for scenes, objects, behavior, UI, and settings. A small C++ runtime uses SDL3 for the window, input, graphics, and audio; CMake builds it. We will pin dependency versions when implementation starts. Lua is an established full programming language, so the work is to make the *engine API* complete enough to build whole games, not to invent a new language. ([Lua](https://www.lua.org/manual/), [SDL3](https://wiki.libsdl.org/SDL3/FrontPage), [CMake](https://cmake.org/cmake/help/latest/guide/tutorial/))
+**First release:** a 2D desktop engine with a code-first project format. Games use Lua for scenes, objects, behavior, UI, and settings. A small C++ runtime uses SDL3 for the window, input, graphics, and audio; CMake builds it. The local setup pins dependency versions. Lua is an established full programming language, so the work is to make the *engine API* complete enough to build whole games, not to invent a new language. ([Lua](https://www.lua.org/manual/), [SDL3](https://wiki.libsdl.org/SDL3/FrontPage), [CMake](https://cmake.org/cmake/help/latest/guide/tutorial/))
 
 **Rule for every milestone:** a game must be runnable from source with `threepoint run path/to/game`. Structured scenes live in readable Lua tables, with handwritten behavior in separate Lua files. The editor can change those tables, but must never hold game data that scripts cannot express.
 
@@ -96,7 +96,7 @@ The editor will also offer a source view for behavior scripts. Its visual contro
 
 ### Lua API checklist for the first 2D release
 
-Each row is a planned capability, implemented in later phases. The lifecycle callbacks are available as of Phase 4; the `threepoint` Lua module and its functions are still planned. An API is complete only when it has an example and a test. Functions use the `tp` value returned by `require("threepoint")`.
+Each row is a planned capability, implemented in phases. Lifecycle, basic drawing, camera, and quit are available as of Phase 5; other functions are still planned. An API is complete only when it has an example and a test. Functions use the `tp` value returned by `require("threepoint")`.
 
 | Capability | Planned Lua surface |
 | --- | --- |
@@ -237,6 +237,33 @@ python3 tests/cli_test.py build/threepoint
 
 ## Phase 4: Lua lifecycle
 
-`threepoint run <directory>` now executes the first scene's script and calls its optional `start()`, `fixed_update(dt)`, `update(dt)`, and `draw()` functions in that order. A script returns a table containing whichever callbacks it needs. `fixed_update` and `update` each receive `dt = 1/60` seconds. This phase runs one simulated tick and one frame, then exits; the continuous timed loop and window arrive in Phase 5. Lua runtime errors show the script file, line, and traceback. A callback field that is present must be a function.
+Phase 4 introduced execution of a scene script's optional `start()`, `fixed_update(dt)`, `update(dt)`, and `draw()` functions. A script returns a table containing whichever callbacks it needs. Its initial runner used one simulated tick and frame; Phase 5 replaces that with a timed loop. Lua runtime errors show the script file, line, and traceback. A callback field that is present must be a function.
 
-**Step 4 check:** `python3 tests/cli_test.py build/threepoint` confirms callback order and `dt`, runs the generated `start`, and checks syntax errors, callback runtime errors, and invalid callback fields. No graphics or input are active yet.
+**Step 4 check:** `python3 tests/cli_test.py build/threepoint` confirms callback execution and `dt`, and checks syntax errors, callback runtime errors, and invalid callback fields.
+
+## Phase 5: window, timing, and drawing
+
+`threepoint run <directory>` now opens an SDL3 window and keeps running until the user closes it or Lua calls `tp.app.quit()`. `start()` runs once; `fixed_update(1/60)` runs on a fixed clock; `update(dt)` receives the measured frame time in seconds (capped at 0.25); and `draw()` renders each frame. The renderer targets about 60 frames per second. Scene `background` accepts `#RRGGBB` or `#RRGGBBAA`.
+
+The first implemented `require("threepoint")` functions are:
+
+| Lua call | Effect |
+| --- | --- |
+| `tp.draw.rect(x, y, width, height, color)` | Filled rectangle. |
+| `tp.draw.circle(x, y, radius, color)` | Filled circle. |
+| `tp.draw.line(x1, y1, x2, y2, color)` | One-pixel line. |
+| `tp.draw.text(text, x, y, color)` | Built-in 8-pixel ASCII text; file fonts and wider character support come in Phase 9. |
+| `tp.camera.set(x, y, zoom)` | Set the world position at the window's top-left and a positive zoom. |
+| `tp.camera.to_world(screen_x, screen_y)` | Return the corresponding world `x, y`. |
+| `tp.app.quit()` | End the game loop cleanly. |
+
+Drawing calls belong in `draw()`. Coordinates are world pixels and colors use `#RRGGBB` or `#RRGGBBAA`. The generated project itself is a Lua-only example: its rectangle and `ThreePoint` label move across the window. From the repository root, create and run a new copy with:
+
+```sh
+./build/threepoint init demo-game
+./build/threepoint run demo-game
+```
+
+Close the window to stop it. `init` only accepts a directory that does not yet exist. The scene's static `entities` and `ui` tables are still validated but are not drawn yet; later phases add automatic entity and UI rendering. [SDL's built-in debug text](https://wiki.libsdl.org/SDL3/SDL_RenderDebugText) is deliberately small and ASCII-only at this stage.
+
+**Step 5 check:** `python3 tests/cli_test.py build/threepoint` and `python3 tests/graphics_test.py build/threepoint` pass. The graphics check uses SDL's dummy video driver to save frames, then verifies the Lua rectangle moves and text, line, and circle draw actual pixels. No visual editor interaction is needed.
