@@ -46,3 +46,9 @@ We're building a production-grade, simple and straight-forward 3D Game Engine fo
 ## Implementation plan
 
 The requirements above are the source of truth. [PLAN.md](PLAN.md) maps each requirement to small, testable phases and records the current state. The existing SDL3/Lua program is a 2D prototype; it does not satisfy the 3D renderer or physics requirements. The first visible 3D demo is planned for Phase 3, and the first Lua-authored 3D demo for Phase 4.
+
+## Current implementation
+
+Phase 1's C++ static core, separate runtime/editor targets, source-only feature-scene skeleton, dependency record, and three-platform CI workflow are in the repository. The new executables currently check a project's `game.lua` entry point; they do not run or edit a 3D game yet. The old 2D SDL3/Lua program is available as the optional `threepoint-2d-prototype` target. Local core and prototype tests pass; Phase 1's Windows, macOS, and Ubuntu CI gate remains unverified until the workflow runs.
+
+On this Ubuntu development machine, `bash scripts/bootstrap-local.sh` builds both targets and runs all available tests. The new CLI check is `build/threepoint --check-project tests/feature_scene`. Future games will be created and run from source files, with no required editor clicks.

@@ -10,7 +10,9 @@ The core will be a C++ static library with separate game runtime and editor exec
 
 ## Small, testable phases
 
-Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implementation phase adds relevant unit or integration tests, runs them, and extends that scene for each new component and Lua API. Never claim a phase complete until its check passes. Keep the feature scene runnable from source and, once export exists, from a packaged build.
+Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implementation phase adds relevant unit or integration tests, runs them, and extends that scene for each new component and Lua API. Never claim a phase complete until its check passes. Keep the feature scene runnable from source once the 3D Lua runtime exists and, once export exists, from a packaged build.
+
+**Phase 1 status (2026-10-17):** The static core, separate runtime/editor targets, optional legacy prototype, source-only feature-scene skeleton, dependency record, and Windows/macOS/Ubuntu CI workflow are implemented. Local core and legacy checks pass. The phase gate remains open until all three CI jobs actually run; this repository has no Git remote configured, so those results are not available yet.
 
 | Phase | Deliverable | Check before commit |
 | --- | --- | --- |

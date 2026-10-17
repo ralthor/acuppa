@@ -40,6 +40,9 @@ ZIG_GLOBAL_CACHE_DIR="$tools_dir/zig-cache" "$tools_dir/venv/bin/cmake" --fresh 
   -DSDL3_DIR="$sysroot_dir/usr/lib/x86_64-linux-gnu/cmake/SDL3" \
   -DLUA_INCLUDE_DIR="$sysroot_dir/usr/include/lua5.4" \
   -DLUA_LIBRARY="$sysroot_dir/usr/lib/x86_64-linux-gnu/liblua5.4.so" \
-  -DLUA_MATH_LIBRARY=m
+  -DLUA_MATH_LIBRARY=m \
+  -DTHREEPOINT_BUILD_2D_PROTOTYPE=ON
 ZIG_GLOBAL_CACHE_DIR="$tools_dir/zig-cache" "$tools_dir/venv/bin/cmake" --build "$project_root/build"
 "$project_root/build/threepoint" --version
+ZIG_GLOBAL_CACHE_DIR="$tools_dir/zig-cache" "$tools_dir/venv/bin/ctest" \
+  --test-dir "$project_root/build" --output-on-failure
