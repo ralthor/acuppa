@@ -51,6 +51,8 @@ The requirements above are the source of truth. [PLAN.md](PLAN.md) maps each req
 
 Phases 10–12 provide a tested full match: a shuffled seven-piece queue, movement, wall kicks, hold, next/ghost previews, line clears, speed levels, visible score, pause, game over, and restart. Run `build/threepoint run games/falling_blocks` to play it now. The separate export/package step remains Phase 24.
 
+The separate [Falling Blocks Lit](games/falling_blocks_lit/README.md) copy applies the Phase 13–14 renderer to the same game. It uses source-generated glTF tiles with seven PBR colors, a dark board panel, a directional light, and a checked-in studio HDRI. Run `build/threepoint run games/falling_blocks_lit` to compare it with the original; both projects run directly from source without editor interaction. The art generator and rendered assets are in the copied project.
+
 ## Current implementation
 
 **Platform scope update (2026-10-17):** The current target is Linux (Ubuntu 24+). Windows and macOS are no longer implementation or release gates, per the latest project direction. The original brief above is retained as supplied; this update supersedes only its platform list.
