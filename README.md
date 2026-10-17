@@ -207,3 +207,17 @@ return {
 **Gap record:** Both sketches use only names in the checklist, so they reveal no missing Lua capability for these two games. They do expose required implementation details: collision normals for Pong; trigger overlaps, scene-scoped timers, and serializable save data for the adventure. The samples do **not** exercise file assets, text input, analog controller axes, camera conversion, or sprite clips; those need their own API examples and tests before release. If a later game needs another capability, add it to this checklist and supply a code-only example before implementing an editor control for it.
 
 **Phase 1 check:** project files, command names, callbacks, and API names are defined here; both sample sketches use only those names; the unproven API areas are recorded above. No runtime behavior is claimed until later phases implement and test it.
+
+## Phase 2: build bootstrap
+
+The repository now has a minimal C++ executable that opens a Lua state and reads the linked SDL3 version. It does not open a game window yet. This verifies the compiler, CMake build, headers, and both libraries before runtime work begins.
+
+On this Ubuntu 26.04 x86-64 machine, administrator access is unavailable to unattended commands. The tested setup keeps tools under ignored `.tools/` and build output under ignored `build/`:
+
+```sh
+bash scripts/bootstrap-local.sh
+```
+
+The script needs `uv`, `apt-get`, and `dpkg-deb` on the machine. It pins Zig 0.17.0 as the local C++ compiler, CMake 4.4.4, Ninja 1.13.2, Ubuntu SDL3 3.4.2, and Lua 5.4.8. It downloads the SDL3 and Lua development packages without installing them system-wide, then configures, builds, and runs the executable. Internet access is needed the first time. On a machine with administrator access, the conventional alternative is to install `build-essential`, `cmake`, `ninja-build`, `libsdl3-dev`, and `liblua5.4-dev` with the system package manager, then run `cmake -S . -B build -G Ninja` and `cmake --build build`.
+
+**Step 2 check passed here:** `bash scripts/bootstrap-local.sh` completed and printed `ThreePoint bootstrap: SDL 3.4.2, Lua 5.4`. Window creation, input, and game commands remain for later steps.
