@@ -10,7 +10,7 @@ This is the source-only project used for integration checks. It runs in the 3D r
 | Lua 3D callbacks and source scene | 4 | `game.lua`, `scenes/main.scene.lua`, `scripts/main.lua`: spawn, rotate, time, fixed/update/draw | `lua_scene_logic`, `lua_scene_capture`; invalid API and path cases | Local covered; hosted CI pending |
 | Keyboard, mouse, controller, screen ray | 5 | `game.lua` named actions; `scripts/main.lua` turns cube, moves camera, reads pointer ray | `input_actions_and_ray`, `lua_scene_logic` injected events, `input_scene_capture` GPU comparison | Local covered; physical controller and hosted CI pending |
 | Entity IDs, transform parenting, camera, light, mesh, script components | 6 | `scripts/main.lua` creates, changes, reads, removes every component; camera and ray use active component | `world_components`, `lua_scene_logic`, `lua_component_errors`; prior GPU captures | Local covered; lighting and per-entity script execution arrive in later phases |
-| Prefabs, spawn/destroy, scene switching | 7 | Pending | Pending | Pending |
+| Source scenes, named parents, prefabs, per-entity scripts, reload/switch | 7 | `scenes/alternate.scene.lua`, `prefabs/probe.prefab.lua`, `scripts/actor.lua`, `scripts/alternate.lua` | `source_scene_and_prefabs` checks callbacks, override, rollback, reload, switch, invalid source | Local covered; hosted CI pending |
 | glTF meshes and scene hierarchy | 8 | Pending | Pending | Pending |
 | Textures, materials, direct-light PBR | 9 | Pending | Pending | Pending |
 | HDR target, exposure, tonemapping | 10 | Pending | Pending | Pending |

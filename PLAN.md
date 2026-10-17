@@ -24,6 +24,8 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 
 **Phase 6 status (2026-10-17):** The core World owns monotonic entity IDs and transform, perspective camera, light, cube mesh, and script components. Lua can create, enumerate, name, and destroy entities, and add, change, read, and remove each component. Transform parenting rejects cycles and renders child cubes through parent transforms; an active camera component drives rendering and screen rays. The feature scene exercises every public operation, core tests cover lifecycle and invalid states, and Lua error tests cover bad component values. All fourteen local Release tests pass with Vulkan validation. Light components hold data for Phase 9 lighting; script components validate and hold project-local paths for Phase 7 per-entity execution. Source scene declarations and reusable prefabs are Phase 7. Hosted CI remains unverified without a Git remote.
 
+**Phase 7 status (2026-10-17):** `game.lua` maps scene and prefab names to project-local Lua files. Scene files declare a dense array of named entities and components, including parent names and per-entity scripts. Single-entity prefab files can be instantiated with component overrides. Lua can find entities by name, spawn/destroy prefabs, inspect the active scene, and request a deferred scene switch or reload. Scene changes rebuild the world from source and reset scene time; enabled per-entity scripts run `start`, `fixed_update`, `update`, and `draw` with their entity ID. A core integration test starts the alternate feature scene, checks per-entity callbacks, parent transforms, prefab overrides and rollback, reloads it, switches to the main scene, and rejects bad source declarations. All fifteen local Release tests pass with Vulkan validation. Hosted CI remains unverified without a Git remote. Prefabs currently describe one entity; multi-entity prefab composition and glTF nodes remain future capabilities.
+
 | Phase | Deliverable | Check before commit |
 | --- | --- | --- |
 | 0 | Restore this 3D brief, this roadmap, `AGENTS.md`, and project-local development skills. | Requirements for every item in README map to a phase; no 2D plan is presented as the goal. |
@@ -52,7 +54,7 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 | 23 | Build a small 3D room/puzzle game from Lua and source assets only. | It exercises glTF, PBR, HDRI, shadows, SSAO, physics, audio, UI, save/load, and export. |
 | 24 | Harden and release: automated feature-scene coverage audit, sanitizers, asset-failure cases, performance budgets, Linux packaging, and documentation. | Ubuntu 24+ release builds pass unit, integration, visual, packaged-game, and stability gates. |
 
-Phases 3–6 are locally complete: the engine can display a 3D cube, run a Lua-authored 3D scene, react to named input, and manage entities and components. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
+Phases 3–7 are locally complete: the engine can display a 3D cube, run Lua-authored 3D scenes, react to named input, manage entities and components, and reproduce worlds from source scene and prefab files. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
 
 | README requirement | Covered in phases |
 | --- | --- |

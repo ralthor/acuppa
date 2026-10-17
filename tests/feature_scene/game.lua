@@ -4,7 +4,8 @@ return {
   title = "ThreePoint Feature Scene",
   window = {width = 1280, height = 720},
   first_scene = "main",
-  scenes = {main = "scenes/main.scene.lua"},
+  scenes = {main = "scenes/main.scene.lua", alternate = "scenes/alternate.scene.lua"},
+  prefabs = {probe = "prefabs/probe.prefab.lua"},
   input = {
     turn = {keyboard = "space", gamepad_button = "a"},
     camera_right = {keyboard = "d", gamepad_axis = "right_x"},

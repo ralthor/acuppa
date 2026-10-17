@@ -12,7 +12,9 @@ extern "C" {
 #include <cmath>
 #include <cstring>
 #include <iterator>
+#include <map>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -21,6 +23,7 @@ namespace threepoint {
 namespace fs = std::filesystem;
 
 struct LuaProject::Impl {
+    struct ScriptRefs;
     explicit Impl(const fs::path& directory);
     ~Impl() { if (lua) lua_close(lua); }
 
@@ -29,6 +32,13 @@ struct LuaProject::Impl {
     void load_table(const fs::path& file);
     void call(int reference, const char* name, double dt, bool pass_dt);
     void install_module();
+    void load_scene(const std::string& name);
+    EntityId instantiate(int table, const std::map<std::string, EntityId>& names = {});
+    void apply_components(EntityId id, int table, const std::map<std::string, EntityId>& names);
+    void sync_scripts();
+    void call_entity(int reference, const char* name, EntityId id, double dt, bool pass_dt);
+    void call_entity_scripts(int ScriptRefs::*reference, const char* name, double dt, bool pass_dt);
+    void clear_callbacks();
 
     static Impl& context(lua_State* lua) {
         return *static_cast<Impl*>(lua_touserdata(lua, lua_upvalueindex(1)));
@@ -50,6 +60,11 @@ struct LuaProject::Impl {
     static int component_set(lua_State* lua);
     static int component_get(lua_State* lua);
     static int component_remove(lua_State* lua);
+    static int entity_find(lua_State* lua);
+    static int prefab_spawn(lua_State* lua);
+    static int scene_name(lua_State* lua);
+    static int scene_switch(lua_State* lua);
+    static int scene_reload(lua_State* lua);
     static glm::vec3 vector_field(lua_State* lua, int table, const char* field,
                                   glm::vec3 fallback, bool positive);
     static glm::vec3 vector_arg(lua_State* lua, int index, bool positive);
@@ -65,6 +80,19 @@ struct LuaProject::Impl {
     int fixed_ref = LUA_NOREF;
     int update_ref = LUA_NOREF;
     int draw_ref = LUA_NOREF;
+    int component_set_ref = LUA_NOREF;
+    struct ScriptRefs {
+        std::string path;
+        int start = LUA_NOREF;
+        int fixed = LUA_NOREF;
+        int update = LUA_NOREF;
+        int draw = LUA_NOREF;
+    };
+    std::map<EntityId, ScriptRefs> scripts;
+    std::map<std::string, std::string> scenes;
+    std::map<std::string, std::string> prefabs;
+    std::string current_scene;
+    std::optional<std::string> pending_scene;
     SceneFrame frame;
     World world;
     InputState input;
@@ -153,6 +181,23 @@ int callback_ref(lua_State* lua, const char* name, bool required) {
     return luaL_ref(lua, LUA_REGISTRYINDEX);
 }
 
+void validate_entity_fields(lua_State* lua, int table) {
+    table = lua_absindex(lua, table);
+    lua_pushnil(lua);
+    while (lua_next(lua, table) != 0) {
+        if (lua_type(lua, -2) != LUA_TSTRING)
+            throw std::runtime_error("entity fields must be names");
+        const char* field = lua_tostring(lua, -2);
+        bool known = false;
+        for (const char* candidate : {"name", "prefab", "transform", "camera",
+                                      "light", "mesh", "script"}) {
+            if (std::strcmp(field, candidate) == 0) { known = true; break; }
+        }
+        if (!known) throw std::runtime_error("unknown entity field: " + std::string(field));
+        lua_pop(lua, 1);
+    }
+}
+
 }  // namespace
 
 LuaProject::Impl::Impl(const fs::path& directory) {
@@ -173,7 +218,27 @@ LuaProject::Impl::Impl(const fs::path& directory) {
     const std::string first_scene = checked_string(lua, -1, "first_scene");
     lua_getfield(lua, -1, "scenes");
     if (!lua_istable(lua, -1)) throw std::runtime_error("game.lua scenes must be a table");
-    const std::string scene_path = checked_string(lua, -1, first_scene.c_str());
+    lua_pushnil(lua);
+    while (lua_next(lua, -2) != 0) {
+        if (lua_type(lua, -2) != LUA_TSTRING || lua_type(lua, -1) != LUA_TSTRING)
+            throw std::runtime_error("game.lua scenes must map names to paths");
+        scenes.emplace(lua_tostring(lua, -2), lua_tostring(lua, -1));
+        lua_pop(lua, 1);
+    }
+    lua_pop(lua, 1);
+    if (scenes.find(first_scene) == scenes.end())
+        throw std::runtime_error("unknown first scene: " + first_scene);
+    lua_getfield(lua, -1, "prefabs");
+    if (!lua_isnil(lua, -1)) {
+        if (!lua_istable(lua, -1)) throw std::runtime_error("game.lua prefabs must be a table");
+        lua_pushnil(lua);
+        while (lua_next(lua, -2) != 0) {
+            if (lua_type(lua, -2) != LUA_TSTRING || lua_type(lua, -1) != LUA_TSTRING)
+                throw std::runtime_error("game.lua prefabs must map names to paths");
+            prefabs.emplace(lua_tostring(lua, -2), lua_tostring(lua, -1));
+            lua_pop(lua, 1);
+        }
+    }
     lua_pop(lua, 1);
 
     lua_getfield(lua, -1, "input");
@@ -221,26 +286,7 @@ LuaProject::Impl::Impl(const fs::path& directory) {
     }
     lua_pop(lua, 2);
 
-    load_table(project_file(scene_path));
-    lua_getfield(lua, -1, "entities");
-    if (!lua_istable(lua, -1)) throw std::runtime_error("scene entities must be a table");
-    lua_pushnil(lua);
-    const bool has_entities = lua_next(lua, -2) != 0;
-    if (has_entities) lua_pop(lua, 2);
-    lua_pop(lua, 1);
-    if (has_entities) {
-        throw std::runtime_error("source scene entity declarations arrive in Phase 6; "
-                                 "create cubes in start() for now");
-    }
-    const std::string script_path = checked_string(lua, -1, "script");
-    lua_pop(lua, 1);
-    load_table(project_file(script_path));
-    start_ref = callback_ref(lua, "start", true);
-    fixed_ref = callback_ref(lua, "fixed_update", true);
-    update_ref = callback_ref(lua, "update", true);
-    draw_ref = callback_ref(lua, "draw", false);
-    lua_pop(lua, 1);
-    call(start_ref, "start", 0.0, false);
+    load_scene(first_scene);
     guard.release();
 }
 
@@ -285,6 +331,209 @@ void LuaProject::Impl::call(int reference, const char* name, double dt, bool pas
     }
 }
 
+void LuaProject::Impl::clear_callbacks() {
+    for (int* reference : {&start_ref, &fixed_ref, &update_ref, &draw_ref}) {
+        if (*reference != LUA_NOREF) luaL_unref(lua, LUA_REGISTRYINDEX, *reference);
+        *reference = LUA_NOREF;
+    }
+    for (auto& [_, refs] : scripts) {
+        for (int reference : {refs.start, refs.fixed, refs.update, refs.draw}) {
+            if (reference != LUA_NOREF) luaL_unref(lua, LUA_REGISTRYINDEX, reference);
+        }
+    }
+    scripts.clear();
+}
+
+void LuaProject::Impl::apply_components(EntityId id, int table,
+                                         const std::map<std::string, EntityId>& names) {
+    table = lua_absindex(lua, table);
+    validate_entity_fields(lua, table);
+    lua_getfield(lua, table, "prefab");
+    if (!lua_isnil(lua, -1)) {
+        if (lua_type(lua, -1) != LUA_TSTRING)
+            throw std::runtime_error("entity prefab must be a name");
+        const std::string name = lua_tostring(lua, -1);
+        const auto found = prefabs.find(name);
+        if (found == prefabs.end()) throw std::runtime_error("unknown prefab: " + name);
+        lua_pop(lua, 1);
+        load_table(project_file(found->second));
+        lua_getfield(lua, -1, "prefab");
+        const bool nested = !lua_isnil(lua, -1);
+        lua_pop(lua, 1);
+        if (nested) throw std::runtime_error("nested prefabs are not supported: " + name);
+        apply_components(id, -1, names);
+        lua_pop(lua, 1);
+    } else {
+        lua_pop(lua, 1);
+    }
+    lua_getfield(lua, table, "name");
+    if (!lua_isnil(lua, -1)) {
+        if (lua_type(lua, -1) != LUA_TSTRING)
+            throw std::runtime_error("entity name must be a string");
+        world.set_name(id, lua_tostring(lua, -1));
+    }
+    lua_pop(lua, 1);
+    for (const char* kind : {"transform", "camera", "light", "mesh", "script"}) {
+        lua_getfield(lua, table, kind);
+        if (lua_isnil(lua, -1)) { lua_pop(lua, 1); continue; }
+        if (!lua_istable(lua, -1))
+            throw std::runtime_error(std::string("entity ") + kind + " must be a table");
+        if (std::strcmp(kind, "transform") == 0) {
+            lua_getfield(lua, -1, "parent");
+            if (lua_type(lua, -1) == LUA_TSTRING) {
+                const std::string parent_name = lua_tostring(lua, -1);
+                const auto parent = names.find(parent_name);
+                if (parent == names.end())
+                    throw std::runtime_error("unknown parent entity: " + parent_name);
+                lua_pop(lua, 1);
+                lua_pushinteger(lua, lua_Integer(parent->second));
+                lua_setfield(lua, -2, "parent");
+            } else {
+                lua_pop(lua, 1);
+            }
+        }
+        lua_rawgeti(lua, LUA_REGISTRYINDEX, component_set_ref);
+        lua_pushinteger(lua, lua_Integer(id));
+        lua_pushstring(lua, kind);
+        lua_pushvalue(lua, -4);
+        if (lua_pcall(lua, 3, 0, 0) != LUA_OK) {
+            const std::string error = lua_tostring(lua, -1);
+            lua_pop(lua, 2);
+            throw std::runtime_error(std::string("entity ") + kind + ": " + error);
+        }
+        lua_pop(lua, 1);
+    }
+}
+
+EntityId LuaProject::Impl::instantiate(int table,
+                                        const std::map<std::string, EntityId>& names) {
+    table = lua_absindex(lua, table);
+    lua_getfield(lua, table, "name");
+    if (!lua_isnil(lua, -1) && lua_type(lua, -1) != LUA_TSTRING)
+        throw std::runtime_error("entity name must be a string");
+    const std::string name = lua_isnil(lua, -1) ? "" : lua_tostring(lua, -1);
+    lua_pop(lua, 1);
+    const EntityId id = world.create(name);
+    try {
+        apply_components(id, table, names);
+    } catch (...) {
+        world.destroy(id);
+        throw;
+    }
+    return id;
+}
+
+void LuaProject::Impl::load_scene(const std::string& name) {
+    const auto found = scenes.find(name);
+    if (found == scenes.end()) throw std::runtime_error("unknown scene: " + name);
+    clear_callbacks();
+    world = World{};
+    current_scene = name;
+    time_seconds = 0.0;
+    fixed_accumulator = 0.0;
+    load_table(project_file(found->second));
+    lua_getfield(lua, -1, "entities");
+    if (!lua_istable(lua, -1)) throw std::runtime_error("scene entities must be a table");
+    const size_t count = lua_rawlen(lua, -1);
+    size_t entries = 0;
+    lua_pushnil(lua);
+    while (lua_next(lua, -2) != 0) {
+        if (!lua_isinteger(lua, -2) || lua_tointeger(lua, -2) < 1 ||
+            size_t(lua_tointeger(lua, -2)) > count)
+            throw std::runtime_error("scene entities must be a dense array");
+        ++entries;
+        lua_pop(lua, 1);
+    }
+    if (entries != count) throw std::runtime_error("scene entities must be a dense array");
+    std::map<std::string, EntityId> names;
+    std::vector<EntityId> ids;
+    ids.reserve(count);
+    for (size_t i = 1; i <= count; ++i) {
+        lua_rawgeti(lua, -1, lua_Integer(i));
+        if (!lua_istable(lua, -1)) throw std::runtime_error("scene entity must be a table");
+        lua_getfield(lua, -1, "name");
+        if (!lua_isnil(lua, -1) && lua_type(lua, -1) != LUA_TSTRING)
+            throw std::runtime_error("scene entity name must be a string");
+        const std::string entity_name = lua_isnil(lua, -1) ? "" : lua_tostring(lua, -1);
+        lua_pop(lua, 1);
+        const EntityId id = world.create(entity_name);
+        if (!entity_name.empty() && !names.emplace(entity_name, id).second)
+            throw std::runtime_error("duplicate scene entity name: " + entity_name);
+        ids.push_back(id);
+        lua_pop(lua, 1);
+    }
+    for (size_t i = 1; i <= count; ++i) {
+        lua_rawgeti(lua, -1, lua_Integer(i));
+        apply_components(ids[i - 1], -1, names);
+        lua_pop(lua, 1);
+    }
+    lua_pop(lua, 1);
+    const std::string script_path = checked_string(lua, -1, "script");
+    lua_pop(lua, 1);
+    load_table(project_file(script_path));
+    start_ref = callback_ref(lua, "start", true);
+    fixed_ref = callback_ref(lua, "fixed_update", true);
+    update_ref = callback_ref(lua, "update", true);
+    draw_ref = callback_ref(lua, "draw", false);
+    lua_pop(lua, 1);
+    call(start_ref, "start", 0.0, false);
+    sync_scripts();
+}
+
+void LuaProject::Impl::call_entity(int reference, const char* name, EntityId id,
+                                    double dt, bool pass_dt) {
+    if (reference == LUA_NOREF) return;
+    lua_rawgeti(lua, LUA_REGISTRYINDEX, reference);
+    lua_pushinteger(lua, lua_Integer(id));
+    if (pass_dt) lua_pushnumber(lua, dt);
+    if (lua_pcall(lua, pass_dt ? 2 : 1, 0, 0) != LUA_OK) {
+        const std::string error = lua_tostring(lua, -1);
+        lua_pop(lua, 1);
+        throw std::runtime_error("entity " + std::to_string(id) + " Lua " + name + "(): " + error);
+    }
+}
+
+void LuaProject::Impl::sync_scripts() {
+    for (auto it = scripts.begin(); it != scripts.end();) {
+        const auto component = world.exists(it->first) ? world.script(it->first) : std::nullopt;
+        if (component && component->enabled && component->path == it->second.path) {
+            ++it;
+            continue;
+        }
+        for (int reference : {it->second.start, it->second.fixed,
+                              it->second.update, it->second.draw}) {
+            if (reference != LUA_NOREF) luaL_unref(lua, LUA_REGISTRYINDEX, reference);
+        }
+        it = scripts.erase(it);
+    }
+    for (const EntityId id : world.entities()) {
+        if (!world.exists(id)) continue;
+        const auto component = world.script(id);
+        if (!component || !component->enabled || scripts.count(id)) continue;
+        load_table(project_file(component->path));
+        ScriptRefs refs;
+        refs.path = component->path;
+        refs.start = callback_ref(lua, "start", false);
+        refs.fixed = callback_ref(lua, "fixed_update", false);
+        refs.update = callback_ref(lua, "update", false);
+        refs.draw = callback_ref(lua, "draw", false);
+        lua_pop(lua, 1);
+        scripts.emplace(id, refs);
+        call_entity(refs.start, "start", id, 0.0, false);
+    }
+}
+
+void LuaProject::Impl::call_entity_scripts(int ScriptRefs::*reference, const char* name,
+                                            double dt, bool pass_dt) {
+    for (const EntityId id : world.entities()) {
+        if (!world.exists(id)) continue;
+        const auto component = world.script(id);
+        const auto it = scripts.find(id);
+        if (component && component->enabled && it != scripts.end())
+            call_entity(it->second.*reference, name, id, dt, pass_dt);
+    }
+}
+
 void LuaProject::Impl::install_module() {
     lua_getglobal(lua, "package");
     lua_getfield(lua, -1, "preload");
@@ -292,6 +541,9 @@ void LuaProject::Impl::install_module() {
     lua_pushcclosure(lua, &open_module, 1);
     lua_setfield(lua, -2, "threepoint");
     lua_pop(lua, 2);
+    lua_pushlightuserdata(lua, this);
+    lua_pushcclosure(lua, &component_set, 1);
+    component_set_ref = luaL_ref(lua, LUA_REGISTRYINDEX);
 }
 
 int LuaProject::Impl::open_module(lua_State* lua) {
@@ -318,6 +570,11 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("component_set", &component_set);
     add_function("component_get", &component_get);
     add_function("component_remove", &component_remove);
+    add_function("entity_find", &entity_find);
+    add_function("prefab_spawn", &prefab_spawn);
+    add_function("scene_name", &scene_name);
+    add_function("scene_switch", &scene_switch);
+    add_function("scene_reload", &scene_reload);
     return 1;
 }
 
@@ -677,6 +934,67 @@ int LuaProject::Impl::component_remove(lua_State* lua) {
     return 1;
 }
 
+int LuaProject::Impl::entity_find(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "entity_find() expects a name");
+    const char* name = luaL_checkstring(lua, 1);
+    const World& world = context(lua).world;
+    for (const EntityId id : world.entities()) {
+        if (world.name(id) == name) {
+            lua_pushinteger(lua, lua_Integer(id));
+            return 1;
+        }
+    }
+    lua_pushnil(lua);
+    return 1;
+}
+
+int LuaProject::Impl::prefab_spawn(lua_State* lua) {
+    if (lua_gettop(lua) < 1 || lua_gettop(lua) > 2)
+        return luaL_error(lua, "prefab_spawn() expects a name and optional overrides");
+    const char* name = luaL_checkstring(lua, 1);
+    if (lua_gettop(lua) == 2) luaL_checktype(lua, 2, LUA_TTABLE);
+    Impl& state = context(lua);
+    EntityId id = 0;
+    try {
+        const auto found = state.prefabs.find(name);
+        if (found == state.prefabs.end())
+            throw std::invalid_argument(std::string("unknown prefab: ") + name);
+        state.load_table(state.project_file(found->second));
+        id = state.instantiate(-1);
+        lua_pop(lua, 1);
+        if (lua_gettop(lua) == 2) state.apply_components(id, 2, {});
+        lua_pushinteger(lua, lua_Integer(id));
+        return 1;
+    } catch (const std::exception& error) {
+        if (id && state.world.exists(id)) state.world.destroy(id);
+        lua_pushstring(lua, error.what());
+    }
+    return lua_error(lua);
+}
+
+int LuaProject::Impl::scene_name(lua_State* lua) {
+    if (lua_gettop(lua) != 0) return luaL_error(lua, "scene_name() expects no arguments");
+    lua_pushstring(lua, context(lua).current_scene.c_str());
+    return 1;
+}
+
+int LuaProject::Impl::scene_switch(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "scene_switch() expects a name");
+    const char* name = luaL_checkstring(lua, 1);
+    Impl& state = context(lua);
+    if (state.scenes.find(name) == state.scenes.end())
+        return luaL_error(lua, "unknown scene: %s", name);
+    state.pending_scene = name;
+    return 0;
+}
+
+int LuaProject::Impl::scene_reload(lua_State* lua) {
+    if (lua_gettop(lua) != 0) return luaL_error(lua, "scene_reload() expects no arguments");
+    Impl& state = context(lua);
+    state.pending_scene = state.current_scene;
+    return 0;
+}
+
 SceneFrame LuaProject::Impl::step(double dt) {
     if (!std::isfinite(dt) || dt < 0.0 || dt > 0.25) {
         throw std::invalid_argument("frame delta must be finite and between 0 and 0.25 seconds");
@@ -690,14 +1008,32 @@ SceneFrame LuaProject::Impl::step(double dt) {
     time_seconds += dt;
     fixed_accumulator += dt;
     unsigned fixed_steps = 0;
-    while (fixed_accumulator + 1e-12 >= fixed_dt && fixed_steps < 8 && !wants_quit) {
+    sync_scripts();
+    while (fixed_accumulator + 1e-12 >= fixed_dt && fixed_steps < 8 &&
+           !wants_quit && !pending_scene) {
         call(fixed_ref, "fixed_update", fixed_dt, true);
+        sync_scripts();
+        if (!pending_scene && !wants_quit)
+            call_entity_scripts(&ScriptRefs::fixed, "fixed_update", fixed_dt, true);
         fixed_accumulator -= fixed_dt;
         ++fixed_steps;
     }
     if (fixed_steps == 8) fixed_accumulator = std::min(fixed_accumulator, fixed_dt);
-    if (!wants_quit) call(update_ref, "update", dt, true);
-    if (!wants_quit) call(draw_ref, "draw", 0.0, false);
+    if (!wants_quit && !pending_scene) call(update_ref, "update", dt, true);
+    if (!wants_quit && !pending_scene) {
+        sync_scripts();
+        call_entity_scripts(&ScriptRefs::update, "update", dt, true);
+    }
+    if (!wants_quit && !pending_scene) call(draw_ref, "draw", 0.0, false);
+    if (!wants_quit && !pending_scene) {
+        sync_scripts();
+        call_entity_scripts(&ScriptRefs::draw, "draw", 0.0, false);
+    }
+    if (pending_scene && !wants_quit) {
+        const std::string next = *pending_scene;
+        pending_scene.reset();
+        load_scene(next);
+    }
     SceneFrame scene = world.snapshot(frame.camera);
     scene.quit = wants_quit;
     return scene;

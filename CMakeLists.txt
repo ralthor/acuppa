@@ -100,6 +100,11 @@ if(BUILD_TESTING)
   add_executable(threepoint_world_test tests/world_test.cpp)
   target_link_libraries(threepoint_world_test PRIVATE threepoint_core)
   add_test(NAME world_components COMMAND threepoint_world_test)
+  add_executable(threepoint_scene_flow_test tests/scene_flow_test.cpp)
+  target_link_libraries(threepoint_scene_flow_test PRIVATE threepoint_core)
+  add_test(NAME source_scene_and_prefabs COMMAND threepoint_scene_flow_test
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene"
+           "${PROJECT_BINARY_DIR}/scene_flow_fixture")
   add_test(NAME core_project_check COMMAND threepoint_core_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   add_test(NAME runtime_project_check COMMAND threepoint --check-project

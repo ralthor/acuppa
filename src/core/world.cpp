@@ -58,6 +58,7 @@ const World::Entity& World::require(EntityId id) const {
 }
 
 const std::string& World::name(EntityId id) const { return require(id).name; }
+void World::set_name(EntityId id, std::string name) { require(id).name = std::move(name); }
 
 void World::set_transform(EntityId id, const TransformComponent& value) {
     if (!finite(value.position) || !finite(value.rotation) || !finite(value.scale) ||

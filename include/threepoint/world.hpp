@@ -49,6 +49,7 @@ public:
     bool exists(EntityId id) const;
     std::vector<EntityId> entities() const;
     const std::string& name(EntityId id) const;
+    void set_name(EntityId id, std::string name);
 
     void set_transform(EntityId id, const TransformComponent& value);
     void set_camera(EntityId id, const CameraComponent& value);
