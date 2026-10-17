@@ -37,6 +37,7 @@ struct LightInstance {
 
 struct SceneFrame {
     PerspectiveCamera camera;
+    float exposure = 1.0f;
     std::vector<CubeInstance> cubes;
     std::vector<ImportedInstance> imported;
     std::vector<LightInstance> lights;

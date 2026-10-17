@@ -40,8 +40,10 @@ with tempfile.TemporaryDirectory() as directory:
     later_pixels = load(later_path)
     early_center = pixel(first_pixels, 640, 360)
     late_center = pixel(later_pixels, 640, 360)
-    assert early_center[0] > 220 and early_center[1] < 130, early_center
-    assert late_center[0] > 220 and late_center[1] > 160, late_center
+    assert early_center[0] > early_center[1] + 25 > early_center[2] + 50, \
+        early_center
+    assert late_center[0] > 210 and late_center[1] > 200 and \
+        late_center[2] < 170, late_center
     assert first_pixels != later_pixels, "Lua rotation produced identical frames"
     assert pixel(first_pixels, 0, 0) == pixel(later_pixels, 0, 0)
 

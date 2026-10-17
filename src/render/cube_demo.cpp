@@ -5,6 +5,8 @@
 #include "cube_frag_spv.hpp"
 #include "pbr_vert_spv.hpp"
 #include "pbr_frag_spv.hpp"
+#include "tonemap_vert_spv.hpp"
+#include "tonemap_frag_spv.hpp"
 
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -154,6 +156,23 @@ CubeDemo::CubeDemo(nvrhi::IDevice* device) : device_(device) {
     require(pbr_input_layout_ && pbr_binding_layout_ && pbr_frame_buffer_ && pbr_sampler_,
             "create PBR input and material resources");
 
+    tonemap_vertex_shader_ = device_->createShader(
+        nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Vertex).setDebugName("tonemap vertex"),
+        tonemap_vert_spv, sizeof(tonemap_vert_spv));
+    tonemap_fragment_shader_ = device_->createShader(
+        nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Pixel).setDebugName("tonemap fragment"),
+        tonemap_frag_spv, sizeof(tonemap_frag_spv));
+    tonemap_binding_layout_ = device_->createBindingLayout(
+        nvrhi::BindingLayoutDesc().setVisibility(nvrhi::ShaderType::AllGraphics)
+            .setBindingOffsets(nvrhi::VulkanBindingOffsets().setSamplerOffset(0))
+            .addItem(nvrhi::BindingLayoutItem::PushConstants(0, sizeof(float)))
+            .addItem(nvrhi::BindingLayoutItem::Texture_SRV(0))
+            .addItem(nvrhi::BindingLayoutItem::Sampler(1)));
+    tonemap_sampler_ = device_->createSampler(nvrhi::SamplerDesc()
+        .setAllAddressModes(nvrhi::SamplerAddressMode::Clamp));
+    require(tonemap_vertex_shader_ && tonemap_fragment_shader_ && tonemap_binding_layout_ &&
+            tonemap_sampler_, "create tonemap resources");
+
     const CubeMesh mesh = make_cube();
     nvrhi::BufferDesc vertex_desc;
     vertex_desc.byteSize = mesh.vertices.size() * sizeof(Vertex);
@@ -290,9 +309,13 @@ void CubeDemo::prepare(const SceneFrame& scene) {
 
 void CubeDemo::release_size_dependent() {
     framebuffers_.clear();
+    hdr_framebuffer_ = nullptr;
+    tonemap_binding_set_ = nullptr;
     pipeline_ = nullptr;
     pbr_pipeline_ = nullptr;
+    tonemap_pipeline_ = nullptr;
     depth_ = nullptr;
+    hdr_color_ = nullptr;
 }
 
 void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t width,
@@ -310,13 +333,33 @@ void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t 
     depth_desc.enableAutomaticStateTracking(nvrhi::ResourceStates::DepthWrite);
     depth_ = device_->createTexture(depth_desc);
     require(depth_, "create cube depth image");
+    nvrhi::TextureDesc hdr_desc;
+    hdr_desc.width = width;
+    hdr_desc.height = height;
+    hdr_desc.format = nvrhi::Format::RGBA16_FLOAT;
+    hdr_desc.isShaderResource = true;
+    hdr_desc.isRenderTarget = true;
+    hdr_desc.debugName = "HDR scene color";
+    hdr_desc.enableAutomaticStateTracking(nvrhi::ResourceStates::RenderTarget);
+    hdr_color_ = device_->createTexture(hdr_desc);
+    require(hdr_color_, "create HDR scene image");
+    hdr_framebuffer_ = device_->createFramebuffer(
+        nvrhi::FramebufferDesc().addColorAttachment(hdr_color_).setDepthAttachment(depth_));
+    require(hdr_framebuffer_, "create HDR scene framebuffer");
     for (const auto& color : colors) {
         auto framebuffer = device_->createFramebuffer(
-            nvrhi::FramebufferDesc().addColorAttachment(color).setDepthAttachment(depth_));
-        require(framebuffer, "create cube framebuffer");
+            nvrhi::FramebufferDesc().addColorAttachment(color));
+        require(framebuffer, "create display framebuffer");
         framebuffers_.push_back(framebuffer);
     }
-    require(!framebuffers_.empty(), "create cube framebuffers");
+    require(!framebuffers_.empty(), "create display framebuffers");
+    tonemap_binding_set_ = device_->createBindingSet(
+        nvrhi::BindingSetDesc()
+            .addItem(nvrhi::BindingSetItem::PushConstants(0, sizeof(float)))
+            .addItem(nvrhi::BindingSetItem::Texture_SRV(0, hdr_color_))
+            .addItem(nvrhi::BindingSetItem::Sampler(1, tonemap_sampler_)),
+        tonemap_binding_layout_);
+    require(tonemap_binding_set_, "create tonemap binding set");
     nvrhi::GraphicsPipelineDesc pipeline_desc;
     pipeline_desc.setVertexShader(vertex_shader_).setFragmentShader(fragment_shader_)
         .setInputLayout(input_layout_).addBindingLayout(binding_layout_);
@@ -324,7 +367,7 @@ void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t 
         .setDepthFunc(nvrhi::ComparisonFunc::Less);
     pipeline_desc.renderState.rasterState.setCullNone().enableDepthClip();
     pipeline_ = device_->createGraphicsPipeline(
-        pipeline_desc, framebuffers_.front()->getFramebufferInfo());
+        pipeline_desc, hdr_framebuffer_->getFramebufferInfo());
     require(pipeline_, "create cube graphics pipeline");
     nvrhi::GraphicsPipelineDesc pbr_desc;
     pbr_desc.setVertexShader(pbr_vertex_shader_).setFragmentShader(pbr_fragment_shader_)
@@ -333,8 +376,16 @@ void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t 
         .setDepthFunc(nvrhi::ComparisonFunc::Less);
     pbr_desc.renderState.rasterState.setCullNone().enableDepthClip();
     pbr_pipeline_ = device_->createGraphicsPipeline(
-        pbr_desc, framebuffers_.front()->getFramebufferInfo());
+        pbr_desc, hdr_framebuffer_->getFramebufferInfo());
     require(pbr_pipeline_, "create PBR graphics pipeline");
+    nvrhi::GraphicsPipelineDesc tonemap_desc;
+    tonemap_desc.setVertexShader(tonemap_vertex_shader_)
+        .setFragmentShader(tonemap_fragment_shader_)
+        .addBindingLayout(tonemap_binding_layout_);
+    tonemap_desc.renderState.rasterState.setCullNone();
+    tonemap_pipeline_ = device_->createGraphicsPipeline(
+        tonemap_desc, framebuffers_.front()->getFramebufferInfo());
+    require(tonemap_pipeline_, "create tonemap graphics pipeline");
 }
 
 void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
@@ -342,11 +393,13 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
     if (image_index >= framebuffers_.size()) {
         throw std::runtime_error("invalid cube framebuffer index");
     }
+    commands->clearTextureFloat(hdr_color_, nvrhi::AllSubresources,
+                                nvrhi::Color(0.08f, 0.18f, 0.38f, 1.0f));
     commands->clearDepthStencilTexture(depth_, nvrhi::AllSubresources, true, 1.0f, false, 0);
     const glm::mat4 view_projection = scene.camera.view_projection(
         float(width_) / float(height_));
     nvrhi::GraphicsState state;
-    state.setPipeline(pipeline_).setFramebuffer(framebuffers_[image_index]);
+    state.setPipeline(pipeline_).setFramebuffer(hdr_framebuffer_);
     state.viewport.addViewportAndScissorRect(nvrhi::Viewport(float(width_), float(height_)));
     state.addBindingSet(binding_set_)
         .addVertexBuffer(nvrhi::VertexBufferBinding().setBuffer(vertices_).setSlot(0).setOffset(0))
@@ -387,7 +440,7 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
         if (found == imported_.end()) throw std::runtime_error("glTF mesh was not prepared");
         for (const auto& primitive : found->second.primitives) {
             nvrhi::GraphicsState imported_state;
-            imported_state.setPipeline(pbr_pipeline_).setFramebuffer(framebuffers_[image_index]);
+            imported_state.setPipeline(pbr_pipeline_).setFramebuffer(hdr_framebuffer_);
             imported_state.viewport.addViewportAndScissorRect(
                 nvrhi::Viewport(float(width_), float(height_)));
             imported_state.addBindingSet(primitive.binding_set)
@@ -402,6 +455,14 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
             commands->drawIndexed(nvrhi::DrawArguments().setVertexCount(primitive.index_count));
         }
     }
+    nvrhi::GraphicsState tonemap_state;
+    tonemap_state.setPipeline(tonemap_pipeline_).setFramebuffer(framebuffers_[image_index]);
+    tonemap_state.viewport.addViewportAndScissorRect(
+        nvrhi::Viewport(float(width_), float(height_)));
+    tonemap_state.addBindingSet(tonemap_binding_set_);
+    commands->setGraphicsState(tonemap_state);
+    commands->setPushConstants(&scene.exposure, sizeof(scene.exposure));
+    commands->draw(nvrhi::DrawArguments().setVertexCount(3));
 }
 
 }  // namespace threepoint

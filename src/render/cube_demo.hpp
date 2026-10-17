@@ -33,10 +33,15 @@ private:
     nvrhi::BindingSetHandle binding_set_;
     nvrhi::ShaderHandle pbr_vertex_shader_;
     nvrhi::ShaderHandle pbr_fragment_shader_;
+    nvrhi::ShaderHandle tonemap_vertex_shader_;
+    nvrhi::ShaderHandle tonemap_fragment_shader_;
     nvrhi::InputLayoutHandle pbr_input_layout_;
     nvrhi::BindingLayoutHandle pbr_binding_layout_;
+    nvrhi::BindingLayoutHandle tonemap_binding_layout_;
+    nvrhi::BindingSetHandle tonemap_binding_set_;
     nvrhi::BufferHandle pbr_frame_buffer_;
     nvrhi::SamplerHandle pbr_sampler_;
+    nvrhi::SamplerHandle tonemap_sampler_;
     nvrhi::TextureHandle white_texture_;
     nvrhi::BufferHandle vertices_;
     nvrhi::BufferHandle indices_;
@@ -55,8 +60,11 @@ private:
     };
     std::map<const GltfAsset*, GpuAsset> imported_;
     nvrhi::TextureHandle depth_;
+    nvrhi::TextureHandle hdr_color_;
     nvrhi::GraphicsPipelineHandle pipeline_;
     nvrhi::GraphicsPipelineHandle pbr_pipeline_;
+    nvrhi::GraphicsPipelineHandle tonemap_pipeline_;
+    nvrhi::FramebufferHandle hdr_framebuffer_;
     std::vector<nvrhi::FramebufferHandle> framebuffers_;
 };
 

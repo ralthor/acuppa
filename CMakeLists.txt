@@ -54,7 +54,7 @@ find_program(THREEPOINT_GLSLANG_VALIDATOR glslangValidator REQUIRED)
 find_library(THREEPOINT_VULKAN_LOADER NAMES vulkan REQUIRED)
 
 set(THREEPOINT_SHADER_HEADERS)
-foreach(shader IN ITEMS cube pbr)
+foreach(shader IN ITEMS cube pbr tonemap)
   foreach(stage IN ITEMS vert frag)
     set(shader_source "${PROJECT_SOURCE_DIR}/src/render/shaders/${shader}.${stage}")
     set(shader_binary "${PROJECT_BINARY_DIR}/shaders/${shader}.${stage}.spv")
@@ -166,6 +166,12 @@ if(BUILD_TESTING)
     add_test(NAME pbr_material_capture COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/pbr_material_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+    add_test(NAME hdr_exposure_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/hdr_exposure_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+    add_test(NAME hdr_live_startup COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene" "hdr")
   endif()
 endif()
 

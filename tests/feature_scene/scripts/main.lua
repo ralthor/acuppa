@@ -4,6 +4,10 @@ local cube
 
 return {
   start = function()
+    threepoint.set_exposure(1)
+    assert(not pcall(threepoint.set_exposure, 0))
+    assert(not pcall(threepoint.set_exposure, math.huge))
+    assert(not pcall(threepoint.set_exposure, "bright"))
     cube = threepoint.spawn({mesh = "builtin:cube", rotation = {0.3, 0, 0}})
     local entity = threepoint.entity_create("component fixture")
     assert(threepoint.entity_exists(entity))

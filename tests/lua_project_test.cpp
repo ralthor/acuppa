@@ -43,6 +43,11 @@ int main(int argc, char* argv[]) {
     project.inject({threepoint::InputDevice::GamepadButton, "a", 0.0f});
     expect(std::abs(project.step(0.0).cubes[0].rotation.y - 0.9f) < 0.001f,
            "released controls did not restore base rotation");
+    threepoint::LuaProject hdr(argv[1], "hdr");
+    threepoint::LuaProject hdr_dim(argv[1], "hdr_dim");
+    expect(std::abs(hdr.step(0.0).exposure - 1.0f) < 0.001f &&
+           std::abs(hdr_dim.step(0.0).exposure - 0.15f) < 0.001f,
+           "source-authored scene exposure did not reach the render frame");
     project.set_viewport(640, 360);
     expect(project.width() == 640 && project.height() == 360,
            "resize did not update Lua's screen-ray viewport");

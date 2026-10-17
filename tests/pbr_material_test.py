@@ -46,7 +46,7 @@ with tempfile.TemporaryDirectory() as directory:
         dark_energy = sum(sum(dark(xx, yy)) for xx in range(x - 45, x + 46, 5)
                           for yy in range(315, 406, 5))
         assert lit_energy > dark_energy * 4 + 2000, (x, lit_energy, dark_energy)
-    assert lit(370, 360)[0] > lit(370, 360)[1] * 3, \
+    assert lit(370, 360)[0] > lit(370, 360)[1] * 2, \
         "dielectric red sphere lost its base color"
     assert sum(lit(910, 360)) > sum(lit(640, 360)) * 2, \
         "rough metallic sphere should spread its highlight"

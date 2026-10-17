@@ -29,11 +29,13 @@ def pixel(pixels, x, y):
 
 
 def orange(rgb):
-    return rgb[0] > 220 and 60 < rgb[1] < 130 and rgb[2] < 80
+    return rgb[0] > 210 and rgb[0] > rgb[1] + 25 and \
+        rgb[1] > rgb[2] + 25 and rgb[2] < 170
 
 
 def yellow(rgb):
-    return rgb[0] > 220 and rgb[1] > 160 and rgb[2] < 90
+    return rgb[0] > 210 and rgb[1] > 200 and \
+        abs(rgb[0] - rgb[1]) < 25 and rgb[2] < 170
 
 
 with tempfile.TemporaryDirectory() as directory:
@@ -52,7 +54,7 @@ with tempfile.TemporaryDirectory() as directory:
     # The purple rear face is submitted after the orange front face. It must fail depth.
     assert orange(pixel(front, 480, 270)), pixel(front, 480, 270)
     assert any(
-        (rgb[2] > 220 and rgb[1] > 150 and rgb[0] < 100)
+        (rgb[2] > 220 and rgb[1] > 200 and rgb[0] < 170)
         for rgb in (pixel(front, x, y) for x in range(300, 660, 4)
                     for y in range(100, 240, 4))
     ), "top face did not appear"

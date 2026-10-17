@@ -54,6 +54,7 @@ struct LuaProject::Impl {
     static int pointer(lua_State* lua);
     static int ray(lua_State* lua);
     static int set_camera(lua_State* lua);
+    static int set_exposure(lua_State* lua);
     static int entity_create(lua_State* lua);
     static int entity_destroy(lua_State* lua);
     static int entity_exists(lua_State* lua);
@@ -354,6 +355,7 @@ std::shared_ptr<const GltfAsset> LuaProject::Impl::ensure_asset(const std::strin
 
 SceneFrame LuaProject::Impl::snapshot() {
     SceneFrame scene = world.snapshot(frame.camera);
+    scene.exposure = frame.exposure;
     for (auto& instance : scene.imported) instance.asset = ensure_asset(instance.source);
     return scene;
 }
@@ -455,6 +457,7 @@ void LuaProject::Impl::load_scene(const std::string& name) {
     if (found == scenes.end()) throw std::runtime_error("unknown scene: " + name);
     clear_callbacks();
     world = World{};
+    frame.exposure = 1.0f;
     current_scene = name;
     time_seconds = 0.0;
     fixed_accumulator = 0.0;
@@ -589,6 +592,7 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("pointer", &pointer);
     add_function("screen_ray", &ray);
     add_function("set_camera", &set_camera);
+    add_function("set_exposure", &set_exposure);
     add_function("entity_create", &entity_create);
     add_function("entity_destroy", &entity_destroy);
     add_function("entity_exists", &entity_exists);
@@ -749,6 +753,16 @@ int LuaProject::Impl::set_camera(lua_State* lua) {
     } catch (const std::invalid_argument& error) {
         return luaL_error(lua, "%s", error.what());
     }
+    return 0;
+}
+
+int LuaProject::Impl::set_exposure(lua_State* lua) {
+    if (lua_gettop(lua) != 1 || !lua_isnumber(lua, 1))
+        return luaL_error(lua, "set_exposure() expects one number");
+    const double exposure = lua_tonumber(lua, 1);
+    if (!std::isfinite(exposure) || exposure < 0.01 || exposure > 32.0)
+        return luaL_error(lua, "exposure must be finite and between 0.01 and 32");
+    context(lua).frame.exposure = float(exposure);
     return 0;
 }
 

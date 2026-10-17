@@ -38,6 +38,8 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 
 **Phase 12 status (2026-10-17):** The game now uses seeded shuffled seven-piece bags, wall kicks, one hold per piece, next and held previews, a ghost landing outline, and increasing fall speed every ten cleared lines. Source-authored 3D glyphs show score, lines, level, pause, game over, and a control guide. Rule tests cover bag completeness, repeatability, kicks, hold lockout, ghost positions, and level timing. The gameplay integration test runs to visible top-out, restarts, checks pause at 120 Hz, and compares 60/120 Hz gravity. GPU captures verify movement, drop, hold, and pause; live startup and all 23 local tests pass under Vulkan validation. The fixed game seed makes restarts reproducible; seven-bag order remains shuffled within each match. Export, sound, editor authoring, physics, and advanced rendering remain later phases.
 
+**Phase 13 status (2026-10-17):** Cube and PBR draws now share a 16-bit floating-point HDR color target with depth, followed by a fullscreen ACES-style tonemap and sRGB display pass. `tp.set_exposure(value)` changes exposure per scene (0.01–32, default 1); invalid values raise Lua errors. The feature scene has identical bright material scenes at two exposures. GPU pixel checks show exposure changes and recoverable gradients in highlights that would have clipped in an 8-bit target. Existing cube, Lua scene, glTF, game, and PBR visual checks were updated for the new output mapping and pass under Vulkan validation. HDRI lighting remains Phase 14.
+
 | Phase | Deliverable | Check before commit |
 | --- | --- | --- |
 | 0 | Restore this 3D brief, this roadmap, `AGENTS.md`, and project-local development skills. | Requirements for every item in README map to a phase; no 2D plan is presented as the goal. |
@@ -69,7 +71,7 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 | 26 | Build a small 3D room/puzzle game from Lua and source assets only. | It exercises glTF, PBR, HDRI, shadows, SSAO, physics, audio, UI, save/load, and export. |
 | 27 | Harden and release: automated feature-scene coverage audit, sanitizers, asset-failure cases, performance budgets, Linux packaging, and documentation. | Ubuntu 24+ release builds pass unit, integration, visual, packaged-game, and stability gates. |
 
-Phases 3–12 are locally complete: the engine can display a 3D cube, run Lua-authored 3D scenes, react to named input, manage entities and components, reproduce worlds from source scene and prefab files, render imported glTF geometry with direct-light PBR materials, and run a full falling-block match without editor action. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
+Phases 3–13 are locally complete: the engine can display a 3D cube, run Lua-authored 3D scenes, react to named input, manage entities and components, reproduce worlds from source scene and prefab files, render imported glTF geometry with direct-light PBR materials and an HDR tonemap, and run a full falling-block match without editor action. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
 
 | README requirement | Covered in phases |
 | --- | --- |
