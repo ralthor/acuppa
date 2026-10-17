@@ -12,7 +12,7 @@ This is the source-only project used for integration checks. It runs in the 3D r
 | Entity IDs, transform parenting, camera, light, mesh, script components | 6 | `scripts/main.lua` creates, changes, reads, removes every component; camera and ray use active component | `world_components`, `lua_scene_logic`, `lua_component_errors`; prior GPU captures | Local covered; lighting and per-entity script execution arrive in later phases |
 | Source scenes, named parents, prefabs, per-entity scripts, reload/switch | 7 | `scenes/alternate.scene.lua`, `prefabs/probe.prefab.lua`, `scripts/actor.lua`, `scripts/alternate.lua` | `source_scene_and_prefabs` checks callbacks, override, rollback, reload, switch, invalid source | Local covered; hosted CI pending |
 | glTF meshes and scene hierarchy | 8 | `assets/triangle.gltf`, external-buffer and GLB variants; `scenes/imported.scene.lua`, `scripts/imported.lua` | `gltf_geometry_and_errors` validates hierarchy, formats, failures; `gltf_scene_capture` verifies visible Vulkan pixels | Local covered for static triangles; hosted CI pending |
-| Textures, materials, direct-light PBR | 9 | Pending | Pending | Pending |
+| Textures, materials, direct-light PBR | 9 | `assets/material_quad.gltf` imports PNG pixels, UVs, normals, and material factors | `gltf_geometry_and_errors` covers import and invalid PNG; direct-light captures pending | Import checkpoint; renderer pending |
 | HDR target, exposure, tonemapping | 10 | Pending | Pending | Pending |
 | HDRI and image-based lighting | 11 | Pending | Pending | Pending |
 | Soft shadows | 12 | Pending | Pending | Pending |

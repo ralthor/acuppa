@@ -54,7 +54,6 @@ void require(bool ok, const char* action) {
 }  // namespace
 
 CubeDemo::CubeDemo(nvrhi::IDevice* device) : device_(device) {
-    static_assert(sizeof(Vertex) == sizeof(GltfVertex), "glTF vertex layout must match shader");
     vertex_shader_ = device_->createShader(
         nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Vertex).setDebugName("cube vertex"),
         cube_vert_spv, sizeof(cube_vert_spv));
@@ -114,10 +113,15 @@ void CubeDemo::prepare(const SceneFrame& scene) {
         require(upload, "create glTF upload command list");
         upload->open();
         for (const auto& primitive : instance.asset->primitives) {
+            std::vector<Vertex> vertices;
+            vertices.reserve(primitive.vertices.size());
+            for (const auto& vertex : primitive.vertices)
+                vertices.push_back({{vertex.position[0], vertex.position[1], vertex.position[2]},
+                                    {vertex.color[0], vertex.color[1], vertex.color[2]}});
             if (primitive.indices.size() > std::numeric_limits<uint32_t>::max())
                 throw std::runtime_error("glTF index count exceeds renderer limit");
             nvrhi::BufferDesc vertex_desc;
-            vertex_desc.byteSize = primitive.vertices.size() * sizeof(GltfVertex);
+            vertex_desc.byteSize = vertices.size() * sizeof(Vertex);
             vertex_desc.isVertexBuffer = true;
             vertex_desc.debugName = "glTF vertices";
             vertex_desc.enableAutomaticStateTracking(nvrhi::ResourceStates::Common);
@@ -132,7 +136,7 @@ void CubeDemo::prepare(const SceneFrame& scene) {
             part.index_count = uint32_t(primitive.indices.size());
             part.node_transform = primitive.node_transform;
             require(part.vertices && part.indices, "create glTF mesh buffers");
-            upload->writeBuffer(part.vertices, primitive.vertices.data(), vertex_desc.byteSize);
+            upload->writeBuffer(part.vertices, vertices.data(), vertex_desc.byteSize);
             upload->writeBuffer(part.indices, primitive.indices.data(), index_desc.byteSize);
             gpu.primitives.push_back(std::move(part));
         }

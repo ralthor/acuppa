@@ -33,6 +33,22 @@ int main(int argc, char* argv[]) {
            external.primitives[0].indices == triangle.indices &&
            binary.primitives[0].indices == triangle.indices,
            "external-buffer glTF or GLB geometry differs from embedded glTF");
+    const auto textured = threepoint::load_gltf(root, "assets/material_quad.gltf");
+    expect(textured.primitives.size() == 1 && textured.images.size() == 4,
+           "textured glTF material or images were not imported");
+    const auto& material = textured.primitives[0].material;
+    expect(std::abs(material.metallic - 0.5f) < 0.001f &&
+           std::abs(material.roughness - 0.4f) < 0.001f &&
+           material.base_color_image == 0 && material.metallic_roughness_image == 1 &&
+           material.normal_image == 2 && material.occlusion_image == 1 &&
+           material.emissive_image == 3,
+           "glTF PBR factors or texture bindings were lost");
+    expect(textured.images[0].width == 2 && textured.images[0].height == 2 &&
+           textured.images[0].rgba.size() == 16 && textured.images[0].rgba[0] == 255,
+           "PNG pixels were not decoded to RGBA");
+    expect(textured.primitives[0].vertices[0].normal[2] == 1.0f &&
+           textured.primitives[0].vertices[0].uv[1] == 1.0f,
+           "glTF normals or UVs were not imported");
 
     bool missing_rejected = false;
     try { threepoint::load_gltf(root, "assets/missing.gltf"); }
@@ -81,5 +97,21 @@ int main(int argc, char* argv[]) {
                                  std::string::npos;
     }
     expect(buffer_escape_rejected, "outside-project glTF buffer was accepted");
+
+    std::ifstream material_input(root / "assets/material_quad.gltf");
+    std::string invalid_image((std::istreambuf_iterator<char>(material_input)),
+                              std::istreambuf_iterator<char>());
+    const auto image_start = invalid_image.find("data:image/png;base64,");
+    expect(image_start != std::string::npos, "textured fixture format changed");
+    const auto image_end = invalid_image.find('"', image_start);
+    invalid_image.replace(image_start, image_end - image_start,
+                          "data:image/png;base64,AAAA");
+    std::ofstream(work / "assets/invalid_image.gltf") << invalid_image;
+    bool image_rejected = false;
+    try { threepoint::load_gltf(work, "assets/invalid_image.gltf"); }
+    catch (const std::runtime_error& error) {
+        image_rejected = std::string(error.what()).find("image 0") != std::string::npos;
+    }
+    expect(image_rejected, "invalid PNG was accepted");
     fs::remove_all(work);
 }

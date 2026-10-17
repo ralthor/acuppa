@@ -30,6 +30,11 @@ FetchContent_Declare(cgltf
   GIT_TAG 360db1a95480fe102ae9c69b27c5d101167ff5ba)
 FetchContent_MakeAvailable(cgltf)
 
+FetchContent_Declare(stb
+  GIT_REPOSITORY https://github.com/nothings/stb.git
+  GIT_TAG 2c980bb59875b0d32144a71867fbdebb2f77cd20)
+FetchContent_MakeAvailable(stb)
+
 FetchContent_Declare(lua
   URL https://www.lua.org/ftp/lua-5.4.8.tar.gz
   URL_HASH SHA256=4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae)
@@ -65,9 +70,11 @@ endforeach()
 
 add_library(threepoint_core STATIC src/core/project.cpp src/core/camera.cpp src/core/input.cpp
             src/core/world.cpp
-            src/core/gltf_asset.cpp src/core/cgltf_impl.c src/core/lua_project.cpp)
+            src/core/gltf_asset.cpp src/core/cgltf_impl.c src/core/stb_image_impl.c
+            src/core/lua_project.cpp)
 target_compile_features(threepoint_core PUBLIC cxx_std_17)
-target_include_directories(threepoint_core PUBLIC include PRIVATE "${cgltf_SOURCE_DIR}")
+target_include_directories(threepoint_core PUBLIC include PRIVATE "${cgltf_SOURCE_DIR}"
+                           "${stb_SOURCE_DIR}")
 target_link_libraries(threepoint_core PUBLIC glm::glm threepoint_lua)
 target_compile_definitions(threepoint_core PUBLIC THREEPOINT_VERSION="${PROJECT_VERSION}")
 

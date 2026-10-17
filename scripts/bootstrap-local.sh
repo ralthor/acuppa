@@ -61,6 +61,8 @@ require_source glm https://github.com/g-truc/glm.git \
   0af55ccecd98d4e5a8d1fad7de25ba429d60e863
 require_source cgltf https://github.com/jkuhlmann/cgltf.git \
   360db1a95480fe102ae9c69b27c5d101167ff5ba
+require_source stb https://github.com/nothings/stb.git \
+  2c980bb59875b0d32144a71867fbdebb2f77cd20
 
 lua_archive="$debs_dir/lua-5.4.8.tar.gz"
 lua_hash=4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae
@@ -98,6 +100,7 @@ ZIG_GLOBAL_CACHE_DIR="$tools_dir/zig-cache" "$tools_dir/venv/bin/cmake" --fresh 
   -DFETCHCONTENT_SOURCE_DIR_NVRHI="$tools_dir/vendor/nvrhi" \
   -DFETCHCONTENT_SOURCE_DIR_GLM="$tools_dir/vendor/glm" \
   -DFETCHCONTENT_SOURCE_DIR_CGLTF="$tools_dir/vendor/cgltf" \
+  -DFETCHCONTENT_SOURCE_DIR_STB="$tools_dir/vendor/stb" \
   -DFETCHCONTENT_SOURCE_DIR_LUA="$tools_dir/vendor/lua-5.4.8" \
   -DTHREEPOINT_BUILD_2D_PROTOTYPE=ON \
   -DTHREEPOINT_ENABLE_GPU_TESTS="$gpu_tests"
