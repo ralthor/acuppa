@@ -8,7 +8,8 @@ return {
             imported = "scenes/imported.scene.lua",
             textured = "scenes/textured.scene.lua", spheres = "scenes/spheres.scene.lua",
             point = "scenes/point.scene.lua", hdr = "scenes/hdr.scene.lua",
-            hdr_dim = "scenes/hdr.scene.lua"},
+            hdr_dim = "scenes/hdr.scene.lua", ibl = "scenes/ibl.scene.lua",
+            ibl_off = "scenes/ibl.scene.lua", ibl_missing = "scenes/ibl.scene.lua"},
   prefabs = {probe = "prefabs/probe.prefab.lua"},
   input = {
     turn = {keyboard = "space", gamepad_button = "a"},

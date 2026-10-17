@@ -55,6 +55,7 @@ struct LuaProject::Impl {
     static int ray(lua_State* lua);
     static int set_camera(lua_State* lua);
     static int set_exposure(lua_State* lua);
+    static int set_environment(lua_State* lua);
     static int entity_create(lua_State* lua);
     static int entity_destroy(lua_State* lua);
     static int entity_exists(lua_State* lua);
@@ -95,6 +96,7 @@ struct LuaProject::Impl {
     std::map<std::string, std::string> scenes;
     std::map<std::string, std::string> prefabs;
     std::map<std::string, std::shared_ptr<const GltfAsset>> assets;
+    std::map<std::string, std::shared_ptr<const HdrImage>> hdr_assets;
     std::string current_scene;
     std::optional<std::string> pending_scene;
     SceneFrame frame;
@@ -356,6 +358,8 @@ std::shared_ptr<const GltfAsset> LuaProject::Impl::ensure_asset(const std::strin
 SceneFrame LuaProject::Impl::snapshot() {
     SceneFrame scene = world.snapshot(frame.camera);
     scene.exposure = frame.exposure;
+    scene.environment = frame.environment;
+    scene.environment_intensity = frame.environment_intensity;
     for (auto& instance : scene.imported) instance.asset = ensure_asset(instance.source);
     return scene;
 }
@@ -458,6 +462,8 @@ void LuaProject::Impl::load_scene(const std::string& name) {
     clear_callbacks();
     world = World{};
     frame.exposure = 1.0f;
+    frame.environment.reset();
+    frame.environment_intensity = 0.0f;
     current_scene = name;
     time_seconds = 0.0;
     fixed_accumulator = 0.0;
@@ -593,6 +599,7 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("screen_ray", &ray);
     add_function("set_camera", &set_camera);
     add_function("set_exposure", &set_exposure);
+    add_function("set_environment", &set_environment);
     add_function("entity_create", &entity_create);
     add_function("entity_destroy", &entity_destroy);
     add_function("entity_exists", &entity_exists);
@@ -763,6 +770,39 @@ int LuaProject::Impl::set_exposure(lua_State* lua) {
     if (!std::isfinite(exposure) || exposure < 0.01 || exposure > 32.0)
         return luaL_error(lua, "exposure must be finite and between 0.01 and 32");
     context(lua).frame.exposure = float(exposure);
+    return 0;
+}
+
+int LuaProject::Impl::set_environment(lua_State* lua) {
+    if (lua_gettop(lua) < 1 || lua_gettop(lua) > 2)
+        return luaL_error(lua, "set_environment() expects a project HDRI path and optional intensity");
+    Impl& state = context(lua);
+    if (lua_isnil(lua, 1)) {
+        if (lua_gettop(lua) != 1) return luaL_error(lua, "clearing environment takes no intensity");
+        state.frame.environment.reset();
+        state.frame.environment_intensity = 0.0f;
+        return 0;
+    }
+    if (lua_type(lua, 1) != LUA_TSTRING)
+        return luaL_error(lua, "environment path must be a string");
+    const std::string path = lua_tostring(lua, 1);
+    const double intensity = lua_gettop(lua) == 2 ? luaL_checknumber(lua, 2) : 1.0;
+    if (!std::isfinite(intensity) || intensity < 0.0 || intensity > 32.0)
+        return luaL_error(lua, "environment intensity must be finite and between 0 and 32");
+    try {
+        const fs::path file = state.project_file(path);
+        auto found = state.hdr_assets.find(path);
+        if (found == state.hdr_assets.end()) {
+            if (state.hdr_assets.size() >= 8)
+                throw std::runtime_error("project HDRI asset limit reached");
+            auto image = std::make_shared<HdrImage>(load_hdr_image(file));
+            found = state.hdr_assets.emplace(path, std::move(image)).first;
+        }
+        state.frame.environment = found->second;
+        state.frame.environment_intensity = float(intensity);
+    } catch (const std::exception& error) {
+        return luaL_error(lua, "%s", error.what());
+    }
     return 0;
 }
 

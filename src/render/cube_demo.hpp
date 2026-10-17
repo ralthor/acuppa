@@ -37,12 +37,17 @@ private:
     nvrhi::ShaderHandle tonemap_fragment_shader_;
     nvrhi::InputLayoutHandle pbr_input_layout_;
     nvrhi::BindingLayoutHandle pbr_binding_layout_;
+    nvrhi::BindingLayoutHandle environment_binding_layout_;
+    nvrhi::BindingSetHandle environment_binding_set_;
     nvrhi::BindingLayoutHandle tonemap_binding_layout_;
     nvrhi::BindingSetHandle tonemap_binding_set_;
     nvrhi::BufferHandle pbr_frame_buffer_;
     nvrhi::SamplerHandle pbr_sampler_;
+    nvrhi::SamplerHandle environment_sampler_;
     nvrhi::SamplerHandle tonemap_sampler_;
     nvrhi::TextureHandle white_texture_;
+    nvrhi::TextureHandle environment_texture_;
+    std::shared_ptr<const HdrImage> environment_source_;
     nvrhi::BufferHandle vertices_;
     nvrhi::BufferHandle indices_;
     struct GpuPrimitive {

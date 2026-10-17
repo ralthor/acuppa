@@ -73,7 +73,7 @@ endforeach()
 add_library(threepoint_core STATIC src/core/project.cpp src/core/camera.cpp src/core/input.cpp
             src/core/world.cpp
             src/core/gltf_asset.cpp src/core/cgltf_impl.c src/core/stb_image_impl.c
-            src/core/lua_project.cpp)
+            src/core/hdr_image.cpp src/core/lua_project.cpp)
 target_compile_features(threepoint_core PUBLIC cxx_std_17)
 target_include_directories(threepoint_core PUBLIC include PRIVATE "${cgltf_SOURCE_DIR}"
                            "${stb_SOURCE_DIR}")
@@ -124,6 +124,11 @@ if(BUILD_TESTING)
   add_test(NAME gltf_geometry_and_errors COMMAND threepoint_gltf_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene"
            "${PROJECT_BINARY_DIR}/gltf_fixture")
+  add_executable(threepoint_hdr_image_test tests/hdr_image_test.cpp)
+  target_link_libraries(threepoint_hdr_image_test PRIVATE threepoint_core)
+  add_test(NAME hdr_image_validation COMMAND threepoint_hdr_image_test
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene"
+           "${PROJECT_BINARY_DIR}/hdr_image_fixture")
   add_executable(threepoint_falling_blocks_rules_test tests/falling_blocks_rules_test.cpp)
   target_link_libraries(threepoint_falling_blocks_rules_test PRIVATE threepoint_lua)
   add_test(NAME falling_blocks_rules COMMAND threepoint_falling_blocks_rules_test
@@ -172,6 +177,12 @@ if(BUILD_TESTING)
     add_test(NAME hdr_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene" "hdr")
+    add_test(NAME ibl_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/ibl_capture_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+    add_test(NAME ibl_live_startup COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene" "ibl")
   endif()
 endif()
 

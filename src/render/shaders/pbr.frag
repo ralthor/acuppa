@@ -16,6 +16,7 @@ layout(std140, set = 0, binding = 6) uniform Frame {
     vec4 light_position_type[8];
     vec4 light_color_intensity[8];
     ivec4 light_count;
+    vec4 environment_params; // x = intensity
 } frame;
 layout(std140, set = 0, binding = 7) uniform Material {
     vec4 base_color;
@@ -24,6 +25,8 @@ layout(std140, set = 0, binding = 7) uniform Material {
     ivec4 maps0; // base color, metallic-roughness, normal, occlusion
     ivec4 maps1; // emissive, alpha mask
 } material;
+layout(set = 1, binding = 0) uniform texture2D environment_texture;
+layout(set = 1, binding = 1) uniform sampler environment_sampler;
 
 const float pi = 3.14159265359;
 
@@ -42,6 +45,59 @@ float geometry_schlick(float ndotv, float roughness) {
 
 vec3 fresnel_schlick(float cosine, vec3 f0) {
     return f0 + (1.0 - f0) * pow(1.0 - cosine, 5.0);
+}
+
+vec2 sample_pair(int index, int count) {
+    return vec2(float(index) / float(count),
+                float(bitfieldReverse(uint(index))) * 2.3283064365386963e-10);
+}
+
+vec3 environment_radiance(vec3 direction) {
+    vec2 coordinates = vec2(atan(direction.z, direction.x) / (2.0 * pi) + 0.5,
+                            acos(clamp(direction.y, -1.0, 1.0)) / pi);
+    return texture(sampler2D(environment_texture, environment_sampler), coordinates).rgb;
+}
+
+vec3 image_based_light(vec3 normal, vec3 view, vec3 albedo,
+                       float metallic, float roughness, vec3 f0) {
+    vec3 tangent = normalize(cross(abs(normal.y) < 0.99 ? vec3(0, 1, 0)
+                                                        : vec3(1, 0, 0), normal));
+    vec3 bitangent = cross(normal, tangent);
+    const int sample_count = 64;
+    vec3 diffuse_light = vec3(0.0);
+    vec3 specular_light = vec3(0.0);
+    float ndotv = max(dot(normal, view), 0.001);
+    float a = roughness * roughness;
+    for (int i = 0; i < sample_count; ++i) {
+        vec2 xi = sample_pair(i, sample_count);
+        float phi = 2.0 * pi * xi.x;
+        float cosine = sqrt(1.0 - xi.y);
+        float sine = sqrt(xi.y);
+        vec3 diffuse_direction = normalize(tangent * cos(phi) * sine +
+                                           bitangent * sin(phi) * sine +
+                                           normal * cosine);
+        diffuse_light += environment_radiance(diffuse_direction);
+
+        cosine = sqrt((1.0 - xi.y) / (1.0 + (a * a - 1.0) * xi.y));
+        sine = sqrt(max(0.0, 1.0 - cosine * cosine));
+        vec3 halfway = normalize(tangent * cos(phi) * sine +
+                                  bitangent * sin(phi) * sine + normal * cosine);
+        vec3 incoming = reflect(-view, halfway);
+        float ndotl = max(dot(normal, incoming), 0.0);
+        if (ndotl > 0.0) {
+            float ndoth = max(dot(normal, halfway), 0.001);
+            float vdoth = max(dot(view, halfway), 0.001);
+            vec3 fresnel = fresnel_schlick(vdoth, f0);
+            float geometry = geometry_schlick(ndotv, roughness) *
+                             geometry_schlick(ndotl, roughness);
+            specular_light += environment_radiance(incoming) * fresnel *
+                              geometry * vdoth / (ndotv * ndoth);
+        }
+    }
+    vec3 surface_fresnel = fresnel_schlick(ndotv, f0);
+    vec3 diffuse = diffuse_light * albedo * (1.0 - metallic) *
+                   (vec3(1.0) - surface_fresnel);
+    return (diffuse + specular_light) / float(sample_count);
 }
 
 void main() {
@@ -102,6 +158,9 @@ void main() {
     vec3 emissive = material.emissive_alpha.rgb;
     if (material.maps1.x != 0)
         emissive *= texture(sampler2D(emissive_texture, material_sampler), uv).rgb;
-    vec3 ambient = 0.03 * albedo * (1.0 - metallic) * occlusion;
+    vec3 ambient = frame.environment_params.x > 0.0
+        ? image_based_light(normal, view, albedo, metallic, roughness, f0) *
+          frame.environment_params.x * occlusion
+        : 0.03 * albedo * (1.0 - metallic) * occlusion;
     out_color = vec4(lighting + ambient + emissive, 1.0);
 }

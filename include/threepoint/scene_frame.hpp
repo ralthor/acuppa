@@ -2,6 +2,7 @@
 
 #include "threepoint/camera.hpp"
 #include "threepoint/gltf_asset.hpp"
+#include "threepoint/hdr_image.hpp"
 
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
@@ -38,6 +39,8 @@ struct LightInstance {
 struct SceneFrame {
     PerspectiveCamera camera;
     float exposure = 1.0f;
+    std::shared_ptr<const HdrImage> environment;
+    float environment_intensity = 0.0f;
     std::vector<CubeInstance> cubes;
     std::vector<ImportedInstance> imported;
     std::vector<LightInstance> lights;

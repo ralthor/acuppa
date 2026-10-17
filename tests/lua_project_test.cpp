@@ -48,6 +48,13 @@ int main(int argc, char* argv[]) {
     expect(std::abs(hdr.step(0.0).exposure - 1.0f) < 0.001f &&
            std::abs(hdr_dim.step(0.0).exposure - 0.15f) < 0.001f,
            "source-authored scene exposure did not reach the render frame");
+    threepoint::LuaProject ibl(argv[1], "ibl"), ibl_off(argv[1], "ibl_off");
+    const auto environment = ibl.step(0.0);
+    const auto no_environment = ibl_off.step(0.0);
+    expect(environment.environment && environment.environment->width == 16 &&
+           environment.environment_intensity == 1.0f &&
+           !no_environment.environment && no_environment.environment_intensity == 0.0f,
+           "source-authored HDRI did not reach the render frame");
     project.set_viewport(640, 360);
     expect(project.width() == 640 && project.height() == 360,
            "resize did not update Lua's screen-ray viewport");

@@ -40,8 +40,9 @@ struct PbrFrame {
     float light_position_type[8][4]{};
     float light_color_intensity[8][4]{};
     int32_t light_count[4]{};
+    float environment_params[4]{};
 };
-static_assert(sizeof(PbrFrame) == 288);
+static_assert(sizeof(PbrFrame) == 304);
 
 struct PbrMaterial {
     float base_color[4]{};
@@ -153,8 +154,18 @@ CubeDemo::CubeDemo(nvrhi::IDevice* device) : device_(device) {
     pbr_frame_buffer_ = device_->createBuffer(frame_desc);
     pbr_sampler_ = device_->createSampler(nvrhi::SamplerDesc()
         .setAllAddressModes(nvrhi::SamplerAddressMode::Wrap));
+    environment_binding_layout_ = device_->createBindingLayout(
+        nvrhi::BindingLayoutDesc().setVisibility(nvrhi::ShaderType::Pixel)
+            .setBindingOffsets(nvrhi::VulkanBindingOffsets().setSamplerOffset(0))
+            .addItem(nvrhi::BindingLayoutItem::Texture_SRV(0))
+            .addItem(nvrhi::BindingLayoutItem::Sampler(1)));
+    environment_sampler_ = device_->createSampler(nvrhi::SamplerDesc()
+        .setAddressU(nvrhi::SamplerAddressMode::Wrap)
+        .setAddressV(nvrhi::SamplerAddressMode::Clamp));
     require(pbr_input_layout_ && pbr_binding_layout_ && pbr_frame_buffer_ && pbr_sampler_,
             "create PBR input and material resources");
+    require(environment_binding_layout_ && environment_sampler_,
+            "create environment lighting resources");
 
     tonemap_vertex_shader_ = device_->createShader(
         nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Vertex).setDebugName("tonemap vertex"),
@@ -207,9 +218,48 @@ CubeDemo::CubeDemo(nvrhi::IDevice* device) : device_(device) {
     upload->close();
     device_->executeCommandList(upload);
     require(device_->waitForIdle(), "upload cube mesh");
+    environment_binding_set_ = device_->createBindingSet(
+        nvrhi::BindingSetDesc()
+            .addItem(nvrhi::BindingSetItem::Texture_SRV(0, white_texture_))
+            .addItem(nvrhi::BindingSetItem::Sampler(1, environment_sampler_)),
+        environment_binding_layout_);
+    require(environment_binding_set_, "create fallback environment binding set");
 }
 
 void CubeDemo::prepare(const SceneFrame& scene) {
+    if (scene.environment != environment_source_) {
+        environment_source_ = scene.environment;
+        environment_texture_ = nullptr;
+        if (scene.environment) {
+            nvrhi::TextureDesc desc;
+            desc.width = scene.environment->width;
+            desc.height = scene.environment->height;
+            desc.format = nvrhi::Format::RGBA32_FLOAT;
+            desc.isShaderResource = true;
+            desc.debugName = "project HDRI";
+            environment_texture_ = device_->createTexture(desc);
+            require(environment_texture_, "create environment texture");
+            auto upload = device_->createCommandList();
+            require(upload, "create environment upload command list");
+            upload->open();
+            upload->beginTrackingTextureState(environment_texture_, nvrhi::AllSubresources,
+                                              nvrhi::ResourceStates::Common);
+            upload->writeTexture(environment_texture_, 0, 0,
+                                 scene.environment->rgba.data(), size_t(desc.width) * 4 * sizeof(float));
+            upload->setPermanentTextureState(environment_texture_,
+                                              nvrhi::ResourceStates::ShaderResource);
+            upload->close();
+            device_->executeCommandList(upload);
+            require(device_->waitForIdle(), "upload environment texture");
+        }
+        environment_binding_set_ = device_->createBindingSet(
+            nvrhi::BindingSetDesc()
+                .addItem(nvrhi::BindingSetItem::Texture_SRV(
+                    0, environment_texture_ ? environment_texture_ : white_texture_))
+                .addItem(nvrhi::BindingSetItem::Sampler(1, environment_sampler_)),
+            environment_binding_layout_);
+        require(environment_binding_set_, "create environment binding set");
+    }
     for (const auto& instance : scene.imported) {
         if (!instance.asset) throw std::runtime_error("imported mesh asset was not loaded");
         if (imported_.count(instance.asset.get())) continue;
@@ -371,7 +421,8 @@ void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t 
     require(pipeline_, "create cube graphics pipeline");
     nvrhi::GraphicsPipelineDesc pbr_desc;
     pbr_desc.setVertexShader(pbr_vertex_shader_).setFragmentShader(pbr_fragment_shader_)
-        .setInputLayout(pbr_input_layout_).addBindingLayout(pbr_binding_layout_);
+        .setInputLayout(pbr_input_layout_).addBindingLayout(pbr_binding_layout_)
+        .addBindingLayout(environment_binding_layout_);
     pbr_desc.renderState.depthStencilState.enableDepthTest().enableDepthWrite()
         .setDepthFunc(nvrhi::ComparisonFunc::Less);
     pbr_desc.renderState.rasterState.setCullNone().enableDepthClip();
@@ -421,6 +472,7 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
     frame.camera[1] = scene.camera.eye.y;
     frame.camera[2] = scene.camera.eye.z;
     frame.light_count[0] = int32_t(scene.lights.size());
+    frame.environment_params[0] = scene.environment ? scene.environment_intensity : 0.0f;
     if (scene.lights.size() > 8) throw std::runtime_error("scene exceeds eight PBR lights");
     for (size_t i = 0; i < scene.lights.size(); ++i) {
         const auto& light = scene.lights[i];
@@ -444,6 +496,7 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
             imported_state.viewport.addViewportAndScissorRect(
                 nvrhi::Viewport(float(width_), float(height_)));
             imported_state.addBindingSet(primitive.binding_set)
+                .addBindingSet(environment_binding_set_)
                 .addVertexBuffer(nvrhi::VertexBufferBinding().setBuffer(primitive.vertices)
                     .setSlot(0).setOffset(0))
                 .setIndexBuffer(nvrhi::IndexBufferBinding().setBuffer(primitive.indices)

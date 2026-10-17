@@ -40,6 +40,8 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 
 **Phase 13 status (2026-10-17):** Cube and PBR draws now share a 16-bit floating-point HDR color target with depth, followed by a fullscreen ACES-style tonemap and sRGB display pass. `tp.set_exposure(value)` changes exposure per scene (0.01–32, default 1); invalid values raise Lua errors. The feature scene has identical bright material scenes at two exposures. GPU pixel checks show exposure changes and recoverable gradients in highlights that would have clipped in an 8-bit target. Existing cube, Lua scene, glTF, game, and PBR visual checks were updated for the new output mapping and pass under Vulkan validation. HDRI lighting remains Phase 14.
 
+**Phase 14 status (2026-10-17):** Source scripts can set or clear a project-local Radiance `.hdr` through `tp.set_environment(path, intensity)`. The core validates paths and 2:1 HDR data before a float texture is uploaded; glTF PBR materials sample it for diffuse and specular ambient light using a fixed 64-sample integration. The feature scene compares three HDRI-lit material spheres with the same unlit scene. Core tests cover decoding and missing/malformed/aspect failures, Lua checks cover unsafe paths and invalid intensity, and Vulkan captures check illumination and the HDRI's different upper/lower radiance. A live scene launch passes under Vulkan validation. README documents a Poly Haven asset workflow. Built-in cubes remain unlit and the HDRI is not yet rendered as a sky background; prefiltered environment maps are a quality and performance follow-up before release.
+
 | Phase | Deliverable | Check before commit |
 | --- | --- | --- |
 | 0 | Restore this 3D brief, this roadmap, `AGENTS.md`, and project-local development skills. | Requirements for every item in README map to a phase; no 2D plan is presented as the goal. |
@@ -69,9 +71,9 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 | 24 | Package and harden the falling-block game built in Phases 10–12. | The same game passes an export smoke test without editor or development files. |
 | 25 | Add miniaudio playback, spatial sound, and script control. | Automated audio-state tests pass; the feature scene plays a 3D sound on contact. |
 | 26 | Build a small 3D room/puzzle game from Lua and source assets only. | It exercises glTF, PBR, HDRI, shadows, SSAO, physics, audio, UI, save/load, and export. |
-| 27 | Harden and release: automated feature-scene coverage audit, sanitizers, asset-failure cases, performance budgets, Linux packaging, and documentation. | Ubuntu 24+ release builds pass unit, integration, visual, packaged-game, and stability gates. |
+| 27 | Harden and release: automated feature-scene coverage audit, sanitizers, asset-failure cases, HDRI quality/performance including prefiltering, Linux packaging, and documentation. | Ubuntu 24+ release builds pass unit, integration, visual, packaged-game, and stability gates. |
 
-Phases 3–13 are locally complete: the engine can display a 3D cube, run Lua-authored 3D scenes, react to named input, manage entities and components, reproduce worlds from source scene and prefab files, render imported glTF geometry with direct-light PBR materials and an HDR tonemap, and run a full falling-block match without editor action. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
+Phases 3–14 are locally complete: the engine can display a 3D cube, run Lua-authored 3D scenes, react to named input, manage entities and components, reproduce worlds from source scene and prefab files, render imported glTF geometry with direct-light PBR, HDR tonemapping, and HDRI lighting, and run a full falling-block match without editor action. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
 
 | README requirement | Covered in phases |
 | --- | --- |
