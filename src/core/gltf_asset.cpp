@@ -145,6 +145,16 @@ int image_index(const cgltf_texture_view& view, const cgltf_data& data) {
     if (!view.texture) return -1;
     if (view.texcoord != 0 || view.has_transform || !view.texture->image)
         throw std::runtime_error("texture requires unsupported UV set, transform, or image format");
+    if (const cgltf_sampler* sampler = view.texture->sampler) {
+        if ((sampler->mag_filter != cgltf_filter_type_undefined &&
+             sampler->mag_filter != cgltf_filter_type_linear) ||
+            (sampler->min_filter != cgltf_filter_type_undefined &&
+             sampler->min_filter != cgltf_filter_type_linear &&
+             sampler->min_filter != cgltf_filter_type_linear_mipmap_linear) ||
+            sampler->wrap_s != cgltf_wrap_mode_repeat ||
+            sampler->wrap_t != cgltf_wrap_mode_repeat)
+            throw std::runtime_error("texture sampler requires unsupported filter or wrap mode");
+    }
     const ptrdiff_t index = view.texture->image - data.images;
     if (index < 0 || size_t(index) >= data.images_count)
         throw std::runtime_error("invalid glTF texture image reference");
@@ -346,8 +356,8 @@ GltfAsset load_gltf(const fs::path& project_root, const std::string& relative_pa
         size_t total_primitives = 0;
         struct Pending { const cgltf_node* node; glm::mat4 parent; size_t depth; };
         std::vector<Pending> pending;
-        for (size_t i = 0; i < scene->nodes_count; ++i)
-            pending.push_back({scene->nodes[i], glm::mat4(1.0f), 0});
+        for (size_t i = scene->nodes_count; i > 0; --i)
+            pending.push_back({scene->nodes[i - 1], glm::mat4(1.0f), 0});
         size_t visited = 0;
         while (!pending.empty()) {
             const Pending current = pending.back();
@@ -373,8 +383,8 @@ GltfAsset load_gltf(const fs::path& project_root, const std::string& relative_pa
                     asset.primitives.push_back(std::move(primitive));
                 }
             }
-            for (size_t i = 0; i < current.node->children_count; ++i)
-                pending.push_back({current.node->children[i], transform, current.depth + 1});
+            for (size_t i = current.node->children_count; i > 0; --i)
+                pending.push_back({current.node->children[i - 1], transform, current.depth + 1});
         }
         if (asset.primitives.empty()) throw std::runtime_error("glTF scene has no triangle meshes");
         return asset;

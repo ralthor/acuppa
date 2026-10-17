@@ -57,6 +57,15 @@ int main() {
     light.intensity = 2;
     world.set_light(first, light);
     expect(world.light(first)->intensity == 2, "light component did not persist");
+    expect(world.snapshot({}).lights.size() == 1 &&
+           world.snapshot({}).lights[0].directional &&
+           world.snapshot({}).lights[0].intensity == 2,
+           "light component did not reach the renderer");
+    for (int i = 0; i < 7; ++i) world.set_light(world.create(), light);
+    bool light_limit_rejected = false;
+    try { world.set_light(world.create(), light); }
+    catch (const std::invalid_argument&) { light_limit_rejected = true; }
+    expect(light_limit_rejected, "ninth light was silently accepted");
     world.set_script(first, {"scripts/main.lua", true});
     expect(world.script(first)->enabled, "script component did not persist");
 

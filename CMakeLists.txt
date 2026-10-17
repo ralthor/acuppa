@@ -54,18 +54,20 @@ find_program(THREEPOINT_GLSLANG_VALIDATOR glslangValidator REQUIRED)
 find_library(THREEPOINT_VULKAN_LOADER NAMES vulkan REQUIRED)
 
 set(THREEPOINT_SHADER_HEADERS)
-foreach(stage IN ITEMS vert frag)
-  set(shader_source "${PROJECT_SOURCE_DIR}/src/render/shaders/cube.${stage}")
-  set(shader_binary "${PROJECT_BINARY_DIR}/shaders/cube.${stage}.spv")
-  set(shader_header "${PROJECT_BINARY_DIR}/generated/cube_${stage}_spv.hpp")
-  add_custom_command(OUTPUT "${shader_header}"
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${PROJECT_BINARY_DIR}/shaders" "${PROJECT_BINARY_DIR}/generated"
-    COMMAND "${THREEPOINT_GLSLANG_VALIDATOR}" -V "${shader_source}" -o "${shader_binary}"
-    COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/embed_spirv.py"
-            "${shader_binary}" "${shader_header}" "cube_${stage}_spv"
-    DEPENDS "${shader_source}" "${PROJECT_SOURCE_DIR}/scripts/embed_spirv.py"
-    VERBATIM)
-  list(APPEND THREEPOINT_SHADER_HEADERS "${shader_header}")
+foreach(shader IN ITEMS cube pbr)
+  foreach(stage IN ITEMS vert frag)
+    set(shader_source "${PROJECT_SOURCE_DIR}/src/render/shaders/${shader}.${stage}")
+    set(shader_binary "${PROJECT_BINARY_DIR}/shaders/${shader}.${stage}.spv")
+    set(shader_header "${PROJECT_BINARY_DIR}/generated/${shader}_${stage}_spv.hpp")
+    add_custom_command(OUTPUT "${shader_header}"
+      COMMAND "${CMAKE_COMMAND}" -E make_directory "${PROJECT_BINARY_DIR}/shaders" "${PROJECT_BINARY_DIR}/generated"
+      COMMAND "${THREEPOINT_GLSLANG_VALIDATOR}" -V "${shader_source}" -o "${shader_binary}"
+      COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/embed_spirv.py"
+              "${shader_binary}" "${shader_header}" "${shader}_${stage}_spv"
+      DEPENDS "${shader_source}" "${PROJECT_SOURCE_DIR}/scripts/embed_spirv.py"
+      VERBATIM)
+    list(APPEND THREEPOINT_SHADER_HEADERS "${shader_header}")
+  endforeach()
 endforeach()
 
 add_library(threepoint_core STATIC src/core/project.cpp src/core/camera.cpp src/core/input.cpp
@@ -142,6 +144,9 @@ if(BUILD_TESTING)
              "${PROJECT_SOURCE_DIR}/tests/feature_scene")
     add_test(NAME gltf_scene_capture COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/gltf_scene_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+    add_test(NAME pbr_material_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/pbr_material_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   endif()
 endif()

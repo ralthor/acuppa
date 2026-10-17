@@ -5,7 +5,9 @@ return {
   window = {width = 1280, height = 720},
   first_scene = "main",
   scenes = {main = "scenes/main.scene.lua", alternate = "scenes/alternate.scene.lua",
-            imported = "scenes/imported.scene.lua"},
+            imported = "scenes/imported.scene.lua",
+            textured = "scenes/textured.scene.lua", spheres = "scenes/spheres.scene.lua",
+            point = "scenes/point.scene.lua"},
   prefabs = {probe = "prefabs/probe.prefab.lua"},
   input = {
     turn = {keyboard = "space", gamepad_button = "a"},

@@ -5,6 +5,7 @@
 #include <nvrhi/nvrhi.h>
 
 #include <cstdint>
+#include <array>
 #include <map>
 #include <memory>
 #include <vector>
@@ -30,6 +31,13 @@ private:
     nvrhi::InputLayoutHandle input_layout_;
     nvrhi::BindingLayoutHandle binding_layout_;
     nvrhi::BindingSetHandle binding_set_;
+    nvrhi::ShaderHandle pbr_vertex_shader_;
+    nvrhi::ShaderHandle pbr_fragment_shader_;
+    nvrhi::InputLayoutHandle pbr_input_layout_;
+    nvrhi::BindingLayoutHandle pbr_binding_layout_;
+    nvrhi::BufferHandle pbr_frame_buffer_;
+    nvrhi::SamplerHandle pbr_sampler_;
+    nvrhi::TextureHandle white_texture_;
     nvrhi::BufferHandle vertices_;
     nvrhi::BufferHandle indices_;
     struct GpuPrimitive {
@@ -37,14 +45,18 @@ private:
         nvrhi::BufferHandle indices;
         uint32_t index_count = 0;
         glm::mat4 node_transform{1.0f};
+        nvrhi::BufferHandle material_buffer;
+        nvrhi::BindingSetHandle binding_set;
     };
     struct GpuAsset {
         std::shared_ptr<const GltfAsset> source;
         std::vector<GpuPrimitive> primitives;
+        std::vector<std::array<nvrhi::TextureHandle, 2>> textures;
     };
     std::map<const GltfAsset*, GpuAsset> imported_;
     nvrhi::TextureHandle depth_;
     nvrhi::GraphicsPipelineHandle pipeline_;
+    nvrhi::GraphicsPipelineHandle pbr_pipeline_;
     std::vector<nvrhi::FramebufferHandle> framebuffers_;
 };
 

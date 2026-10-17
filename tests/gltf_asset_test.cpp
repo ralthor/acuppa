@@ -49,6 +49,13 @@ int main(int argc, char* argv[]) {
     expect(textured.primitives[0].vertices[0].normal[2] == 1.0f &&
            textured.primitives[0].vertices[0].uv[1] == 1.0f,
            "glTF normals or UVs were not imported");
+    const auto spheres = threepoint::load_gltf(root, "assets/material_spheres.gltf");
+    expect(spheres.primitives.size() == 3 &&
+           spheres.primitives[0].material.metallic < 0.1f &&
+           spheres.primitives[1].material.metallic > 0.9f &&
+           spheres.primitives[1].material.roughness <= 0.2f &&
+           spheres.primitives[2].material.roughness > 0.7f,
+           "reference sphere materials were not imported distinctly");
 
     bool missing_rejected = false;
     try { threepoint::load_gltf(root, "assets/missing.gltf"); }
@@ -99,8 +106,9 @@ int main(int argc, char* argv[]) {
     expect(buffer_escape_rejected, "outside-project glTF buffer was accepted");
 
     std::ifstream material_input(root / "assets/material_quad.gltf");
-    std::string invalid_image((std::istreambuf_iterator<char>(material_input)),
-                              std::istreambuf_iterator<char>());
+    const std::string material_source((std::istreambuf_iterator<char>(material_input)),
+                                      std::istreambuf_iterator<char>());
+    std::string invalid_image = material_source;
     const auto image_start = invalid_image.find("data:image/png;base64,");
     expect(image_start != std::string::npos, "textured fixture format changed");
     const auto image_end = invalid_image.find('"', image_start);
@@ -113,5 +121,21 @@ int main(int argc, char* argv[]) {
         image_rejected = std::string(error.what()).find("image 0") != std::string::npos;
     }
     expect(image_rejected, "invalid PNG was accepted");
+    std::string unsupported_sampler = material_source;
+    const auto textures_key = unsupported_sampler.find("\"textures\": [");
+    const auto first_texture = unsupported_sampler.find("\"source\": 0", textures_key);
+    expect(textures_key != std::string::npos && first_texture != std::string::npos,
+           "textured fixture texture table changed");
+    unsupported_sampler.insert(textures_key, "\"samplers\": [{\"wrapS\": 33071}], ");
+    const auto first_texture_after_insert = unsupported_sampler.find("\"source\": 0", textures_key);
+    unsupported_sampler.replace(first_texture_after_insert, std::string("\"source\": 0").size(),
+                                "\"source\": 0, \"sampler\": 0");
+    std::ofstream(work / "assets/unsupported_sampler.gltf") << unsupported_sampler;
+    bool sampler_rejected = false;
+    try { threepoint::load_gltf(work, "assets/unsupported_sampler.gltf"); }
+    catch (const std::runtime_error& error) {
+        sampler_rejected = std::string(error.what()).find("sampler") != std::string::npos;
+    }
+    expect(sampler_rejected, "unsupported texture sampler was silently accepted");
     fs::remove_all(work);
 }

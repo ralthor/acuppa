@@ -99,7 +99,13 @@ void World::set_light(EntityId id, const LightComponent& value) {
         value.intensity < 0.0f) {
         throw std::invalid_argument("invalid light color, direction, or intensity");
     }
-    require(id).light = value;
+    Entity& entity = require(id);
+    if (!entity.light) {
+        size_t count = 0;
+        for (const auto& [_, other] : entities_) count += other.light.has_value();
+        if (count >= 8) throw std::invalid_argument("scene supports at most eight lights");
+    }
+    entity.light = value;
 }
 
 void World::set_mesh(EntityId id, const MeshComponent& value) {
@@ -208,6 +214,14 @@ SceneFrame World::snapshot(const PerspectiveCamera& fallback_camera) const {
         return matrix;
     };
     for (const auto& [id, entity] : entities_) {
+        if (entity.light) {
+            const glm::mat4 transform = world_matrix(id);
+            const glm::vec3 direction = glm::normalize(glm::vec3(
+                transform * glm::vec4(entity.light->direction, 0.0f)));
+            frame.lights.push_back({entity.light->type == LightComponent::Type::Directional,
+                                    glm::vec3(transform[3]), direction, entity.light->color,
+                                    entity.light->intensity});
+        }
         if (entity.mesh && entity.mesh->visible && entity.mesh->mesh == "builtin:cube") {
             const TransformComponent transform = entity.transform.value_or(TransformComponent{});
             const glm::mat4 parent = transform.parent

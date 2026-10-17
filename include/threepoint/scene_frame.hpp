@@ -27,10 +27,19 @@ struct ImportedInstance {
     std::shared_ptr<const GltfAsset> asset;
 };
 
+struct LightInstance {
+    bool directional = false;
+    glm::vec3 position{0.0f};
+    glm::vec3 direction{0.0f, -1.0f, 0.0f};
+    glm::vec3 color{1.0f};
+    float intensity = 1.0f;
+};
+
 struct SceneFrame {
     PerspectiveCamera camera;
     std::vector<CubeInstance> cubes;
     std::vector<ImportedInstance> imported;
+    std::vector<LightInstance> lights;
     bool quit = false;
 };
 
