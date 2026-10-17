@@ -24,7 +24,7 @@ namespace fs = std::filesystem;
 
 struct LuaProject::Impl {
     struct ScriptRefs;
-    explicit Impl(const fs::path& directory);
+    explicit Impl(const fs::path& directory, const std::string& initial_scene);
     ~Impl() { if (lua) lua_close(lua); }
 
     SceneFrame step(double dt);
@@ -39,6 +39,8 @@ struct LuaProject::Impl {
     void call_entity(int reference, const char* name, EntityId id, double dt, bool pass_dt);
     void call_entity_scripts(int ScriptRefs::*reference, const char* name, double dt, bool pass_dt);
     void clear_callbacks();
+    std::shared_ptr<const GltfAsset> ensure_asset(const std::string& source);
+    SceneFrame snapshot();
 
     static Impl& context(lua_State* lua) {
         return *static_cast<Impl*>(lua_touserdata(lua, lua_upvalueindex(1)));
@@ -91,6 +93,7 @@ struct LuaProject::Impl {
     std::map<EntityId, ScriptRefs> scripts;
     std::map<std::string, std::string> scenes;
     std::map<std::string, std::string> prefabs;
+    std::map<std::string, std::shared_ptr<const GltfAsset>> assets;
     std::string current_scene;
     std::optional<std::string> pending_scene;
     SceneFrame frame;
@@ -200,7 +203,7 @@ void validate_entity_fields(lua_State* lua, int table) {
 
 }  // namespace
 
-LuaProject::Impl::Impl(const fs::path& directory) {
+LuaProject::Impl::Impl(const fs::path& directory, const std::string& initial_scene) {
     const auto paths = require_project(directory);
     root = fs::canonical(paths.root);
     lua = luaL_newstate();
@@ -286,7 +289,7 @@ LuaProject::Impl::Impl(const fs::path& directory) {
     }
     lua_pop(lua, 2);
 
-    load_scene(first_scene);
+    load_scene(initial_scene.empty() ? first_scene : initial_scene);
     guard.release();
 }
 
@@ -329,6 +332,22 @@ void LuaProject::Impl::call(int reference, const char* name, double dt, bool pas
         lua_pop(lua, 1);
         throw std::runtime_error(std::string("Lua ") + name + "(): " + error);
     }
+}
+
+std::shared_ptr<const GltfAsset> LuaProject::Impl::ensure_asset(const std::string& source) {
+    if (source == "builtin:cube") return {};
+    const auto found = assets.find(source);
+    if (found != assets.end()) return found->second;
+    if (assets.size() >= 128) throw std::runtime_error("project glTF asset limit reached");
+    auto asset = std::make_shared<GltfAsset>(load_gltf(root, source));
+    assets.emplace(source, asset);
+    return asset;
+}
+
+SceneFrame LuaProject::Impl::snapshot() {
+    SceneFrame scene = world.snapshot(frame.camera);
+    for (auto& instance : scene.imported) instance.asset = ensure_asset(instance.source);
+    return scene;
 }
 
 void LuaProject::Impl::clear_callbacks() {
@@ -616,18 +635,16 @@ int LuaProject::Impl::spawn(lua_State* lua) {
     luaL_checktype(lua, 1, LUA_TTABLE);
     lua_getfield(lua, 1, "mesh");
     const char* mesh = luaL_checkstring(lua, -1);
-    if (std::strcmp(mesh, "builtin:cube") != 0) {
-        return luaL_argerror(lua, 1, "mesh must be 'builtin:cube'");
-    }
     lua_pop(lua, 1);
     try {
+        state.ensure_asset(mesh);
         TransformComponent transform;
         transform.position = vector_field(lua, 1, "position", glm::vec3(0), false);
         transform.rotation = vector_field(lua, 1, "rotation", glm::vec3(0), false);
         transform.scale = vector_field(lua, 1, "scale", glm::vec3(1), true);
         const EntityId id = state.world.create();
         state.world.set_transform(id, transform);
-        state.world.set_mesh(id, {"builtin:cube", true});
+        state.world.set_mesh(id, {mesh, true});
         lua_pushinteger(lua, lua_Integer(id));
     } catch (const std::exception& error) {
         return luaL_error(lua, "%s", error.what());
@@ -828,6 +845,7 @@ int LuaProject::Impl::component_set(lua_State* lua) {
             }
             lua_pop(lua, 1);
             value.visible = optional_boolean(lua, 3, "visible", value.visible);
+            state.ensure_asset(value.mesh);
             state.world.set_mesh(id, value);
         } else if (std::strcmp(kind, "script") == 0) {
             ScriptComponent value = state.world.script(id).value_or(ScriptComponent{});
@@ -1000,7 +1018,7 @@ SceneFrame LuaProject::Impl::step(double dt) {
         throw std::invalid_argument("frame delta must be finite and between 0 and 0.25 seconds");
     }
     if (wants_quit) {
-        SceneFrame scene = world.snapshot(frame.camera);
+        SceneFrame scene = snapshot();
         scene.quit = true;
         return scene;
     }
@@ -1034,12 +1052,13 @@ SceneFrame LuaProject::Impl::step(double dt) {
         pending_scene.reset();
         load_scene(next);
     }
-    SceneFrame scene = world.snapshot(frame.camera);
+    SceneFrame scene = snapshot();
     scene.quit = wants_quit;
     return scene;
 }
 
-LuaProject::LuaProject(const fs::path& root) : impl_(std::make_unique<Impl>(root)) {}
+LuaProject::LuaProject(const fs::path& root, std::string initial_scene)
+    : impl_(std::make_unique<Impl>(root, initial_scene)) {}
 LuaProject::~LuaProject() = default;
 uint32_t LuaProject::width() const { return impl_->width; }
 uint32_t LuaProject::height() const { return impl_->height; }

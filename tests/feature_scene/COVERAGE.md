@@ -11,7 +11,7 @@ This is the source-only project used for integration checks. It runs in the 3D r
 | Keyboard, mouse, controller, screen ray | 5 | `game.lua` named actions; `scripts/main.lua` turns cube, moves camera, reads pointer ray | `input_actions_and_ray`, `lua_scene_logic` injected events, `input_scene_capture` GPU comparison | Local covered; physical controller and hosted CI pending |
 | Entity IDs, transform parenting, camera, light, mesh, script components | 6 | `scripts/main.lua` creates, changes, reads, removes every component; camera and ray use active component | `world_components`, `lua_scene_logic`, `lua_component_errors`; prior GPU captures | Local covered; lighting and per-entity script execution arrive in later phases |
 | Source scenes, named parents, prefabs, per-entity scripts, reload/switch | 7 | `scenes/alternate.scene.lua`, `prefabs/probe.prefab.lua`, `scripts/actor.lua`, `scripts/alternate.lua` | `source_scene_and_prefabs` checks callbacks, override, rollback, reload, switch, invalid source | Local covered; hosted CI pending |
-| glTF meshes and scene hierarchy | 8 | Pending | Pending | Pending |
+| glTF meshes and scene hierarchy | 8 | `assets/triangle.gltf`, external-buffer and GLB variants; `scenes/imported.scene.lua`, `scripts/imported.lua` | `gltf_geometry_and_errors` validates hierarchy, formats, failures; `gltf_scene_capture` verifies visible Vulkan pixels | Local covered for static triangles; hosted CI pending |
 | Textures, materials, direct-light PBR | 9 | Pending | Pending | Pending |
 | HDR target, exposure, tonemapping | 10 | Pending | Pending | Pending |
 | HDRI and image-based lighting | 11 | Pending | Pending | Pending |

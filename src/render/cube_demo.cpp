@@ -8,6 +8,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <array>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -53,6 +54,7 @@ void require(bool ok, const char* action) {
 }  // namespace
 
 CubeDemo::CubeDemo(nvrhi::IDevice* device) : device_(device) {
+    static_assert(sizeof(Vertex) == sizeof(GltfVertex), "glTF vertex layout must match shader");
     vertex_shader_ = device_->createShader(
         nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Vertex).setDebugName("cube vertex"),
         cube_vert_spv, sizeof(cube_vert_spv));
@@ -100,6 +102,45 @@ CubeDemo::CubeDemo(nvrhi::IDevice* device) : device_(device) {
     upload->close();
     device_->executeCommandList(upload);
     require(device_->waitForIdle(), "upload cube mesh");
+}
+
+void CubeDemo::prepare(const SceneFrame& scene) {
+    for (const auto& instance : scene.imported) {
+        if (!instance.asset) throw std::runtime_error("imported mesh asset was not loaded");
+        if (imported_.count(instance.asset.get())) continue;
+        GpuAsset gpu;
+        gpu.source = instance.asset;
+        auto upload = device_->createCommandList();
+        require(upload, "create glTF upload command list");
+        upload->open();
+        for (const auto& primitive : instance.asset->primitives) {
+            if (primitive.indices.size() > std::numeric_limits<uint32_t>::max())
+                throw std::runtime_error("glTF index count exceeds renderer limit");
+            nvrhi::BufferDesc vertex_desc;
+            vertex_desc.byteSize = primitive.vertices.size() * sizeof(GltfVertex);
+            vertex_desc.isVertexBuffer = true;
+            vertex_desc.debugName = "glTF vertices";
+            vertex_desc.enableAutomaticStateTracking(nvrhi::ResourceStates::Common);
+            nvrhi::BufferDesc index_desc;
+            index_desc.byteSize = primitive.indices.size() * sizeof(uint32_t);
+            index_desc.isIndexBuffer = true;
+            index_desc.debugName = "glTF indices";
+            index_desc.enableAutomaticStateTracking(nvrhi::ResourceStates::Common);
+            GpuPrimitive part;
+            part.vertices = device_->createBuffer(vertex_desc);
+            part.indices = device_->createBuffer(index_desc);
+            part.index_count = uint32_t(primitive.indices.size());
+            part.node_transform = primitive.node_transform;
+            require(part.vertices && part.indices, "create glTF mesh buffers");
+            upload->writeBuffer(part.vertices, primitive.vertices.data(), vertex_desc.byteSize);
+            upload->writeBuffer(part.indices, primitive.indices.data(), index_desc.byteSize);
+            gpu.primitives.push_back(std::move(part));
+        }
+        upload->close();
+        device_->executeCommandList(upload);
+        require(device_->waitForIdle(), "upload glTF mesh");
+        imported_.emplace(instance.asset.get(), std::move(gpu));
+    }
 }
 
 void CubeDemo::release_size_dependent() {
@@ -166,6 +207,25 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
         const glm::mat4 mvp = view_projection * model;
         commands->setPushConstants(glm::value_ptr(mvp), sizeof(mvp));
         commands->drawIndexed(nvrhi::DrawArguments().setVertexCount(36));
+    }
+    for (const auto& instance : scene.imported) {
+        const auto found = imported_.find(instance.asset.get());
+        if (found == imported_.end()) throw std::runtime_error("glTF mesh was not prepared");
+        for (const auto& primitive : found->second.primitives) {
+            nvrhi::GraphicsState imported_state;
+            imported_state.setPipeline(pipeline_).setFramebuffer(framebuffers_[image_index]);
+            imported_state.viewport.addViewportAndScissorRect(
+                nvrhi::Viewport(float(width_), float(height_)));
+            imported_state.addBindingSet(binding_set_)
+                .addVertexBuffer(nvrhi::VertexBufferBinding().setBuffer(primitive.vertices)
+                    .setSlot(0).setOffset(0))
+                .setIndexBuffer(nvrhi::IndexBufferBinding().setBuffer(primitive.indices)
+                    .setFormat(nvrhi::Format::R32_UINT).setOffset(0));
+            commands->setGraphicsState(imported_state);
+            const glm::mat4 mvp = view_projection * instance.transform * primitive.node_transform;
+            commands->setPushConstants(glm::value_ptr(mvp), sizeof(mvp));
+            commands->drawIndexed(nvrhi::DrawArguments().setVertexCount(primitive.index_count));
+        }
     }
 }
 

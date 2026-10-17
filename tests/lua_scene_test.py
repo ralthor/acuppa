@@ -52,7 +52,7 @@ with tempfile.TemporaryDirectory() as directory:
                       'tp.spawn({mesh="not:a:mesh"}) end, '
                       'fixed_update=function() end, update=function() end}\n')
     bad_mesh = run("run", invalid_project, "--frames", 1)
-    assert bad_mesh.returncode != 0 and "builtin:cube" in bad_mesh.stderr, bad_mesh.stderr
+    assert bad_mesh.returncode != 0 and "mesh path must end" in bad_mesh.stderr, bad_mesh.stderr
 
     script.write_text('local tp = require("threepoint")\nreturn {start=function() '
                       'tp.spawn({mesh="builtin:cube", scale={0,1,1}}) end, '

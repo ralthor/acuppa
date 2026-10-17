@@ -493,6 +493,7 @@ private:
 
     bool draw_frame(uint32_t next_frame) {
         if (swapchain_ == VK_NULL_HANDLE) return false;
+        if (cube_) cube_->prepare(scene_frame_);
         uint32_t image_index = 0;
         VkResult acquire = vkAcquireNextImageKHR(device_, swapchain_, UINT64_MAX,
                                                  image_available_, VK_NULL_HANDLE, &image_index);

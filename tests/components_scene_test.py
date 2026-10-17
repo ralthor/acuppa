@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory() as directory:
         ('tp.component_set(id, "transform", {parent=id})', "parent"),
         ('tp.component_set(id, "camera", {fov=0})', "camera"),
         ('tp.component_set(id, "light", {intensity=-1})', "light"),
-        ('tp.component_set(id, "mesh", {mesh="missing"})', "unsupported mesh"),
+        ('tp.component_set(id, "mesh", {mesh="missing"})', "mesh path must end"),
         ('tp.component_set(id, "mesh", {visible="yes"})', "boolean"),
         ('tp.component_set(id, "script", {path="../outside.lua"})', "outside project"),
         ('tp.entity_destroy(999)', "unknown entity ID"),

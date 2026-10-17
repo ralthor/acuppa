@@ -103,7 +103,11 @@ void World::set_light(EntityId id, const LightComponent& value) {
 }
 
 void World::set_mesh(EntityId id, const MeshComponent& value) {
-    if (value.mesh != "builtin:cube") {
+    const std::filesystem::path path(value.mesh);
+    if (value.mesh != "builtin:cube" &&
+        (value.mesh.empty() || path.is_absolute() ||
+         (path.extension() != ".gltf" && path.extension() != ".glb") ||
+         value.mesh.find("..") != std::string::npos)) {
         throw std::invalid_argument("unsupported mesh: " + value.mesh);
     }
     require(id).mesh = value;
@@ -210,6 +214,8 @@ SceneFrame World::snapshot(const PerspectiveCamera& fallback_camera) const {
                 ? world_matrix(*transform.parent) : glm::mat4(1.0f);
             frame.cubes.push_back({id, transform.position, transform.rotation, transform.scale,
                                    parent});
+        } else if (entity.mesh && entity.mesh->visible) {
+            frame.imported.push_back({id, entity.mesh->mesh, world_matrix(id), {}});
         }
     }
     return frame;

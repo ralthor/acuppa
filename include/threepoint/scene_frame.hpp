@@ -1,11 +1,13 @@
 #pragma once
 
 #include "threepoint/camera.hpp"
+#include "threepoint/gltf_asset.hpp"
 
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 namespace threepoint {
@@ -18,9 +20,17 @@ struct CubeInstance {
     glm::mat4 parent_transform{1.0f};
 };
 
+struct ImportedInstance {
+    uint64_t id = 0;
+    std::string source;
+    glm::mat4 transform{1.0f};
+    std::shared_ptr<const GltfAsset> asset;
+};
+
 struct SceneFrame {
     PerspectiveCamera camera;
     std::vector<CubeInstance> cubes;
+    std::vector<ImportedInstance> imported;
     bool quit = false;
 };
 

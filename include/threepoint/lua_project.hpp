@@ -6,12 +6,14 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <string>
 
 namespace threepoint {
 
 class LuaProject {
 public:
-    explicit LuaProject(const std::filesystem::path& root);
+    explicit LuaProject(const std::filesystem::path& root,
+                        std::string initial_scene = {});
     ~LuaProject();
     LuaProject(const LuaProject&) = delete;
     LuaProject& operator=(const LuaProject&) = delete;

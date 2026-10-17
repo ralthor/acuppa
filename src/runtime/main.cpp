@@ -23,6 +23,7 @@ int main(int argc, char* argv[]) {
             uint32_t frames = 0;
             std::filesystem::path capture;
             std::string held_key;
+            std::string initial_scene;
             for (int i = 3; i < argc; ++i) {
                 const std::string_view option = argv[i];
                 if (option == "--frames" && i + 1 < argc && frames == 0) {
@@ -42,6 +43,9 @@ int main(int argc, char* argv[]) {
                 } else if (option == "--hold-key" && i + 1 < argc && held_key.empty()) {
                     held_key = argv[++i];
                     if (held_key.empty()) throw std::invalid_argument("--hold-key needs a key name");
+                } else if (option == "--scene" && i + 1 < argc && initial_scene.empty()) {
+                    initial_scene = argv[++i];
+                    if (initial_scene.empty()) throw std::invalid_argument("--scene needs a name");
                 } else {
                     throw std::invalid_argument("unknown or repeated run option: " +
                                                 std::string(option));
@@ -50,7 +54,7 @@ int main(int argc, char* argv[]) {
             if (!capture.empty() && frames == 0) {
                 throw std::invalid_argument("--capture requires --frames");
             }
-            threepoint::LuaProject project(argv[2]);
+            threepoint::LuaProject project(argv[2], initial_scene);
             if (!held_key.empty()) {
                 project.inject({threepoint::InputDevice::Keyboard, held_key, 1.0f});
             }
@@ -134,6 +138,6 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     }
-    std::cerr << "Usage: threepoint run <project> [--frames N] [--capture file.ppm] [--hold-key name] | --version | --check-project <directory> | --preview | --smoke-vulkan | --smoke-cube | --capture-clear <file.ppm> | --capture-cube <file.ppm> [angle-radians]\n";
+    std::cerr << "Usage: threepoint run <project> [--scene name] [--frames N] [--capture file.ppm] [--hold-key name] | --version | --check-project <directory> | --preview | --smoke-vulkan | --smoke-cube | --capture-clear <file.ppm> | --capture-cube <file.ppm> [angle-radians]\n";
     return 2;
 }

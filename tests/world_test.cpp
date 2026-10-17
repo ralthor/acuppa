@@ -22,6 +22,10 @@ int main() {
     expect(world.transform(first)->position.x == 1, "transform did not persist");
     world.set_mesh(first, {"builtin:cube", true});
     expect(world.snapshot({}).cubes.size() == 1, "mesh component did not render");
+    world.set_mesh(second, {"assets/triangle.gltf", true});
+    expect(world.snapshot({}).imported.size() == 1 &&
+           world.snapshot({}).imported[0].source == "assets/triangle.gltf",
+           "imported mesh component did not reach render snapshot");
     threepoint::TransformComponent parent_transform;
     parent_transform.position = {4, 0, 0};
     world.set_transform(second, parent_transform);

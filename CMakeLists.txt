@@ -25,6 +25,11 @@ FetchContent_Declare(glm
   GIT_TAG 0af55ccecd98d4e5a8d1fad7de25ba429d60e863)
 FetchContent_MakeAvailable(glm)
 
+FetchContent_Declare(cgltf
+  GIT_REPOSITORY https://github.com/jkuhlmann/cgltf.git
+  GIT_TAG 360db1a95480fe102ae9c69b27c5d101167ff5ba)
+FetchContent_MakeAvailable(cgltf)
+
 FetchContent_Declare(lua
   URL https://www.lua.org/ftp/lua-5.4.8.tar.gz
   URL_HASH SHA256=4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae)
@@ -60,9 +65,9 @@ endforeach()
 
 add_library(threepoint_core STATIC src/core/project.cpp src/core/camera.cpp src/core/input.cpp
             src/core/world.cpp
-            src/core/lua_project.cpp)
+            src/core/gltf_asset.cpp src/core/cgltf_impl.c src/core/lua_project.cpp)
 target_compile_features(threepoint_core PUBLIC cxx_std_17)
-target_include_directories(threepoint_core PUBLIC include)
+target_include_directories(threepoint_core PUBLIC include PRIVATE "${cgltf_SOURCE_DIR}")
 target_link_libraries(threepoint_core PUBLIC glm::glm threepoint_lua)
 target_compile_definitions(threepoint_core PUBLIC THREEPOINT_VERSION="${PROJECT_VERSION}")
 
@@ -105,6 +110,11 @@ if(BUILD_TESTING)
   add_test(NAME source_scene_and_prefabs COMMAND threepoint_scene_flow_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene"
            "${PROJECT_BINARY_DIR}/scene_flow_fixture")
+  add_executable(threepoint_gltf_test tests/gltf_asset_test.cpp)
+  target_link_libraries(threepoint_gltf_test PRIVATE threepoint_core)
+  add_test(NAME gltf_geometry_and_errors COMMAND threepoint_gltf_test
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene"
+           "${PROJECT_BINARY_DIR}/gltf_fixture")
   add_test(NAME core_project_check COMMAND threepoint_core_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   add_test(NAME runtime_project_check COMMAND threepoint --check-project
@@ -122,6 +132,9 @@ if(BUILD_TESTING)
              "${PROJECT_SOURCE_DIR}/tests/feature_scene")
     add_test(NAME input_scene_capture COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/input_scene_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+    add_test(NAME gltf_scene_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/gltf_scene_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   endif()
 endif()

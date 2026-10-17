@@ -26,6 +26,8 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 
 **Phase 7 status (2026-10-17):** `game.lua` maps scene and prefab names to project-local Lua files. Scene files declare a dense array of named entities and components, including parent names and per-entity scripts. Single-entity prefab files can be instantiated with component overrides. Lua can find entities by name, spawn/destroy prefabs, inspect the active scene, and request a deferred scene switch or reload. Scene changes rebuild the world from source and reset scene time; enabled per-entity scripts run `start`, `fixed_update`, `update`, and `draw` with their entity ID. A core integration test starts the alternate feature scene, checks per-entity callbacks, parent transforms, prefab overrides and rollback, reloads it, switches to the main scene, and rejects bad source declarations. All fifteen local Release tests pass with Vulkan validation. Hosted CI remains unverified without a Git remote. Prefabs currently describe one entity; multi-entity prefab composition and glTF nodes remain future capabilities.
 
+**Phase 8 status (2026-10-17):** Pinned cgltf v1.15 loads static triangle geometry, `POSITION`, optional `COLOR_0`, indices, default-scene nodes, and composed parent transforms from embedded/external-buffer `.gltf` and `.glb`. Mesh components and `tp.spawn` accept project-relative asset paths. The Vulkan renderer uploads/caches imported geometry; the checked-in triangle fixture visibly renders from a source scene via `--scene imported`. Core tests check node hierarchy, all three buffer forms, missing/outside files, unsafe external URIs, and out-of-bounds accessors. All seventeen local Release tests pass with Vulkan validation. The importer intentionally rejects sparse/compressed/skinned/morphed geometry, nontriangle primitives, required extensions, and unsupported external URI syntax; material/texture rendering is Phase 9. Hosted CI remains unverified without a Git remote.
+
 | Phase | Deliverable | Check before commit |
 | --- | --- | --- |
 | 0 | Restore this 3D brief, this roadmap, `AGENTS.md`, and project-local development skills. | Requirements for every item in README map to a phase; no 2D plan is presented as the goal. |
@@ -54,7 +56,7 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 | 23 | Build a small 3D room/puzzle game from Lua and source assets only. | It exercises glTF, PBR, HDRI, shadows, SSAO, physics, audio, UI, save/load, and export. |
 | 24 | Harden and release: automated feature-scene coverage audit, sanitizers, asset-failure cases, performance budgets, Linux packaging, and documentation. | Ubuntu 24+ release builds pass unit, integration, visual, packaged-game, and stability gates. |
 
-Phases 3–7 are locally complete: the engine can display a 3D cube, run Lua-authored 3D scenes, react to named input, manage entities and components, and reproduce worlds from source scene and prefab files. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
+Phases 3–8 are locally complete: the engine can display a 3D cube, run Lua-authored 3D scenes, react to named input, manage entities and components, reproduce worlds from source scene and prefab files, and render imported glTF geometry. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
 
 | README requirement | Covered in phases |
 | --- | --- |
