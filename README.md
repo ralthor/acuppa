@@ -47,9 +47,9 @@ We're building a production-grade, simple and straight-forward 3D Game Engine fo
 
 The requirements above are the source of truth. [PLAN.md](PLAN.md) maps each requirement to small, testable phases and records the current state. The existing SDL3/Lua program is a 2D prototype; it does not satisfy the 3D renderer or physics requirements. The first visible 3D demo is complete in Phase 3, and the first Lua-authored 3D demo is complete in Phase 4.
 
-**Priority update (2026-10-17):** The next work is a playable, source-only 3D falling-block game: a 2D rules grid displayed with 3D blocks. Its game rules, controls, score, and restart will be written in Lua and project files, with no editor clicks. The first playable version is planned for Phase 11 after a pure Lua rules step in Phase 10; Phase 12 finishes game feedback and familiar falling-block features. Advanced graphics move to Phases 13–16, and sound moves to Phase 25. The original 3D engine requirements above remain in scope.
+**Priority update (2026-10-17):** A playable, source-only 3D falling-block game now runs: a 2D rules grid displayed with 3D blocks. Its game rules, controls, score, and restart are written in Lua and project files, with no editor clicks. Phase 12 finishes game feedback and familiar falling-block features. Advanced graphics move to Phases 13–16, and sound moves to Phase 25. The original 3D engine requirements above remain in scope.
 
-Phase 10 now has a tested [pure Lua falling-block board](games/falling_blocks/README.md): all seven shapes, movement, rotation, locking, and line clears. The playable 3D scene and controls are the next step.
+Phases 10–11 provide the tested [Falling Blocks game](games/falling_blocks/README.md): all seven shapes, movement, rotation, locking, line clears, gravity, and keyboard/controller play. Run `build/threepoint run games/falling_blocks` to play it now. Phase 12 adds visible score and the remaining familiar controls.
 
 ## Current implementation
 

@@ -210,6 +210,14 @@ LuaProject::Impl::Impl(const fs::path& directory, const std::string& initial_sce
     if (!lua) throw std::runtime_error("could not create Lua state");
     std::unique_ptr<lua_State, decltype(&lua_close)> guard(lua, lua_close);
     luaL_openlibs(lua);
+    lua_getglobal(lua, "package");
+    const std::string module_path = (root / "?.lua").string() + ";" +
+                                    (root / "?/init.lua").string();
+    lua_pushlstring(lua, module_path.data(), module_path.size());
+    lua_setfield(lua, -2, "path");
+    lua_pushliteral(lua, "");
+    lua_setfield(lua, -2, "cpath");
+    lua_pop(lua, 1);
     install_module();
 
     load_table(paths.manifest);

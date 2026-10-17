@@ -129,6 +129,10 @@ if(BUILD_TESTING)
   add_test(NAME falling_blocks_rules COMMAND threepoint_falling_blocks_rules_test
            "${PROJECT_SOURCE_DIR}/games/falling_blocks/scripts/board.lua"
            "${PROJECT_SOURCE_DIR}/tests/falling_blocks_rules.lua")
+  add_executable(threepoint_falling_blocks_game_test tests/falling_blocks_game_test.cpp)
+  target_link_libraries(threepoint_falling_blocks_game_test PRIVATE threepoint_core)
+  add_test(NAME falling_blocks_game_logic COMMAND threepoint_falling_blocks_game_test
+           "${PROJECT_SOURCE_DIR}/games/falling_blocks")
   add_test(NAME core_project_check COMMAND threepoint_core_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   add_test(NAME runtime_project_check COMMAND threepoint --check-project
@@ -147,6 +151,12 @@ if(BUILD_TESTING)
     add_test(NAME lua_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+    add_test(NAME falling_blocks_live_startup COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/games/falling_blocks")
+    add_test(NAME falling_blocks_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/falling_blocks_capture_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/games/falling_blocks")
     add_test(NAME input_scene_capture COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/input_scene_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene")

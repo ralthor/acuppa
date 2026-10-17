@@ -25,7 +25,7 @@ This is the source-only project used for integration checks. It runs in the 3D r
 | Source round trip and agent control | 22 | Pending | Pending | Pending |
 | Headless tests and exported game | 23 | Pending | Pending | Pending |
 | Spatial audio and Lua control | 25 | Pending | Pending | Pending |
-| Both code-only sample games | 10–12, 24, 26 | `games/falling_blocks/scripts/board.lua` starts the separate falling-block project | `falling_blocks_rules` covers the seven shapes, collisions, rotations, locking, clears, and invalid calls; live play, capture, and export follow | Board rules covered; playable game pending |
+| Both code-only sample games | 10–12, 24, 26 | `games/falling_blocks` is a separate source-only Lua game; the feature scene also checks project-local `require` | `falling_blocks_rules`, `falling_blocks_game_logic`, live startup, and Vulkan capture cover rules and play; export follows | Playable game covered; feedback and export pending |
 
 The public Lua API checklist and sample-game requirements are in [PLAN.md](../../PLAN.md). The final coverage audit checks that each public call has a runnable example, an invalid-input test, and a feature-scene case.
 

@@ -128,4 +128,13 @@ function Board:hard_drop()
   return distance, self:lock()
 end
 
+function Board.line_score(cleared, level)
+  local points = {[0] = 0, 100, 300, 500, 800}
+  assert(type(cleared) == "number" and cleared == math.floor(cleared) and
+         cleared >= 0 and cleared <= 4, "invalid line count")
+  assert(type(level) == "number" and level == math.floor(level) and level >= 1,
+         "invalid level")
+  return points[cleared] * level
+end
+
 return Board

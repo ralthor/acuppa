@@ -1,4 +1,5 @@
 local threepoint = require("threepoint")
+assert(require("scripts.helper").project_local)
 local cube
 
 return {

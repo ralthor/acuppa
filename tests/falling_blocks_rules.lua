@@ -67,4 +67,7 @@ assert(top.game_over and not top.active and not top:move(1, 0))
 expect_error(function() Board.new():spawn("bad") end)
 expect_error(function() Board.new():hard_drop() end)
 
+assert(Board.line_score(1, 1) == 100 and Board.line_score(2, 2) == 600 and
+       Board.line_score(4, 1) == 800)
+expect_error(function() Board.line_score(5, 1) end)
 print("Falling-block board rules passed")
