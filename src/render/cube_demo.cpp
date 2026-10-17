@@ -158,7 +158,7 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
             .setFormat(nvrhi::Format::R16_UINT).setOffset(0));
     commands->setGraphicsState(state);
     for (const CubeInstance& cube : scene.cubes) {
-        const glm::mat4 model = glm::scale(
+        const glm::mat4 model = cube.parent_transform * glm::scale(
             glm::rotate(glm::rotate(glm::rotate(
                 glm::translate(glm::mat4(1.0f), cube.position), cube.rotation.y,
                 glm::vec3(0, 1, 0)), cube.rotation.x, glm::vec3(1, 0, 0)),

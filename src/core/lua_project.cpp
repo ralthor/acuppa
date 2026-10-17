@@ -1,6 +1,7 @@
 #include "threepoint/lua_project.hpp"
 
 #include "threepoint/project.hpp"
+#include "threepoint/world.hpp"
 
 extern "C" {
 #include <lauxlib.h>
@@ -41,6 +42,14 @@ struct LuaProject::Impl {
     static int pointer(lua_State* lua);
     static int ray(lua_State* lua);
     static int set_camera(lua_State* lua);
+    static int entity_create(lua_State* lua);
+    static int entity_destroy(lua_State* lua);
+    static int entity_exists(lua_State* lua);
+    static int entities(lua_State* lua);
+    static int entity_name(lua_State* lua);
+    static int component_set(lua_State* lua);
+    static int component_get(lua_State* lua);
+    static int component_remove(lua_State* lua);
     static glm::vec3 vector_field(lua_State* lua, int table, const char* field,
                                   glm::vec3 fallback, bool positive);
     static glm::vec3 vector_arg(lua_State* lua, int index, bool positive);
@@ -49,7 +58,6 @@ struct LuaProject::Impl {
     lua_State* lua = nullptr;
     uint32_t width = 960;
     uint32_t height = 540;
-    uint64_t next_id = 1;
     double time_seconds = 0.0;
     double fixed_accumulator = 0.0;
     bool wants_quit = false;
@@ -58,6 +66,7 @@ struct LuaProject::Impl {
     int update_ref = LUA_NOREF;
     int draw_ref = LUA_NOREF;
     SceneFrame frame;
+    World world;
     InputState input;
 };
 
@@ -87,14 +96,15 @@ uint32_t dimension(lua_State* lua, int table, const char* field) {
     return value;
 }
 
-float optional_number(lua_State* lua, int table, const char* field, float fallback) {
+float optional_number(lua_State* lua, int table, const char* field, float fallback,
+                      const char* section = "camera") {
     lua_getfield(lua, table, field);
     if (lua_isnil(lua, -1)) {
         lua_pop(lua, 1);
         return fallback;
     }
     if (!lua_isnumber(lua, -1) || !std::isfinite(lua_tonumber(lua, -1))) {
-        luaL_error(lua, "camera.%s must be finite", field);
+        throw std::invalid_argument(std::string(section) + "." + field + " must be finite");
     }
     const float value = float(lua_tonumber(lua, -1));
     lua_pop(lua, 1);
@@ -107,6 +117,26 @@ void push_vec3(lua_State* lua, const glm::vec3& value) {
         lua_pushnumber(lua, value[i]);
         lua_rawseti(lua, -2, i + 1);
     }
+}
+
+EntityId checked_id(lua_State* lua, int index) {
+    const lua_Integer id = luaL_checkinteger(lua, index);
+    if (id <= 0) luaL_argerror(lua, index, "entity ID must be positive");
+    return EntityId(id);
+}
+
+bool optional_boolean(lua_State* lua, int table, const char* field, bool fallback) {
+    lua_getfield(lua, table, field);
+    if (lua_isnil(lua, -1)) {
+        lua_pop(lua, 1);
+        return fallback;
+    }
+    if (!lua_isboolean(lua, -1)) {
+        throw std::invalid_argument(std::string(field) + " must be boolean");
+    }
+    const bool value = lua_toboolean(lua, -1) != 0;
+    lua_pop(lua, 1);
+    return value;
 }
 
 int callback_ref(lua_State* lua, const char* name, bool required) {
@@ -280,20 +310,30 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("pointer", &pointer);
     add_function("screen_ray", &ray);
     add_function("set_camera", &set_camera);
+    add_function("entity_create", &entity_create);
+    add_function("entity_destroy", &entity_destroy);
+    add_function("entity_exists", &entity_exists);
+    add_function("entities", &entities);
+    add_function("entity_name", &entity_name);
+    add_function("component_set", &component_set);
+    add_function("component_get", &component_get);
+    add_function("component_remove", &component_remove);
     return 1;
 }
 
 glm::vec3 LuaProject::Impl::vector_arg(lua_State* lua, int index, bool positive) {
-    luaL_checktype(lua, index, LUA_TTABLE);
-    if (lua_rawlen(lua, index) != 3) luaL_argerror(lua, index, "expected three numbers");
+    if (!lua_istable(lua, index) || lua_rawlen(lua, index) != 3)
+        throw std::invalid_argument("expected a vector of three numbers");
     glm::vec3 value;
     for (int i = 0; i < 3; ++i) {
         lua_rawgeti(lua, index, i + 1);
-        const double component = luaL_checknumber(lua, -1);
+        if (!lua_isnumber(lua, -1))
+            throw std::invalid_argument("expected a vector of three numbers");
+        const double component = lua_tonumber(lua, -1);
         if (!std::isfinite(component) || std::abs(component) > 1000000.0 ||
             (positive && component <= 0.0)) {
-            luaL_argerror(lua, index, positive ? "scale must be positive and finite"
-                                              : "vector components must be finite");
+            throw std::invalid_argument(positive ? "scale must be positive and finite"
+                                                  : "vector components must be finite");
         }
         value[i] = float(component);
         lua_pop(lua, 1);
@@ -323,26 +363,34 @@ int LuaProject::Impl::spawn(lua_State* lua) {
         return luaL_argerror(lua, 1, "mesh must be 'builtin:cube'");
     }
     lua_pop(lua, 1);
-    CubeInstance cube;
-    cube.position = vector_field(lua, 1, "position", glm::vec3(0), false);
-    cube.rotation = vector_field(lua, 1, "rotation", glm::vec3(0), false);
-    cube.scale = vector_field(lua, 1, "scale", glm::vec3(1), true);
-    if (state.frame.cubes.size() >= 10000) return luaL_error(lua, "cube limit reached");
-    cube.id = state.next_id++;
-    state.frame.cubes.push_back(cube);
-    lua_pushinteger(lua, lua_Integer(cube.id));
+    try {
+        TransformComponent transform;
+        transform.position = vector_field(lua, 1, "position", glm::vec3(0), false);
+        transform.rotation = vector_field(lua, 1, "rotation", glm::vec3(0), false);
+        transform.scale = vector_field(lua, 1, "scale", glm::vec3(1), true);
+        const EntityId id = state.world.create();
+        state.world.set_transform(id, transform);
+        state.world.set_mesh(id, {"builtin:cube", true});
+        lua_pushinteger(lua, lua_Integer(id));
+    } catch (const std::exception& error) {
+        return luaL_error(lua, "%s", error.what());
+    }
     return 1;
 }
 
 int LuaProject::Impl::set_rotation(lua_State* lua) {
     if (lua_gettop(lua) != 2) return luaL_error(lua, "set_rotation() expects an ID and a vector");
     Impl& state = context(lua);
-    const lua_Integer id = luaL_checkinteger(lua, 1);
-    const glm::vec3 value = vector_arg(lua, 2, false);
-    const auto found = std::find_if(state.frame.cubes.begin(), state.frame.cubes.end(),
-        [id](const CubeInstance& cube) { return cube.id == uint64_t(id); });
-    if (id <= 0 || found == state.frame.cubes.end()) return luaL_error(lua, "unknown cube ID");
-    found->rotation = value;
+    const EntityId id = checked_id(lua, 1);
+    try {
+        const glm::vec3 value = vector_arg(lua, 2, false);
+        auto transform = state.world.transform(id);
+        if (!transform) throw std::invalid_argument("entity has no transform");
+        transform->rotation = value;
+        state.world.set_transform(id, *transform);
+    } catch (const std::invalid_argument& error) {
+        return luaL_error(lua, "%s", error.what());
+    }
     return 0;
 }
 
@@ -383,7 +431,9 @@ int LuaProject::Impl::ray(lua_State* lua) {
     const double y = luaL_checknumber(lua, 2);
     Impl& state = context(lua);
     try {
-        const WorldRay world = screen_ray(state.frame.camera, state.width, state.height, x, y);
+        PerspectiveCamera camera = state.frame.camera;
+        if (const auto active = state.world.active_camera()) camera = state.world.camera(*active)->camera;
+        const WorldRay world = screen_ray(camera, state.width, state.height, x, y);
         lua_createtable(lua, 0, 2);
         push_vec3(lua, world.origin);
         lua_setfield(lua, -2, "origin");
@@ -399,20 +449,232 @@ int LuaProject::Impl::set_camera(lua_State* lua) {
     if (lua_gettop(lua) != 1) return luaL_error(lua, "set_camera() expects one table");
     luaL_checktype(lua, 1, LUA_TTABLE);
     Impl& state = context(lua);
-    PerspectiveCamera camera = state.frame.camera;
-    camera.eye = vector_field(lua, 1, "eye", camera.eye, false);
-    camera.target = vector_field(lua, 1, "target", camera.target, false);
-    camera.up = vector_field(lua, 1, "up", camera.up, false);
-    camera.vertical_fov_degrees = optional_number(lua, 1, "fov", camera.vertical_fov_degrees);
-    camera.near_plane = optional_number(lua, 1, "near", camera.near_plane);
-    camera.far_plane = optional_number(lua, 1, "far", camera.far_plane);
     try {
+        PerspectiveCamera camera = state.frame.camera;
+        if (const auto active = state.world.active_camera()) camera = state.world.camera(*active)->camera;
+        camera.eye = vector_field(lua, 1, "eye", camera.eye, false);
+        camera.target = vector_field(lua, 1, "target", camera.target, false);
+        camera.up = vector_field(lua, 1, "up", camera.up, false);
+        camera.vertical_fov_degrees = optional_number(lua, 1, "fov", camera.vertical_fov_degrees);
+        camera.near_plane = optional_number(lua, 1, "near", camera.near_plane);
+        camera.far_plane = optional_number(lua, 1, "far", camera.far_plane);
         camera.view_projection(float(state.width) / float(state.height));
+        if (const auto active = state.world.active_camera()) {
+            state.world.set_camera(*active, {camera, true});
+        } else {
+            state.frame.camera = camera;
+        }
     } catch (const std::invalid_argument& error) {
         return luaL_error(lua, "%s", error.what());
     }
-    state.frame.camera = camera;
     return 0;
+}
+
+int LuaProject::Impl::entity_create(lua_State* lua) {
+    if (lua_gettop(lua) > 1) return luaL_error(lua, "entity_create() accepts one optional name");
+    const char* name = luaL_optstring(lua, 1, "");
+    try {
+        lua_pushinteger(lua, lua_Integer(context(lua).world.create(name)));
+    } catch (const std::exception& error) {
+        return luaL_error(lua, "%s", error.what());
+    }
+    return 1;
+}
+
+int LuaProject::Impl::entity_destroy(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "entity_destroy() expects an ID");
+    const EntityId id = checked_id(lua, 1);
+    try { context(lua).world.destroy(id); }
+    catch (const std::invalid_argument& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::entity_exists(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "entity_exists() expects an ID");
+    lua_pushboolean(lua, context(lua).world.exists(checked_id(lua, 1)));
+    return 1;
+}
+
+int LuaProject::Impl::entities(lua_State* lua) {
+    if (lua_gettop(lua) != 0) return luaL_error(lua, "entities() expects no arguments");
+    const auto ids = context(lua).world.entities();
+    lua_createtable(lua, int(ids.size()), 0);
+    for (size_t i = 0; i < ids.size(); ++i) {
+        lua_pushinteger(lua, lua_Integer(ids[i]));
+        lua_rawseti(lua, -2, lua_Integer(i + 1));
+    }
+    return 1;
+}
+
+int LuaProject::Impl::entity_name(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "entity_name() expects an ID");
+    try { lua_pushstring(lua, context(lua).world.name(checked_id(lua, 1)).c_str()); }
+    catch (const std::invalid_argument& error) { return luaL_error(lua, "%s", error.what()); }
+    return 1;
+}
+
+int LuaProject::Impl::component_set(lua_State* lua) {
+    if (lua_gettop(lua) != 3) return luaL_error(lua, "component_set() expects ID, kind, table");
+    const EntityId id = checked_id(lua, 1);
+    const char* kind = luaL_checkstring(lua, 2);
+    luaL_checktype(lua, 3, LUA_TTABLE);
+    Impl& state = context(lua);
+    try {
+        if (std::strcmp(kind, "transform") == 0) {
+            TransformComponent value = state.world.transform(id).value_or(TransformComponent{});
+            value.position = vector_field(lua, 3, "position", value.position, false);
+            value.rotation = vector_field(lua, 3, "rotation", value.rotation, false);
+            value.scale = vector_field(lua, 3, "scale", value.scale, true);
+            lua_getfield(lua, 3, "parent");
+            if (!lua_isnil(lua, -1)) {
+                if (!lua_isinteger(lua, -1) || lua_tointeger(lua, -1) < 0)
+                    throw std::invalid_argument("transform.parent must be an entity ID or zero");
+                const lua_Integer parent = lua_tointeger(lua, -1);
+                value.parent = parent == 0 ? std::nullopt
+                    : std::optional<EntityId>(EntityId(parent));
+            }
+            lua_pop(lua, 1);
+            state.world.set_transform(id, value);
+        } else if (std::strcmp(kind, "camera") == 0) {
+            CameraComponent value = state.world.camera(id).value_or(CameraComponent{});
+            value.camera.eye = vector_field(lua, 3, "eye", value.camera.eye, false);
+            value.camera.target = vector_field(lua, 3, "target", value.camera.target, false);
+            value.camera.up = vector_field(lua, 3, "up", value.camera.up, false);
+            value.camera.vertical_fov_degrees = optional_number(lua, 3, "fov", value.camera.vertical_fov_degrees);
+            value.camera.near_plane = optional_number(lua, 3, "near", value.camera.near_plane);
+            value.camera.far_plane = optional_number(lua, 3, "far", value.camera.far_plane);
+            value.active = optional_boolean(lua, 3, "active", value.active);
+            state.world.set_camera(id, value);
+        } else if (std::strcmp(kind, "light") == 0) {
+            LightComponent value = state.world.light(id).value_or(LightComponent{});
+            lua_getfield(lua, 3, "type");
+            if (!lua_isnil(lua, -1)) {
+                if (lua_type(lua, -1) != LUA_TSTRING)
+                    throw std::invalid_argument("light.type must be a string");
+                const char* type = lua_tostring(lua, -1);
+                if (std::strcmp(type, "point") == 0) value.type = LightComponent::Type::Point;
+                else if (std::strcmp(type, "directional") == 0) value.type = LightComponent::Type::Directional;
+                else throw std::invalid_argument("light.type must be point or directional");
+            }
+            lua_pop(lua, 1);
+            value.color = vector_field(lua, 3, "color", value.color, false);
+            value.direction = vector_field(lua, 3, "direction", value.direction, false);
+            value.intensity = optional_number(lua, 3, "intensity", value.intensity, "light");
+            state.world.set_light(id, value);
+        } else if (std::strcmp(kind, "mesh") == 0) {
+            MeshComponent value = state.world.mesh(id).value_or(MeshComponent{});
+            lua_getfield(lua, 3, "mesh");
+            if (!lua_isnil(lua, -1)) {
+                if (lua_type(lua, -1) != LUA_TSTRING)
+                    throw std::invalid_argument("mesh.mesh must be a string");
+                value.mesh = lua_tostring(lua, -1);
+            }
+            lua_pop(lua, 1);
+            value.visible = optional_boolean(lua, 3, "visible", value.visible);
+            state.world.set_mesh(id, value);
+        } else if (std::strcmp(kind, "script") == 0) {
+            ScriptComponent value = state.world.script(id).value_or(ScriptComponent{});
+            lua_getfield(lua, 3, "path");
+            if (!lua_isnil(lua, -1)) {
+                if (lua_type(lua, -1) != LUA_TSTRING)
+                    throw std::invalid_argument("script.path must be a string");
+                value.path = lua_tostring(lua, -1);
+            }
+            lua_pop(lua, 1);
+            value.enabled = optional_boolean(lua, 3, "enabled", value.enabled);
+            const std::string file = state.project_file(value.path).string();
+            if (luaL_loadfilex(lua, file.c_str(), "t") != LUA_OK) {
+                const std::string error = lua_tostring(lua, -1);
+                lua_pop(lua, 1);
+                throw std::runtime_error("script component: " + error);
+            }
+            lua_pop(lua, 1);
+            state.world.set_script(id, value);
+        } else {
+            throw std::invalid_argument(std::string("unknown component kind: ") + kind);
+        }
+    } catch (const std::exception& error) {
+        return luaL_error(lua, "%s", error.what());
+    }
+    return 0;
+}
+
+int LuaProject::Impl::component_get(lua_State* lua) {
+    if (lua_gettop(lua) != 2) return luaL_error(lua, "component_get() expects ID and kind");
+    const EntityId id = checked_id(lua, 1);
+    const char* kind = luaL_checkstring(lua, 2);
+    const World& world = context(lua).world;
+    try {
+        if (std::strcmp(kind, "transform") == 0) {
+            const auto value = world.transform(id);
+            if (!value) { lua_pushnil(lua); return 1; }
+            lua_createtable(lua, 0, 4);
+            push_vec3(lua, value->position); lua_setfield(lua, -2, "position");
+            push_vec3(lua, value->rotation); lua_setfield(lua, -2, "rotation");
+            push_vec3(lua, value->scale); lua_setfield(lua, -2, "scale");
+            if (value->parent) {
+                lua_pushinteger(lua, lua_Integer(*value->parent));
+                lua_setfield(lua, -2, "parent");
+            }
+        } else if (std::strcmp(kind, "camera") == 0) {
+            const auto value = world.camera(id);
+            if (!value) { lua_pushnil(lua); return 1; }
+            lua_createtable(lua, 0, 7);
+            push_vec3(lua, value->camera.eye); lua_setfield(lua, -2, "eye");
+            push_vec3(lua, value->camera.target); lua_setfield(lua, -2, "target");
+            push_vec3(lua, value->camera.up); lua_setfield(lua, -2, "up");
+            lua_pushnumber(lua, value->camera.vertical_fov_degrees); lua_setfield(lua, -2, "fov");
+            lua_pushnumber(lua, value->camera.near_plane); lua_setfield(lua, -2, "near");
+            lua_pushnumber(lua, value->camera.far_plane); lua_setfield(lua, -2, "far");
+            lua_pushboolean(lua, value->active); lua_setfield(lua, -2, "active");
+        } else if (std::strcmp(kind, "light") == 0) {
+            const auto value = world.light(id);
+            if (!value) { lua_pushnil(lua); return 1; }
+            lua_createtable(lua, 0, 4);
+            lua_pushstring(lua, value->type == LightComponent::Type::Point ? "point" : "directional");
+            lua_setfield(lua, -2, "type");
+            push_vec3(lua, value->color); lua_setfield(lua, -2, "color");
+            push_vec3(lua, value->direction); lua_setfield(lua, -2, "direction");
+            lua_pushnumber(lua, value->intensity); lua_setfield(lua, -2, "intensity");
+        } else if (std::strcmp(kind, "mesh") == 0) {
+            const auto value = world.mesh(id);
+            if (!value) { lua_pushnil(lua); return 1; }
+            lua_createtable(lua, 0, 2);
+            lua_pushstring(lua, value->mesh.c_str()); lua_setfield(lua, -2, "mesh");
+            lua_pushboolean(lua, value->visible); lua_setfield(lua, -2, "visible");
+        } else if (std::strcmp(kind, "script") == 0) {
+            const auto value = world.script(id);
+            if (!value) { lua_pushnil(lua); return 1; }
+            lua_createtable(lua, 0, 2);
+            lua_pushstring(lua, value->path.c_str()); lua_setfield(lua, -2, "path");
+            lua_pushboolean(lua, value->enabled); lua_setfield(lua, -2, "enabled");
+        } else {
+            return luaL_error(lua, "unknown component kind: %s", kind);
+        }
+    } catch (const std::invalid_argument& error) {
+        return luaL_error(lua, "%s", error.what());
+    }
+    return 1;
+}
+
+int LuaProject::Impl::component_remove(lua_State* lua) {
+    if (lua_gettop(lua) != 2) return luaL_error(lua, "component_remove() expects ID and kind");
+    const EntityId id = checked_id(lua, 1);
+    const char* kind = luaL_checkstring(lua, 2);
+    World& world = context(lua).world;
+    bool removed = false;
+    try {
+        if (std::strcmp(kind, "transform") == 0) removed = world.remove_transform(id);
+        else if (std::strcmp(kind, "camera") == 0) removed = world.remove_camera(id);
+        else if (std::strcmp(kind, "light") == 0) removed = world.remove_light(id);
+        else if (std::strcmp(kind, "mesh") == 0) removed = world.remove_mesh(id);
+        else if (std::strcmp(kind, "script") == 0) removed = world.remove_script(id);
+        else return luaL_error(lua, "unknown component kind: %s", kind);
+    } catch (const std::invalid_argument& error) {
+        return luaL_error(lua, "%s", error.what());
+    }
+    lua_pushboolean(lua, removed);
+    return 1;
 }
 
 SceneFrame LuaProject::Impl::step(double dt) {
@@ -420,8 +682,9 @@ SceneFrame LuaProject::Impl::step(double dt) {
         throw std::invalid_argument("frame delta must be finite and between 0 and 0.25 seconds");
     }
     if (wants_quit) {
-        frame.quit = true;
-        return frame;
+        SceneFrame scene = world.snapshot(frame.camera);
+        scene.quit = true;
+        return scene;
     }
     constexpr double fixed_dt = 1.0 / 60.0;
     time_seconds += dt;
@@ -435,8 +698,9 @@ SceneFrame LuaProject::Impl::step(double dt) {
     if (fixed_steps == 8) fixed_accumulator = std::min(fixed_accumulator, fixed_dt);
     if (!wants_quit) call(update_ref, "update", dt, true);
     if (!wants_quit) call(draw_ref, "draw", 0.0, false);
-    frame.quit = wants_quit;
-    return frame;
+    SceneFrame scene = world.snapshot(frame.camera);
+    scene.quit = wants_quit;
+    return scene;
 }
 
 LuaProject::LuaProject(const fs::path& root) : impl_(std::make_unique<Impl>(root)) {}

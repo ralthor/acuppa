@@ -64,7 +64,7 @@ with tempfile.TemporaryDirectory() as directory:
                       'tp.set_rotation(999, {0,0,0}) end, '
                       'fixed_update=function() end, update=function() end}\n')
     bad_id = run("run", invalid_project, "--frames", 1)
-    assert bad_id.returncode != 0 and "unknown cube ID" in bad_id.stderr, bad_id.stderr
+    assert bad_id.returncode != 0 and "unknown entity ID" in bad_id.stderr, bad_id.stderr
 
     script.write_text('local tp = require("threepoint")\nreturn {start=function() '
                       'tp.time(1) end, fixed_update=function() end, '

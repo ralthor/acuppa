@@ -9,7 +9,7 @@ This is the source-only project used for integration checks. It runs in the 3D r
 | Transforms, camera, depth, cube | 3 | Built-in cube preview and Phase 4 Lua cube | `camera_math`, `cube_capture` GPU angle/depth/resize checks | Local covered; hosted CI pending |
 | Lua 3D callbacks and source scene | 4 | `game.lua`, `scenes/main.scene.lua`, `scripts/main.lua`: spawn, rotate, time, fixed/update/draw | `lua_scene_logic`, `lua_scene_capture`; invalid API and path cases | Local covered; hosted CI pending |
 | Keyboard, mouse, controller, screen ray | 5 | `game.lua` named actions; `scripts/main.lua` turns cube, moves camera, reads pointer ray | `input_actions_and_ray`, `lua_scene_logic` injected events, `input_scene_capture` GPU comparison | Local covered; physical controller and hosted CI pending |
-| Entity IDs, components, lights | 6 | Pending | Pending | Pending |
+| Entity IDs, transform parenting, camera, light, mesh, script components | 6 | `scripts/main.lua` creates, changes, reads, removes every component; camera and ray use active component | `world_components`, `lua_scene_logic`, `lua_component_errors`; prior GPU captures | Local covered; lighting and per-entity script execution arrive in later phases |
 | Prefabs, spawn/destroy, scene switching | 7 | Pending | Pending | Pending |
 | glTF meshes and scene hierarchy | 8 | Pending | Pending | Pending |
 | Textures, materials, direct-light PBR | 9 | Pending | Pending | Pending |
