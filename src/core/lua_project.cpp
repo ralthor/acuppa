@@ -896,6 +896,8 @@ int LuaProject::Impl::component_set(lua_State* lua) {
             value.color = vector_field(lua, 3, "color", value.color, false);
             value.direction = vector_field(lua, 3, "direction", value.direction, false);
             value.intensity = optional_number(lua, 3, "intensity", value.intensity, "light");
+            value.shadows = optional_boolean(lua, 3, "shadows", value.shadows);
+            value.shadow_range = optional_number(lua, 3, "shadow_range", value.shadow_range, "light");
             state.world.set_light(id, value);
         } else if (std::strcmp(kind, "mesh") == 0) {
             MeshComponent value = state.world.mesh(id).value_or(MeshComponent{});
@@ -945,7 +947,7 @@ int LuaProject::Impl::component_get(lua_State* lua) {
         if (std::strcmp(kind, "transform") == 0) {
             const auto value = world.transform(id);
             if (!value) { lua_pushnil(lua); return 1; }
-            lua_createtable(lua, 0, 4);
+            lua_createtable(lua, 0, 6);
             push_vec3(lua, value->position); lua_setfield(lua, -2, "position");
             push_vec3(lua, value->rotation); lua_setfield(lua, -2, "rotation");
             push_vec3(lua, value->scale); lua_setfield(lua, -2, "scale");
@@ -973,6 +975,8 @@ int LuaProject::Impl::component_get(lua_State* lua) {
             push_vec3(lua, value->color); lua_setfield(lua, -2, "color");
             push_vec3(lua, value->direction); lua_setfield(lua, -2, "direction");
             lua_pushnumber(lua, value->intensity); lua_setfield(lua, -2, "intensity");
+            lua_pushboolean(lua, value->shadows); lua_setfield(lua, -2, "shadows");
+            lua_pushnumber(lua, value->shadow_range); lua_setfield(lua, -2, "shadow_range");
         } else if (std::strcmp(kind, "mesh") == 0) {
             const auto value = world.mesh(id);
             if (!value) { lua_pushnil(lua); return 1; }

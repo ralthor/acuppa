@@ -7,11 +7,18 @@
 #include "pbr_frag_spv.hpp"
 #include "tonemap_vert_spv.hpp"
 #include "tonemap_frag_spv.hpp"
+#include "shadow_cube_vert_spv.hpp"
+#include "shadow_cube_frag_spv.hpp"
+#include "shadow_pbr_vert_spv.hpp"
+#include "shadow_pbr_frag_spv.hpp"
 
+#include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/geometric.hpp>
 
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -59,6 +66,16 @@ struct PbrTransform {
 };
 static_assert(sizeof(PbrTransform) == 128);
 
+struct ShadowFrame {
+    glm::mat4 transforms[48]{};
+    float settings[8][4]{};
+};
+static_assert(sizeof(ShadowFrame) == 3200);
+
+constexpr uint32_t shadow_tile = 512;
+constexpr uint32_t shadow_columns = 6;
+constexpr uint32_t shadow_rows = 8;
+
 struct CubeMesh {
     std::vector<Vertex> vertices;
     std::vector<uint16_t> indices;
@@ -83,6 +100,34 @@ CubeMesh make_cube() {
     face({{{-1,-1,-1}, { 1,-1,-1}, { 1,-1, 1}, {-1,-1, 1}}}, {0.95f, 0.27f, 0.73f});
     face({{{ 1,-1,-1}, {-1,-1,-1}, {-1, 1,-1}, { 1, 1,-1}}}, {0.52f, 0.30f, 0.95f});
     return mesh;
+}
+
+glm::mat4 cube_model(const CubeInstance& cube) {
+    return cube.parent_transform * glm::scale(
+        glm::rotate(glm::rotate(glm::rotate(
+            glm::translate(glm::mat4(1.0f), cube.position), cube.rotation.y,
+            glm::vec3(0, 1, 0)), cube.rotation.x, glm::vec3(1, 0, 0)),
+            cube.rotation.z, glm::vec3(0, 0, 1)), cube.scale);
+}
+
+glm::mat4 shadow_matrix(const LightInstance& light, int face) {
+    if (light.directional) {
+        const glm::vec3 direction = glm::normalize(light.direction);
+        const glm::vec3 up = std::abs(direction.y) > 0.95f
+            ? glm::vec3(0, 0, 1) : glm::vec3(0, 1, 0);
+        const float range = light.shadow_range;
+        return glm::orthoRH_ZO(-range, range, -range, range, 0.1f, 2.0f * range + 0.1f) *
+               glm::lookAtRH(light.position - direction * range,
+                             light.position, up);
+    }
+    static const glm::vec3 directions[6] = {
+        {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
+    };
+    static const glm::vec3 ups[6] = {
+        {0, -1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}, {0, -1, 0}, {0, -1, 0}
+    };
+    return glm::perspectiveRH_ZO(glm::radians(90.0f), 1.0f, 0.05f, light.shadow_range) *
+           glm::lookAtRH(light.position, light.position + directions[face], ups[face]);
 }
 
 void require(bool ok, const char* action) {
@@ -167,6 +212,40 @@ CubeDemo::CubeDemo(nvrhi::IDevice* device) : device_(device) {
     require(environment_binding_layout_ && environment_sampler_,
             "create environment lighting resources");
 
+    shadow_cube_vertex_shader_ = device_->createShader(
+        nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Vertex).setDebugName("shadow cube vertex"),
+        shadow_cube_vert_spv, sizeof(shadow_cube_vert_spv));
+    shadow_cube_fragment_shader_ = device_->createShader(
+        nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Pixel).setDebugName("shadow cube fragment"),
+        shadow_cube_frag_spv, sizeof(shadow_cube_frag_spv));
+    shadow_pbr_vertex_shader_ = device_->createShader(
+        nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Vertex).setDebugName("shadow glTF vertex"),
+        shadow_pbr_vert_spv, sizeof(shadow_pbr_vert_spv));
+    shadow_pbr_fragment_shader_ = device_->createShader(
+        nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Pixel).setDebugName("shadow glTF fragment"),
+        shadow_pbr_frag_spv, sizeof(shadow_pbr_frag_spv));
+    require(shadow_cube_vertex_shader_ && shadow_cube_fragment_shader_ &&
+            shadow_pbr_vertex_shader_ && shadow_pbr_fragment_shader_,
+            "create shadow shaders");
+    nvrhi::BufferDesc shadow_desc;
+    shadow_desc.byteSize = sizeof(ShadowFrame);
+    shadow_desc.isConstantBuffer = true;
+    shadow_desc.isVolatile = true;
+    shadow_desc.maxVersions = 16;
+    shadow_desc.debugName = "shadow frame";
+    shadow_frame_buffer_ = device_->createBuffer(shadow_desc);
+    shadow_sampler_ = device_->createSampler(nvrhi::SamplerDesc()
+        .setAllAddressModes(nvrhi::SamplerAddressMode::Clamp).setAllFilters(false));
+    shadow_binding_layout_ = device_->createBindingLayout(
+        nvrhi::BindingLayoutDesc().setVisibility(nvrhi::ShaderType::Pixel)
+            .setBindingOffsets(nvrhi::VulkanBindingOffsets()
+                .setSamplerOffset(0).setConstantBufferOffset(0))
+            .addItem(nvrhi::BindingLayoutItem::Texture_SRV(0))
+            .addItem(nvrhi::BindingLayoutItem::Sampler(1))
+            .addItem(nvrhi::BindingLayoutItem::VolatileConstantBuffer(2)));
+    require(shadow_frame_buffer_ && shadow_sampler_ && shadow_binding_layout_,
+            "create shadow sampling resources");
+
     tonemap_vertex_shader_ = device_->createShader(
         nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Vertex).setDebugName("tonemap vertex"),
         tonemap_vert_spv, sizeof(tonemap_vert_spv));
@@ -224,9 +303,59 @@ CubeDemo::CubeDemo(nvrhi::IDevice* device) : device_(device) {
             .addItem(nvrhi::BindingSetItem::Sampler(1, environment_sampler_)),
         environment_binding_layout_);
     require(environment_binding_set_, "create fallback environment binding set");
+    shadow_binding_set_ = device_->createBindingSet(
+        nvrhi::BindingSetDesc()
+            .addItem(nvrhi::BindingSetItem::Texture_SRV(0, white_texture_))
+            .addItem(nvrhi::BindingSetItem::Sampler(1, shadow_sampler_))
+            .addItem(nvrhi::BindingSetItem::ConstantBuffer(2, shadow_frame_buffer_)),
+        shadow_binding_layout_);
+    require(shadow_binding_set_, "create fallback shadow binding set");
 }
 
 void CubeDemo::prepare(const SceneFrame& scene) {
+    bool needs_shadows = false;
+    for (const auto& light : scene.lights) needs_shadows |= light.shadows;
+    if (needs_shadows && !shadow_atlas_) {
+        nvrhi::TextureDesc desc;
+        desc.width = shadow_tile * shadow_columns;
+        desc.height = shadow_tile * shadow_rows;
+        desc.format = nvrhi::Format::D32;
+        desc.isShaderResource = true;
+        desc.isRenderTarget = true;
+        desc.debugName = "shadow atlas";
+        desc.enableAutomaticStateTracking(nvrhi::ResourceStates::DepthWrite);
+        shadow_atlas_ = device_->createTexture(desc);
+        require(shadow_atlas_, "create shadow atlas");
+        shadow_framebuffer_ = device_->createFramebuffer(
+            nvrhi::FramebufferDesc().setDepthAttachment(shadow_atlas_));
+        require(shadow_framebuffer_, "create shadow framebuffer");
+        shadow_binding_set_ = device_->createBindingSet(
+            nvrhi::BindingSetDesc()
+                .addItem(nvrhi::BindingSetItem::Texture_SRV(0, shadow_atlas_))
+                .addItem(nvrhi::BindingSetItem::Sampler(1, shadow_sampler_))
+                .addItem(nvrhi::BindingSetItem::ConstantBuffer(2, shadow_frame_buffer_)),
+            shadow_binding_layout_);
+        require(shadow_binding_set_, "create shadow atlas binding set");
+        nvrhi::GraphicsPipelineDesc cube_desc;
+        cube_desc.setVertexShader(shadow_cube_vertex_shader_)
+            .setFragmentShader(shadow_cube_fragment_shader_)
+            .setInputLayout(input_layout_).addBindingLayout(binding_layout_);
+        cube_desc.renderState.depthStencilState.enableDepthTest().enableDepthWrite()
+            .setDepthFunc(nvrhi::ComparisonFunc::Less);
+        cube_desc.renderState.rasterState.setCullNone().enableDepthClip();
+        shadow_cube_pipeline_ = device_->createGraphicsPipeline(
+            cube_desc, shadow_framebuffer_->getFramebufferInfo());
+        nvrhi::GraphicsPipelineDesc imported_desc;
+        imported_desc.setVertexShader(shadow_pbr_vertex_shader_)
+            .setFragmentShader(shadow_pbr_fragment_shader_)
+            .setInputLayout(pbr_input_layout_).addBindingLayout(pbr_binding_layout_);
+        imported_desc.renderState.depthStencilState.enableDepthTest().enableDepthWrite()
+            .setDepthFunc(nvrhi::ComparisonFunc::Less);
+        imported_desc.renderState.rasterState.setCullNone().enableDepthClip();
+        shadow_pbr_pipeline_ = device_->createGraphicsPipeline(
+            imported_desc, shadow_framebuffer_->getFramebufferInfo());
+        require(shadow_cube_pipeline_ && shadow_pbr_pipeline_, "create shadow pipelines");
+    }
     if (scene.environment != environment_source_) {
         environment_source_ = scene.environment;
         environment_texture_ = nullptr;
@@ -422,7 +551,8 @@ void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t 
     nvrhi::GraphicsPipelineDesc pbr_desc;
     pbr_desc.setVertexShader(pbr_vertex_shader_).setFragmentShader(pbr_fragment_shader_)
         .setInputLayout(pbr_input_layout_).addBindingLayout(pbr_binding_layout_)
-        .addBindingLayout(environment_binding_layout_);
+        .addBindingLayout(environment_binding_layout_)
+        .addBindingLayout(shadow_binding_layout_);
     pbr_desc.renderState.depthStencilState.enableDepthTest().enableDepthWrite()
         .setDepthFunc(nvrhi::ComparisonFunc::Less);
     pbr_desc.renderState.rasterState.setCullNone().enableDepthClip();
@@ -444,6 +574,88 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
     if (image_index >= framebuffers_.size()) {
         throw std::runtime_error("invalid cube framebuffer index");
     }
+    if (scene.lights.size() > 8) throw std::runtime_error("scene exceeds eight PBR lights");
+    PbrFrame frame{};
+    frame.camera[0] = scene.camera.eye.x;
+    frame.camera[1] = scene.camera.eye.y;
+    frame.camera[2] = scene.camera.eye.z;
+    frame.light_count[0] = int32_t(scene.lights.size());
+    frame.environment_params[0] = scene.environment ? scene.environment_intensity : 0.0f;
+    ShadowFrame shadows{};
+    bool has_shadows = false;
+    for (size_t i = 0; i < scene.lights.size(); ++i) {
+        const auto& light = scene.lights[i];
+        const glm::vec3 position = light.directional ? light.direction : light.position;
+        frame.light_position_type[i][0] = position.x;
+        frame.light_position_type[i][1] = position.y;
+        frame.light_position_type[i][2] = position.z;
+        frame.light_position_type[i][3] = light.directional ? 0.0f : 1.0f;
+        frame.light_color_intensity[i][0] = light.color.r;
+        frame.light_color_intensity[i][1] = light.color.g;
+        frame.light_color_intensity[i][2] = light.color.b;
+        frame.light_color_intensity[i][3] = light.intensity;
+        if (light.shadows) {
+            has_shadows = true;
+            shadows.settings[i][0] = 1.0f;
+            for (int face = 0; face < (light.directional ? 1 : 6); ++face)
+                shadows.transforms[i * 6 + face] = shadow_matrix(light, face);
+        }
+    }
+    commands->writeBuffer(pbr_frame_buffer_, &frame, sizeof(frame));
+    if (has_shadows) {
+        if (!shadow_atlas_ || !shadow_framebuffer_ ||
+            !shadow_cube_pipeline_ || !shadow_pbr_pipeline_)
+            throw std::runtime_error("shadow atlas was not prepared");
+        commands->clearDepthStencilTexture(shadow_atlas_, nvrhi::AllSubresources,
+                                           true, 1.0f, false, 0);
+        for (size_t i = 0; i < scene.lights.size(); ++i) {
+            const auto& light = scene.lights[i];
+            if (!light.shadows) continue;
+            for (int face = 0; face < (light.directional ? 1 : 6); ++face) {
+                const auto viewport = nvrhi::Viewport(
+                    float(face * shadow_tile), float((face + 1) * shadow_tile),
+                    float(i * shadow_tile), float((i + 1) * shadow_tile), 0.0f, 1.0f);
+                const glm::mat4& light_matrix = shadows.transforms[i * 6 + face];
+                nvrhi::GraphicsState cube_state;
+                cube_state.setPipeline(shadow_cube_pipeline_).setFramebuffer(shadow_framebuffer_);
+                cube_state.viewport.addViewportAndScissorRect(viewport);
+                cube_state.addBindingSet(binding_set_)
+                    .addVertexBuffer(nvrhi::VertexBufferBinding().setBuffer(vertices_)
+                        .setSlot(0).setOffset(0))
+                    .setIndexBuffer(nvrhi::IndexBufferBinding().setBuffer(indices_)
+                        .setFormat(nvrhi::Format::R16_UINT).setOffset(0));
+                commands->setGraphicsState(cube_state);
+                for (const CubeInstance& cube : scene.cubes) {
+                    const glm::mat4 mvp = light_matrix * cube_model(cube);
+                    commands->setPushConstants(glm::value_ptr(mvp), sizeof(mvp));
+                    commands->drawIndexed(nvrhi::DrawArguments().setVertexCount(36));
+                }
+                for (const auto& instance : scene.imported) {
+                    const auto found = imported_.find(instance.asset.get());
+                    if (found == imported_.end())
+                        throw std::runtime_error("shadow caster mesh was not prepared");
+                    for (const auto& primitive : found->second.primitives) {
+                        nvrhi::GraphicsState imported_state;
+                        imported_state.setPipeline(shadow_pbr_pipeline_)
+                            .setFramebuffer(shadow_framebuffer_);
+                        imported_state.viewport.addViewportAndScissorRect(viewport);
+                        imported_state.addBindingSet(primitive.binding_set)
+                            .addVertexBuffer(nvrhi::VertexBufferBinding().setBuffer(
+                                primitive.vertices).setSlot(0).setOffset(0))
+                            .setIndexBuffer(nvrhi::IndexBufferBinding().setBuffer(
+                                primitive.indices).setFormat(nvrhi::Format::R32_UINT).setOffset(0));
+                        commands->setGraphicsState(imported_state);
+                        const glm::mat4 model = instance.transform * primitive.node_transform;
+                        const PbrTransform transform{light_matrix * model, model};
+                        commands->setPushConstants(&transform, sizeof(transform));
+                        commands->drawIndexed(nvrhi::DrawArguments().setVertexCount(
+                            primitive.index_count));
+                    }
+                }
+            }
+        }
+    }
+    commands->writeBuffer(shadow_frame_buffer_, &shadows, sizeof(shadows));
     commands->clearTextureFloat(hdr_color_, nvrhi::AllSubresources,
                                 nvrhi::Color(0.08f, 0.18f, 0.38f, 1.0f));
     commands->clearDepthStencilTexture(depth_, nvrhi::AllSubresources, true, 1.0f, false, 0);
@@ -458,35 +670,10 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
             .setFormat(nvrhi::Format::R16_UINT).setOffset(0));
     commands->setGraphicsState(state);
     for (const CubeInstance& cube : scene.cubes) {
-        const glm::mat4 model = cube.parent_transform * glm::scale(
-            glm::rotate(glm::rotate(glm::rotate(
-                glm::translate(glm::mat4(1.0f), cube.position), cube.rotation.y,
-                glm::vec3(0, 1, 0)), cube.rotation.x, glm::vec3(1, 0, 0)),
-                cube.rotation.z, glm::vec3(0, 0, 1)), cube.scale);
-        const glm::mat4 mvp = view_projection * model;
+        const glm::mat4 mvp = view_projection * cube_model(cube);
         commands->setPushConstants(glm::value_ptr(mvp), sizeof(mvp));
         commands->drawIndexed(nvrhi::DrawArguments().setVertexCount(36));
     }
-    PbrFrame frame{};
-    frame.camera[0] = scene.camera.eye.x;
-    frame.camera[1] = scene.camera.eye.y;
-    frame.camera[2] = scene.camera.eye.z;
-    frame.light_count[0] = int32_t(scene.lights.size());
-    frame.environment_params[0] = scene.environment ? scene.environment_intensity : 0.0f;
-    if (scene.lights.size() > 8) throw std::runtime_error("scene exceeds eight PBR lights");
-    for (size_t i = 0; i < scene.lights.size(); ++i) {
-        const auto& light = scene.lights[i];
-        const glm::vec3 position = light.directional ? light.direction : light.position;
-        frame.light_position_type[i][0] = position.x;
-        frame.light_position_type[i][1] = position.y;
-        frame.light_position_type[i][2] = position.z;
-        frame.light_position_type[i][3] = light.directional ? 0.0f : 1.0f;
-        frame.light_color_intensity[i][0] = light.color.r;
-        frame.light_color_intensity[i][1] = light.color.g;
-        frame.light_color_intensity[i][2] = light.color.b;
-        frame.light_color_intensity[i][3] = light.intensity;
-    }
-    commands->writeBuffer(pbr_frame_buffer_, &frame, sizeof(frame));
     for (const auto& instance : scene.imported) {
         const auto found = imported_.find(instance.asset.get());
         if (found == imported_.end()) throw std::runtime_error("glTF mesh was not prepared");
@@ -497,6 +684,7 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
                 nvrhi::Viewport(float(width_), float(height_)));
             imported_state.addBindingSet(primitive.binding_set)
                 .addBindingSet(environment_binding_set_)
+                .addBindingSet(shadow_binding_set_)
                 .addVertexBuffer(nvrhi::VertexBufferBinding().setBuffer(primitive.vertices)
                     .setSlot(0).setOffset(0))
                 .setIndexBuffer(nvrhi::IndexBufferBinding().setBuffer(primitive.indices)

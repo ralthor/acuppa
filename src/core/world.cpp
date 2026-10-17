@@ -96,8 +96,9 @@ void World::set_light(EntityId id, const LightComponent& value) {
     if (!finite(value.color) || !finite(value.direction) ||
         value.color.x < 0.0f || value.color.y < 0.0f || value.color.z < 0.0f ||
         glm::length(value.direction) <= 0.0f || !std::isfinite(value.intensity) ||
-        value.intensity < 0.0f) {
-        throw std::invalid_argument("invalid light color, direction, or intensity");
+        value.intensity < 0.0f || !std::isfinite(value.shadow_range) ||
+        value.shadow_range < 0.1f || value.shadow_range > 1000.0f) {
+        throw std::invalid_argument("invalid light color, direction, intensity, or shadow range");
     }
     Entity& entity = require(id);
     if (!entity.light) {
@@ -220,7 +221,8 @@ SceneFrame World::snapshot(const PerspectiveCamera& fallback_camera) const {
                 transform * glm::vec4(entity.light->direction, 0.0f)));
             frame.lights.push_back({entity.light->type == LightComponent::Type::Directional,
                                     glm::vec3(transform[3]), direction, entity.light->color,
-                                    entity.light->intensity});
+                                    entity.light->intensity, entity.light->shadows,
+                                    entity.light->shadow_range});
         }
         if (entity.mesh && entity.mesh->visible && entity.mesh->mesh == "builtin:cube") {
             const TransformComponent transform = entity.transform.value_or(TransformComponent{});

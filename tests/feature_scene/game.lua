@@ -9,7 +9,12 @@ return {
             textured = "scenes/textured.scene.lua", spheres = "scenes/spheres.scene.lua",
             point = "scenes/point.scene.lua", hdr = "scenes/hdr.scene.lua",
             hdr_dim = "scenes/hdr.scene.lua", ibl = "scenes/ibl.scene.lua",
-            ibl_off = "scenes/ibl.scene.lua", ibl_missing = "scenes/ibl.scene.lua"},
+            ibl_off = "scenes/ibl.scene.lua", ibl_missing = "scenes/ibl.scene.lua",
+            shadow = "scenes/shadow.scene.lua", shadow_off = "scenes/shadow.scene.lua",
+            shadow_shift = "scenes/shadow.scene.lua",
+            shadow_point = "scenes/shadow.scene.lua",
+            shadow_point_off = "scenes/shadow.scene.lua",
+            shadow_point_second = "scenes/shadow.scene.lua"},
   prefabs = {probe = "prefabs/probe.prefab.lua"},
   input = {
     turn = {keyboard = "space", gamepad_button = "a"},

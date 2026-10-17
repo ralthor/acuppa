@@ -27,6 +27,12 @@ layout(std140, set = 0, binding = 7) uniform Material {
 } material;
 layout(set = 1, binding = 0) uniform texture2D environment_texture;
 layout(set = 1, binding = 1) uniform sampler environment_sampler;
+layout(set = 2, binding = 0) uniform texture2D shadow_texture;
+layout(set = 2, binding = 1) uniform sampler shadow_sampler;
+layout(std140, set = 2, binding = 2) uniform Shadows {
+    mat4 transforms[48];
+    vec4 settings[8]; // x = enabled
+} shadows;
 
 const float pi = 3.14159265359;
 
@@ -100,6 +106,35 @@ vec3 image_based_light(vec3 normal, vec3 view, vec3 albedo,
     return (diffuse + specular_light) / float(sample_count);
 }
 
+float shadow_visibility(int light_index, vec3 position, vec3 normal, vec3 light_direction) {
+    if (shadows.settings[light_index].x < 0.5) return 1.0;
+    int face = 0;
+    if (frame.light_position_type[light_index].w > 0.5) {
+        vec3 delta = position - frame.light_position_type[light_index].xyz;
+        vec3 axis = abs(delta);
+        if (axis.x >= axis.y && axis.x >= axis.z) face = delta.x > 0.0 ? 0 : 1;
+        else if (axis.y >= axis.z) face = delta.y > 0.0 ? 2 : 3;
+        else face = delta.z > 0.0 ? 4 : 5;
+    }
+    vec4 clip = shadows.transforms[light_index * 6 + face] * vec4(position, 1.0);
+    vec3 projected = clip.xyz / clip.w;
+    if (abs(projected.x) > 1.0 || abs(projected.y) > 1.0 ||
+        projected.z < 0.0 || projected.z > 1.0) return 1.0;
+    vec2 local = vec2(projected.x * 0.5 + 0.5, 0.5 - projected.y * 0.5);
+    float bias = max(0.004, 0.006 * (1.0 - max(dot(normal, light_direction), 0.0)));
+    float visible = 0.0;
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            vec2 tap = clamp(local + vec2(x, y) / 512.0,
+                             vec2(0.5 / 512.0), vec2(1.0 - 0.5 / 512.0));
+            vec2 atlas_uv = (vec2(float(face), float(light_index)) + tap) / vec2(6.0, 8.0);
+            float depth = texture(sampler2D(shadow_texture, shadow_sampler), atlas_uv).r;
+            visible += projected.z - bias <= depth ? 1.0 : 0.0;
+        }
+    }
+    return visible / 9.0;
+}
+
 void main() {
     vec4 base = material.base_color;
     if (material.maps0.x != 0)
@@ -149,7 +184,8 @@ void main() {
         vec3 specular = distribution * geometry * fresnel /
                         max(4.0 * ndotv * ndotl, 0.0001);
         vec3 diffuse = (vec3(1.0) - fresnel) * (1.0 - metallic) * albedo / pi;
-        lighting += (diffuse + specular) * radiance * ndotl;
+        lighting += (diffuse + specular) * radiance * ndotl *
+                    shadow_visibility(i, world_position, normal, light);
     }
     float occlusion = 1.0;
     if (material.maps0.w != 0)

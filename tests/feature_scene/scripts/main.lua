@@ -35,6 +35,10 @@ return {
     threepoint.component_set(entity, "light", {type = "point", intensity = 2})
     threepoint.component_set(entity, "light", {intensity = 3})
     assert(threepoint.component_get(entity, "light").intensity == 3)
+    threepoint.component_set(entity, "light", {shadows = true, shadow_range = 12})
+    assert(threepoint.component_get(entity, "light").shadows)
+    assert(threepoint.component_get(entity, "light").shadow_range == 12)
+    threepoint.component_set(entity, "light", {shadows = false})
 
     threepoint.component_set(entity, "mesh", {mesh = "builtin:cube", visible = false})
     threepoint.component_set(entity, "mesh", {visible = false})

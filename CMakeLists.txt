@@ -54,7 +54,7 @@ find_program(THREEPOINT_GLSLANG_VALIDATOR glslangValidator REQUIRED)
 find_library(THREEPOINT_VULKAN_LOADER NAMES vulkan REQUIRED)
 
 set(THREEPOINT_SHADER_HEADERS)
-foreach(shader IN ITEMS cube pbr tonemap)
+foreach(shader IN ITEMS cube pbr tonemap shadow_cube shadow_pbr)
   foreach(stage IN ITEMS vert frag)
     set(shader_source "${PROJECT_SOURCE_DIR}/src/render/shaders/${shader}.${stage}")
     set(shader_binary "${PROJECT_BINARY_DIR}/shaders/${shader}.${stage}.spv")
@@ -196,6 +196,15 @@ if(BUILD_TESTING)
     add_test(NAME ibl_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene" "ibl")
+    add_test(NAME shadow_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/shadow_capture_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+    add_test(NAME shadow_live_startup COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene" "shadow")
+    add_test(NAME point_shadow_live_startup COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene" "shadow_point")
   endif()
 endif()
 

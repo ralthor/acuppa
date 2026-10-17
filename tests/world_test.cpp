@@ -55,12 +55,22 @@ int main() {
     threepoint::LightComponent light;
     light.type = threepoint::LightComponent::Type::Directional;
     light.intensity = 2;
+    light.shadows = true;
+    light.shadow_range = 7;
     world.set_light(first, light);
     expect(world.light(first)->intensity == 2, "light component did not persist");
     expect(world.snapshot({}).lights.size() == 1 &&
            world.snapshot({}).lights[0].directional &&
-           world.snapshot({}).lights[0].intensity == 2,
+           world.snapshot({}).lights[0].intensity == 2 &&
+           world.snapshot({}).lights[0].shadows &&
+           world.snapshot({}).lights[0].shadow_range == 7,
            "light component did not reach the renderer");
+    bool bad_shadow_range = false;
+    try { light.shadow_range = 0; world.set_light(first, light); }
+    catch (const std::invalid_argument&) { bad_shadow_range = true; }
+    expect(bad_shadow_range && world.light(first)->shadow_range == 7,
+           "invalid shadow range changed a light");
+    light.shadow_range = 7;
     for (int i = 0; i < 7; ++i) world.set_light(world.create(), light);
     bool light_limit_rejected = false;
     try { world.set_light(world.create(), light); }
