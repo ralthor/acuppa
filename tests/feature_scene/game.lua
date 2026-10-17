@@ -5,5 +5,11 @@ return {
   window = {width = 1280, height = 720},
   first_scene = "main",
   scenes = {main = "scenes/main.scene.lua"},
-  input = {},
+  input = {
+    turn = {keyboard = "space", gamepad_button = "a"},
+    camera_right = {keyboard = "d", gamepad_axis = "right_x"},
+    select = {mouse_button = "left"},
+    jump = {gamepad_button = "b"},
+    pan = {gamepad_axis = "left_x"},
+  },
 }

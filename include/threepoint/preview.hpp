@@ -1,5 +1,6 @@
 #pragma once
 
+#include "threepoint/input.hpp"
 #include "threepoint/scene_frame.hpp"
 
 #include <cstdint>
@@ -20,6 +21,9 @@ struct PreviewOptions {
     float cube_angle = 0.0f;     // Capture angle in radians; live preview rotates over time.
     double fixed_delta = 0.0;    // Positive value drives deterministic scripted frames.
     std::function<SceneFrame(double)> on_frame;
+    std::function<void(const InputEvent&)> on_input;
+    std::function<void(double, double)> on_pointer;
+    std::function<void(uint32_t, uint32_t)> on_resize;
 };
 
 struct PreviewResult {

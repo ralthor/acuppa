@@ -94,4 +94,12 @@ with tempfile.TemporaryDirectory() as directory:
     assert outside_path.returncode != 0 and "outside project" in outside_path.stderr, \
         outside_path.stderr
 
+    scene.write_text('return {entities={}, script="scripts/main.lua"}\n')
+    manifest = invalid_project / "game.lua"
+    manifest.write_text(manifest.read_text().replace('keyboard = "space"',
+                                                    'keyboard_typo = "space"'))
+    bad_binding = run("run", invalid_project, "--frames", 1)
+    assert bad_binding.returncode != 0 and "unknown input binding field" in bad_binding.stderr, \
+        bad_binding.stderr
+
 print("Lua-only cube scene, callbacks, timing, GPU animation, and invalid inputs passed")

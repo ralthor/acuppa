@@ -22,6 +22,7 @@ int main(int argc, char* argv[]) {
         try {
             uint32_t frames = 0;
             std::filesystem::path capture;
+            std::string held_key;
             for (int i = 3; i < argc; ++i) {
                 const std::string_view option = argv[i];
                 if (option == "--frames" && i + 1 < argc && frames == 0) {
@@ -38,6 +39,9 @@ int main(int argc, char* argv[]) {
                 } else if (option == "--capture" && i + 1 < argc && capture.empty()) {
                     capture = argv[++i];
                     if (capture.empty()) throw std::invalid_argument("--capture needs a path");
+                } else if (option == "--hold-key" && i + 1 < argc && held_key.empty()) {
+                    held_key = argv[++i];
+                    if (held_key.empty()) throw std::invalid_argument("--hold-key needs a key name");
                 } else {
                     throw std::invalid_argument("unknown or repeated run option: " +
                                                 std::string(option));
@@ -47,6 +51,9 @@ int main(int argc, char* argv[]) {
                 throw std::invalid_argument("--capture requires --frames");
             }
             threepoint::LuaProject project(argv[2]);
+            if (!held_key.empty()) {
+                project.inject({threepoint::InputDevice::Keyboard, held_key, 1.0f});
+            }
             threepoint::PreviewOptions options;
             options.scene = threepoint::PreviewOptions::Scene::Project;
             options.width = project.width();
@@ -56,6 +63,15 @@ int main(int argc, char* argv[]) {
             options.capture_frame = frames == 0 ? 1 : frames;
             options.fixed_delta = frames == 0 ? 0.0 : 1.0 / 60.0;
             options.on_frame = [&project](double dt) { return project.step(dt); };
+            options.on_input = [&project](const threepoint::InputEvent& event) {
+                project.inject(event);
+            };
+            options.on_pointer = [&project](double x, double y) {
+                project.set_pointer(x, y);
+            };
+            options.on_resize = [&project](uint32_t width, uint32_t height) {
+                project.set_viewport(width, height);
+            };
             const auto result = threepoint::run_preview(options);
             std::cout << "Rendered " << result.frames << " project frames\n";
             if (!capture.empty() && result.frames != frames) {
@@ -118,6 +134,6 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     }
-    std::cerr << "Usage: threepoint run <project> [--frames N] [--capture file.ppm] | --version | --check-project <directory> | --preview | --smoke-vulkan | --smoke-cube | --capture-clear <file.ppm> | --capture-cube <file.ppm> [angle-radians]\n";
+    std::cerr << "Usage: threepoint run <project> [--frames N] [--capture file.ppm] [--hold-key name] | --version | --check-project <directory> | --preview | --smoke-vulkan | --smoke-cube | --capture-clear <file.ppm> | --capture-cube <file.ppm> [angle-radians]\n";
     return 2;
 }

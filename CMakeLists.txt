@@ -58,7 +58,7 @@ foreach(stage IN ITEMS vert frag)
   list(APPEND THREEPOINT_SHADER_HEADERS "${shader_header}")
 endforeach()
 
-add_library(threepoint_core STATIC src/core/project.cpp src/core/camera.cpp
+add_library(threepoint_core STATIC src/core/project.cpp src/core/camera.cpp src/core/input.cpp
             src/core/lua_project.cpp)
 target_compile_features(threepoint_core PUBLIC cxx_std_17)
 target_include_directories(threepoint_core PUBLIC include)
@@ -90,6 +90,9 @@ if(BUILD_TESTING)
   target_link_libraries(threepoint_lua_test PRIVATE threepoint_core)
   add_test(NAME lua_scene_logic COMMAND threepoint_lua_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+  add_executable(threepoint_input_test tests/input_test.cpp)
+  target_link_libraries(threepoint_input_test PRIVATE threepoint_core)
+  add_test(NAME input_actions_and_ray COMMAND threepoint_input_test)
   add_test(NAME core_project_check COMMAND threepoint_core_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   add_test(NAME runtime_project_check COMMAND threepoint --check-project
@@ -104,6 +107,9 @@ if(BUILD_TESTING)
              "${PROJECT_SOURCE_DIR}/tests/cube_capture_test.py" $<TARGET_FILE:threepoint>)
     add_test(NAME lua_scene_capture COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_scene_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+    add_test(NAME input_scene_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/input_scene_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   endif()
 endif()

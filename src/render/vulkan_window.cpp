@@ -12,6 +12,7 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <exception>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -59,6 +60,36 @@ nvrhi::Format texture_format(VkFormat format) {
     }
 }
 
+std::string key_name(int key) {
+    if (key >= GLFW_KEY_A && key <= GLFW_KEY_Z) return std::string(1, char('a' + key - GLFW_KEY_A));
+    if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9) return std::string(1, char('0' + key - GLFW_KEY_0));
+    switch (key) {
+    case GLFW_KEY_LEFT: return "left";
+    case GLFW_KEY_RIGHT: return "right";
+    case GLFW_KEY_UP: return "up";
+    case GLFW_KEY_DOWN: return "down";
+    case GLFW_KEY_SPACE: return "space";
+    case GLFW_KEY_ENTER: return "enter";
+    case GLFW_KEY_ESCAPE: return "escape";
+    case GLFW_KEY_TAB: return "tab";
+    case GLFW_KEY_BACKSPACE: return "backspace";
+    case GLFW_KEY_LEFT_SHIFT: return "left_shift";
+    case GLFW_KEY_RIGHT_SHIFT: return "right_shift";
+    case GLFW_KEY_LEFT_CONTROL: return "left_control";
+    case GLFW_KEY_RIGHT_CONTROL: return "right_control";
+    default: return {};
+    }
+}
+
+const char* mouse_button_name(int button) {
+    switch (button) {
+    case GLFW_MOUSE_BUTTON_LEFT: return "left";
+    case GLFW_MOUSE_BUTTON_RIGHT: return "right";
+    case GLFW_MOUSE_BUTTON_MIDDLE: return "middle";
+    default: return nullptr;
+    }
+}
+
 class VulkanWindow {
 public:
     explicit VulkanWindow(const PreviewOptions& options) : options_(options) {}
@@ -90,6 +121,8 @@ public:
         while (!glfwWindowShouldClose(window_) &&
                (options_.frame_limit == 0 || result.frames < options_.frame_limit)) {
             glfwPollEvents();
+            if (pending_input_error_) std::rethrow_exception(pending_input_error_);
+            poll_gamepad();
             if (glfwWindowShouldClose(window_)) break;
             const double current_time = glfwGetTime();
             if (options_.on_frame) {
@@ -146,6 +179,35 @@ private:
         glfwSetFramebufferSizeCallback(window_, [](GLFWwindow* window, int, int) {
             static_cast<VulkanWindow*>(glfwGetWindowUserPointer(window))->resized_ = true;
         });
+        glfwSetKeyCallback(window_, [](GLFWwindow* window, int key, int, int action, int) {
+            auto* self = static_cast<VulkanWindow*>(glfwGetWindowUserPointer(window));
+            if (!self->options_.on_input) return;
+            try {
+                const std::string name = key_name(key);
+                if (!name.empty()) self->options_.on_input({InputDevice::Keyboard, name,
+                    action == GLFW_RELEASE ? 0.0f : 1.0f});
+            } catch (...) { self->pending_input_error_ = std::current_exception(); }
+        });
+        glfwSetMouseButtonCallback(window_, [](GLFWwindow* window, int button, int action, int) {
+            auto* self = static_cast<VulkanWindow*>(glfwGetWindowUserPointer(window));
+            if (!self->options_.on_input) return;
+            try {
+                const char* name = mouse_button_name(button);
+                if (name) self->options_.on_input({InputDevice::MouseButton, name,
+                    action == GLFW_RELEASE ? 0.0f : 1.0f});
+            } catch (...) { self->pending_input_error_ = std::current_exception(); }
+        });
+        glfwSetCursorPosCallback(window_, [](GLFWwindow* window, double x, double y) {
+            auto* self = static_cast<VulkanWindow*>(glfwGetWindowUserPointer(window));
+            if (!self->options_.on_pointer) return;
+            try { self->options_.on_pointer(x, y); }
+            catch (...) { self->pending_input_error_ = std::current_exception(); }
+        });
+        if (options_.on_pointer) {
+            double x = 0.0, y = 0.0;
+            glfwGetCursorPos(window_, &x, &y);
+            options_.on_pointer(x, y);
+        }
 
         uint32_t extension_count = 0;
         const char** extensions = glfwGetRequiredInstanceExtensions(&extension_count);
@@ -286,6 +348,27 @@ private:
         vkGetDeviceQueue(device_, queue_family_, 0, &queue_);
     }
 
+    void poll_gamepad() {
+        if (!options_.on_input) return;
+        GLFWgamepadstate state{};
+        const bool connected = glfwGetGamepadState(GLFW_JOYSTICK_1, &state) == GLFW_TRUE;
+        constexpr const char* buttons[] = {
+            "a", "b", "x", "y", "left_bumper", "right_bumper", "back", "start",
+            "guide", "left_thumb", "right_thumb", "dpad_up", "dpad_right",
+            "dpad_down", "dpad_left"};
+        constexpr const char* axes[] = {
+            "left_x", "left_y", "right_x", "right_y", "left_trigger", "right_trigger"};
+        for (int i = 0; i <= GLFW_GAMEPAD_BUTTON_LAST; ++i) {
+            options_.on_input({InputDevice::GamepadButton, buttons[i],
+                connected && state.buttons[i] == GLFW_PRESS ? 1.0f : 0.0f});
+        }
+        for (int i = 0; i <= GLFW_GAMEPAD_AXIS_LAST; ++i) {
+            float value = connected ? state.axes[i] : 0.0f;
+            if (connected && i >= GLFW_GAMEPAD_AXIS_LEFT_TRIGGER) value = (value + 1.0f) * 0.5f;
+            options_.on_input({InputDevice::GamepadAxis, axes[i], value});
+        }
+    }
+
     void recreate_swapchain() {
         int width = 0;
         int height = 0;
@@ -400,6 +483,11 @@ private:
             if (!staging_) throw std::runtime_error("nvrhi could not create capture storage");
         }
         resized_ = false;
+        if (options_.on_resize) {
+            int logical_width = 0, logical_height = 0;
+            glfwGetWindowSize(window_, &logical_width, &logical_height);
+            options_.on_resize(uint32_t(logical_width), uint32_t(logical_height));
+        }
         std::cout << "Swapchain: " << extent_.width << 'x' << extent_.height << '\n';
     }
 
@@ -512,6 +600,7 @@ private:
     bool glfw_started_ = false;
     bool resized_ = false;
     bool captured_ = false;
+    std::exception_ptr pending_input_error_;
     GLFWwindow* window_ = nullptr;
     VkInstance instance_ = VK_NULL_HANDLE;
     VkSurfaceKHR surface_ = VK_NULL_HANDLE;

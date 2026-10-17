@@ -21,6 +21,32 @@ int main(int argc, char* argv[]) {
     const auto last = project.step(0.0);
     expect(std::abs(last.cubes[0].rotation.y - 0.9f) < 0.001f,
            "the code-only scene did not animate deterministically");
+    project.inject({threepoint::InputDevice::Keyboard, "space", 1.0f});
+    project.inject({threepoint::InputDevice::Keyboard, "d", 1.0f});
+    project.inject({threepoint::InputDevice::MouseButton, "left", 1.0f});
+    project.inject({threepoint::InputDevice::GamepadButton, "b", 1.0f});
+    project.inject({threepoint::InputDevice::GamepadAxis, "left_x", 0.5f});
+    project.set_pointer(640.0, 360.0);
+    const auto controlled = project.step(0.0);
+    expect(std::abs(controlled.cubes[0].rotation.y - 1.8f) < 0.001f,
+           "injected keyboard input did not turn the cube");
+    expect(std::abs(controlled.camera.eye.x - 1.5f) < 0.001f &&
+           std::abs(controlled.camera.eye.z - 6.5f) < 0.001f,
+           "injected keyboard, mouse, and controller input did not move the camera");
+    project.inject({threepoint::InputDevice::Keyboard, "space", 0.0f});
+    project.inject({threepoint::InputDevice::GamepadButton, "a", 1.0f});
+    expect(std::abs(project.step(0.0).cubes[0].rotation.y - 1.8f) < 0.001f,
+           "controller binding did not substitute for keyboard");
+    project.inject({threepoint::InputDevice::GamepadButton, "a", 0.0f});
+    expect(std::abs(project.step(0.0).cubes[0].rotation.y - 0.9f) < 0.001f,
+           "released controls did not restore base rotation");
+    project.set_viewport(640, 360);
+    expect(project.width() == 640 && project.height() == 360,
+           "resize did not update Lua's screen-ray viewport");
+    bool bad_viewport = false;
+    try { project.set_viewport(0, 360); }
+    catch (const std::invalid_argument&) { bad_viewport = true; }
+    expect(bad_viewport, "zero-size viewport was accepted");
     bool rejected = false;
     try { project.step(-1.0); }
     catch (const std::invalid_argument&) { rejected = true; }

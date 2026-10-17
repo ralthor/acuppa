@@ -1,5 +1,6 @@
 #pragma once
 
+#include "threepoint/input.hpp"
 #include "threepoint/scene_frame.hpp"
 
 #include <cstdint>
@@ -17,6 +18,9 @@ public:
 
     uint32_t width() const;
     uint32_t height() const;
+    void inject(const InputEvent& event);
+    void set_pointer(double x, double y);
+    void set_viewport(uint32_t width, uint32_t height);
     SceneFrame step(double dt);
 
 private:

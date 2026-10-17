@@ -20,6 +20,8 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 
 **Phase 4 status (2026-10-17):** `threepoint run <project>` loads `game.lua`, its selected source scene, and its behavior script. Lua `start`, `fixed_update`, `update`, and optional `draw` run on a deterministic 60 Hz step for bounded tests; `require("threepoint")` can spawn a built-in cube, change its rotation, read game time, and quit. The feature scene creates and animates its cube entirely in Lua. A headless logic test and two real GPU captures verify callbacks, timing, and animation; invalid mesh/scale/ID/time and outside-project script paths fail clearly. All ten local Release tests pass with Vulkan validation. Hosted Ubuntu CI remains unverified without a Git remote. Broader entities, components, and input remain later phases.
 
+**Phase 5 status (2026-10-17):** Source `game.lua` declares named keyboard, mouse-button, gamepad-button, and gamepad-axis actions. GLFW feeds live events from the window and first connected gamepad; `threepoint.action(name)` reads the strongest active binding. Lua can read pointer coordinates, create a screen-to-world ray, and update the perspective camera. Injected key/mouse/controller events predictably turn the feature-scene cube and move its camera; a held-key GPU capture differs from the same source scene without input. Resize updates ray viewport dimensions. All twelve local Release tests pass with Vulkan validation. Physical controller hardware was not available for a manual check; the input path was exercised by injection. Hosted CI remains unverified without a Git remote.
+
 | Phase | Deliverable | Check before commit |
 | --- | --- | --- |
 | 0 | Restore this 3D brief, this roadmap, `AGENTS.md`, and project-local development skills. | Requirements for every item in README map to a phase; no 2D plan is presented as the goal. |
@@ -48,7 +50,7 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 | 23 | Build a small 3D room/puzzle game from Lua and source assets only. | It exercises glTF, PBR, HDRI, shadows, SSAO, physics, audio, UI, save/load, and export. |
 | 24 | Harden and release: automated feature-scene coverage audit, sanitizers, asset-failure cases, performance budgets, Linux packaging, and documentation. | Ubuntu 24+ release builds pass unit, integration, visual, packaged-game, and stability gates. |
 
-Phases 3 and 4 are locally complete: the engine can display a 3D cube and run a Lua-authored 3D scene. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
+Phases 3–5 are locally complete: the engine can display a 3D cube, run a Lua-authored 3D scene, and react to named input. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
 
 | README requirement | Covered in phases |
 | --- | --- |

@@ -10,6 +10,7 @@ extern "C" {
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -36,6 +37,10 @@ struct LuaProject::Impl {
     static int set_rotation(lua_State* lua);
     static int quit(lua_State* lua);
     static int time(lua_State* lua);
+    static int action(lua_State* lua);
+    static int pointer(lua_State* lua);
+    static int ray(lua_State* lua);
+    static int set_camera(lua_State* lua);
     static glm::vec3 vector_field(lua_State* lua, int table, const char* field,
                                   glm::vec3 fallback, bool positive);
     static glm::vec3 vector_arg(lua_State* lua, int index, bool positive);
@@ -53,6 +58,7 @@ struct LuaProject::Impl {
     int update_ref = LUA_NOREF;
     int draw_ref = LUA_NOREF;
     SceneFrame frame;
+    InputState input;
 };
 
 namespace {
@@ -79,6 +85,28 @@ uint32_t dimension(lua_State* lua, int table, const char* field) {
     const auto value = uint32_t(lua_tointeger(lua, -1));
     lua_pop(lua, 1);
     return value;
+}
+
+float optional_number(lua_State* lua, int table, const char* field, float fallback) {
+    lua_getfield(lua, table, field);
+    if (lua_isnil(lua, -1)) {
+        lua_pop(lua, 1);
+        return fallback;
+    }
+    if (!lua_isnumber(lua, -1) || !std::isfinite(lua_tonumber(lua, -1))) {
+        luaL_error(lua, "camera.%s must be finite", field);
+    }
+    const float value = float(lua_tonumber(lua, -1));
+    lua_pop(lua, 1);
+    return value;
+}
+
+void push_vec3(lua_State* lua, const glm::vec3& value) {
+    lua_createtable(lua, 3, 0);
+    for (int i = 0; i < 3; ++i) {
+        lua_pushnumber(lua, value[i]);
+        lua_rawseti(lua, -2, i + 1);
+    }
 }
 
 int callback_ref(lua_State* lua, const char* name, bool required) {
@@ -116,6 +144,51 @@ LuaProject::Impl::Impl(const fs::path& directory) {
     lua_getfield(lua, -1, "scenes");
     if (!lua_istable(lua, -1)) throw std::runtime_error("game.lua scenes must be a table");
     const std::string scene_path = checked_string(lua, -1, first_scene.c_str());
+    lua_pop(lua, 1);
+
+    lua_getfield(lua, -1, "input");
+    if (!lua_istable(lua, -1)) throw std::runtime_error("game.lua input must be a table");
+    lua_pushnil(lua);
+    while (lua_next(lua, -2) != 0) {
+        if (lua_type(lua, -2) != LUA_TSTRING || !lua_istable(lua, -1)) {
+            throw std::runtime_error("input actions must map names to binding tables");
+        }
+        const std::string name(lua_tostring(lua, -2));
+        bool bound = false;
+        const struct {
+            const char* field;
+            InputDevice device;
+        } sources[] = {{"keyboard", InputDevice::Keyboard},
+                       {"mouse_button", InputDevice::MouseButton},
+                       {"gamepad_button", InputDevice::GamepadButton},
+                       {"gamepad_axis", InputDevice::GamepadAxis}};
+        for (const auto& source : sources) {
+            lua_getfield(lua, -1, source.field);
+            if (!lua_isnil(lua, -1)) {
+                if (lua_type(lua, -1) != LUA_TSTRING) {
+                    throw std::runtime_error("input binding must name a control");
+                }
+                input.bind(name, source.device, lua_tostring(lua, -1));
+                bound = true;
+            }
+            lua_pop(lua, 1);
+        }
+        lua_pushnil(lua);
+        while (lua_next(lua, -2) != 0) {
+            if (lua_type(lua, -2) != LUA_TSTRING) {
+                throw std::runtime_error("input binding field must be a string");
+            }
+            const char* field = lua_tostring(lua, -2);
+            const bool recognized = std::any_of(std::begin(sources), std::end(sources),
+                [field](const auto& source) { return std::strcmp(field, source.field) == 0; });
+            if (!recognized) {
+                throw std::runtime_error("unknown input binding field: " + std::string(field));
+            }
+            lua_pop(lua, 1);
+        }
+        if (!bound) throw std::runtime_error("input action has no binding: " + name);
+        lua_pop(lua, 1);
+    }
     lua_pop(lua, 2);
 
     load_table(project_file(scene_path));
@@ -203,6 +276,10 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("set_rotation", &set_rotation);
     add_function("quit", &quit);
     add_function("time", &time);
+    add_function("action", &action);
+    add_function("pointer", &pointer);
+    add_function("screen_ray", &ray);
+    add_function("set_camera", &set_camera);
     return 1;
 }
 
@@ -281,6 +358,63 @@ int LuaProject::Impl::time(lua_State* lua) {
     return 1;
 }
 
+int LuaProject::Impl::action(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "action() expects one name");
+    const char* name = luaL_checkstring(lua, 1);
+    try {
+        lua_pushnumber(lua, context(lua).input.action(name));
+    } catch (const std::invalid_argument& error) {
+        return luaL_error(lua, "%s", error.what());
+    }
+    return 1;
+}
+
+int LuaProject::Impl::pointer(lua_State* lua) {
+    if (lua_gettop(lua) != 0) return luaL_error(lua, "pointer() expects no arguments");
+    const auto [x, y] = context(lua).input.pointer();
+    lua_pushnumber(lua, x);
+    lua_pushnumber(lua, y);
+    return 2;
+}
+
+int LuaProject::Impl::ray(lua_State* lua) {
+    if (lua_gettop(lua) != 2) return luaL_error(lua, "screen_ray() expects x and y");
+    const double x = luaL_checknumber(lua, 1);
+    const double y = luaL_checknumber(lua, 2);
+    Impl& state = context(lua);
+    try {
+        const WorldRay world = screen_ray(state.frame.camera, state.width, state.height, x, y);
+        lua_createtable(lua, 0, 2);
+        push_vec3(lua, world.origin);
+        lua_setfield(lua, -2, "origin");
+        push_vec3(lua, world.direction);
+        lua_setfield(lua, -2, "direction");
+    } catch (const std::invalid_argument& error) {
+        return luaL_error(lua, "%s", error.what());
+    }
+    return 1;
+}
+
+int LuaProject::Impl::set_camera(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "set_camera() expects one table");
+    luaL_checktype(lua, 1, LUA_TTABLE);
+    Impl& state = context(lua);
+    PerspectiveCamera camera = state.frame.camera;
+    camera.eye = vector_field(lua, 1, "eye", camera.eye, false);
+    camera.target = vector_field(lua, 1, "target", camera.target, false);
+    camera.up = vector_field(lua, 1, "up", camera.up, false);
+    camera.vertical_fov_degrees = optional_number(lua, 1, "fov", camera.vertical_fov_degrees);
+    camera.near_plane = optional_number(lua, 1, "near", camera.near_plane);
+    camera.far_plane = optional_number(lua, 1, "far", camera.far_plane);
+    try {
+        camera.view_projection(float(state.width) / float(state.height));
+    } catch (const std::invalid_argument& error) {
+        return luaL_error(lua, "%s", error.what());
+    }
+    state.frame.camera = camera;
+    return 0;
+}
+
 SceneFrame LuaProject::Impl::step(double dt) {
     if (!std::isfinite(dt) || dt < 0.0 || dt > 0.25) {
         throw std::invalid_argument("frame delta must be finite and between 0 and 0.25 seconds");
@@ -309,6 +443,15 @@ LuaProject::LuaProject(const fs::path& root) : impl_(std::make_unique<Impl>(root
 LuaProject::~LuaProject() = default;
 uint32_t LuaProject::width() const { return impl_->width; }
 uint32_t LuaProject::height() const { return impl_->height; }
+void LuaProject::inject(const InputEvent& event) { impl_->input.inject(event); }
+void LuaProject::set_pointer(double x, double y) { impl_->input.set_pointer(x, y); }
+void LuaProject::set_viewport(uint32_t width, uint32_t height) {
+    if (width == 0 || height == 0 || width > 8192 || height > 8192) {
+        throw std::invalid_argument("viewport size must be from 1 to 8192");
+    }
+    impl_->width = width;
+    impl_->height = height;
+}
 SceneFrame LuaProject::step(double dt) { return impl_->step(dt); }
 
 }  // namespace threepoint
