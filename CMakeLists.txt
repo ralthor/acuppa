@@ -124,6 +124,11 @@ if(BUILD_TESTING)
   add_test(NAME gltf_geometry_and_errors COMMAND threepoint_gltf_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene"
            "${PROJECT_BINARY_DIR}/gltf_fixture")
+  add_executable(threepoint_falling_blocks_rules_test tests/falling_blocks_rules_test.cpp)
+  target_link_libraries(threepoint_falling_blocks_rules_test PRIVATE threepoint_lua)
+  add_test(NAME falling_blocks_rules COMMAND threepoint_falling_blocks_rules_test
+           "${PROJECT_SOURCE_DIR}/games/falling_blocks/scripts/board.lua"
+           "${PROJECT_SOURCE_DIR}/tests/falling_blocks_rules.lua")
   add_test(NAME core_project_check COMMAND threepoint_core_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   add_test(NAME runtime_project_check COMMAND threepoint --check-project

@@ -32,6 +32,8 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 
 **Phase 9 status (2026-10-17):** The importer reads `NORMAL`, `TEXCOORD_0`, glTF metallic/roughness/base-color/emissive factors, and base-color, metallic-roughness, normal, occlusion, and emissive image references. Pinned stb_image decodes bounded PNG/JPEG data into RGBA pixels. Imported geometry uses a direct-light GGX PBR shader, texture sampling, and scene-authored directional/point lights (up to eight). Checked-in textured quad and three reference spheres visibly respond to light; image checks and the prior glTF capture pass under Vulkan validation. All eighteen local Release tests pass. Unsupported sampler modes, alternate UV sets, texture transforms, alpha blending, and material extensions are rejected; the current renderer has one texture mip and bright values clip until Phase 13 HDR/tonemapping. Hosted CI remains unverified without a Git remote.
 
+**Phase 10 status (2026-10-17):** `games/falling_blocks/scripts/board.lua` implements the 10×20 grid and all seven shapes, with spawn, movement, rotation, wall/floor and occupied-cell collision, locking, and consecutive line clears. The rules have no rendering or editor dependency. The deterministic Lua test covers every shape, four-turn rotation, blocked rotation/movement, locking, single/double clears, top-out, and invalid calls. The first playable 3D scene remains Phase 11.
+
 | Phase | Deliverable | Check before commit |
 | --- | --- | --- |
 | 0 | Restore this 3D brief, this roadmap, `AGENTS.md`, and project-local development skills. | Requirements for every item in README map to a phase; no 2D plan is presented as the goal. |
@@ -63,7 +65,7 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 | 26 | Build a small 3D room/puzzle game from Lua and source assets only. | It exercises glTF, PBR, HDRI, shadows, SSAO, physics, audio, UI, save/load, and export. |
 | 27 | Harden and release: automated feature-scene coverage audit, sanitizers, asset-failure cases, performance budgets, Linux packaging, and documentation. | Ubuntu 24+ release builds pass unit, integration, visual, packaged-game, and stability gates. |
 
-Phases 3–9 are locally complete: the engine can display a 3D cube, run Lua-authored 3D scenes, react to named input, manage entities and components, reproduce worlds from source scene and prefab files, and render imported glTF geometry with direct-light PBR materials. Phase 10 starts the game itself. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
+Phases 3–10 are locally complete: the engine can display a 3D cube, run Lua-authored 3D scenes, react to named input, manage entities and components, reproduce worlds from source scene and prefab files, render imported glTF geometry with direct-light PBR materials, and test the falling-block rules without a window. Phase 11 connects the rules to a playable 3D scene. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
 
 | README requirement | Covered in phases |
 | --- | --- |
