@@ -23,6 +23,7 @@ with tempfile.TemporaryDirectory() as temporary:
     result = run("run", project)
     assert result.returncode == 0, result.stderr
     assert "started 'New Game'" in result.stdout and "stopped" in result.stdout
+    assert "Hello from ThreePoint" in result.stdout
 
     game = project / "game.lua"
     original = game.read_text()
@@ -36,13 +37,40 @@ with tempfile.TemporaryDirectory() as temporary:
     game.write_text("error({})\n")
     result = run("run", project)
     assert result.returncode != 0 and "game.lua: Lua error" in result.stderr
+    assert "game.lua:1:" in result.stderr
     game.write_text(original)
 
     script = project / "scripts/main.lua"
     original_script = script.read_text()
     script.write_text("return {\n")
     result = run("run", project)
-    assert result.returncode != 0 and "scripts/main.lua:" in result.stderr
+    assert result.returncode != 0 and "scripts/main.lua:2:" in result.stderr, result.stderr
+
+    script.write_text("""return {
+  start = function() print("callback:start") end,
+  fixed_update = function(dt) assert(dt == 1 / 60); print("callback:fixed_update") end,
+  update = function(dt) assert(dt == 1 / 60); print("callback:update") end,
+  draw = function() print("callback:draw") end
+}
+""")
+    result = run("run", project)
+    assert result.returncode == 0, result.stderr
+    callbacks = [line for line in result.stdout.splitlines() if line.startswith("callback:")]
+    assert callbacks == ["callback:start", "callback:fixed_update", "callback:update", "callback:draw"]
+
+    for callback in ("start", "fixed_update", "update", "draw"):
+        script.write_text(f'return {{\n  {callback} = function() error("boom") end\n}}\n')
+        result = run("run", project)
+        assert result.returncode != 0 and "scripts/main.lua:2:" in result.stderr, result.stderr
+        assert "boom" in result.stderr and "stopped" not in result.stdout
+
+    script.write_text('error({})\nreturn {}\n')
+    result = run("run", project)
+    assert result.returncode != 0 and "scripts/main.lua:1:" in result.stderr, result.stderr
+
+    script.write_text('return {start = true}\n')
+    result = run("run", project)
+    assert result.returncode != 0 and "'start' must be a function" in result.stderr
     script.write_text(original_script)
 
     (project / "scenes/main.scene.lua").unlink()

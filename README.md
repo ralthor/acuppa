@@ -96,7 +96,7 @@ The editor will also offer a source view for behavior scripts. Its visual contro
 
 ### Lua API checklist for the first 2D release
 
-Each row is a planned capability; none is implemented yet. An API is complete only when it has an example and a test. Functions use the `tp` value returned by `require("threepoint")`.
+Each row is a planned capability, implemented in later phases. The lifecycle callbacks are available as of Phase 4; the `threepoint` Lua module and its functions are still planned. An API is complete only when it has an example and a test. Functions use the `tp` value returned by `require("threepoint")`.
 
 | Capability | Planned Lua surface |
 | --- | --- |
@@ -225,7 +225,7 @@ The script needs `uv`, `apt-get`, and `dpkg-deb` on the machine. It pins Zig 0.1
 
 ## Phase 3: project commands
 
-`threepoint init <directory>` creates `game.lua`, a scene, a script, and an example test in a **new** directory. It refuses an existing directory rather than overwriting files. `threepoint run <directory>` loads `game.lua`, checks its API version, title, window, input table, first scene, and scene paths, then checks every scene table and script syntax. Errors name the project file; Lua syntax errors include a line number. For now, `run` reports startup and shutdown without opening a window or calling game callbacks. Those arrive in the next steps.
+`threepoint init <directory>` creates `game.lua`, a scene, a script, and an example test in a **new** directory. It refuses an existing directory rather than overwriting files. `threepoint run <directory>` loads `game.lua`, checks its API version, title, window, input table, first scene, and scene paths, then checks every scene table and script syntax. Errors name the project file; Lua syntax errors include a line number. The runner executes the first scene's callbacks as described below; window creation arrives in Phase 5.
 
 After building, the command-line check is:
 
@@ -234,3 +234,9 @@ python3 tests/cli_test.py build/threepoint
 ```
 
 **Step 3 check:** the test creates a project, runs it, confirms `init` cannot overwrite it, and checks syntax and missing-file errors.
+
+## Phase 4: Lua lifecycle
+
+`threepoint run <directory>` now executes the first scene's script and calls its optional `start()`, `fixed_update(dt)`, `update(dt)`, and `draw()` functions in that order. A script returns a table containing whichever callbacks it needs. `fixed_update` and `update` each receive `dt = 1/60` seconds. This phase runs one simulated tick and one frame, then exits; the continuous timed loop and window arrive in Phase 5. Lua runtime errors show the script file, line, and traceback. A callback field that is present must be a function.
+
+**Step 4 check:** `python3 tests/cli_test.py build/threepoint` confirms callback order and `dt`, runs the generated `start`, and checks syntax errors, callback runtime errors, and invalid callback fields. No graphics or input are active yet.

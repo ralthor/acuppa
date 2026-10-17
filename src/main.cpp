@@ -79,13 +79,33 @@ static std::string project_file(const std::string& name) {
   return path.string();
 }
 
+static int lua_traceback(lua_State* lua) {
+  const char* error = lua_tostring(lua, 1);
+  luaL_traceback(lua, lua, error ? error : "Lua error", 1);
+  return 1;
+}
+
+static void call_lua(lua_State* lua, int arguments, int results, const std::string& file) {
+  const int function = lua_gettop(lua) - arguments;
+  lua_pushcfunction(lua, lua_traceback);
+  lua_insert(lua, function);
+  if (lua_pcall(lua, arguments, results, function) != LUA_OK) {
+    const char* error = lua_tostring(lua, -1);
+    const std::string message = error ? error : "Lua error";
+    throw std::runtime_error(message.rfind(file + ":", 0) == 0 ? message
+                                                               : file + ": " + message);
+  }
+  lua_remove(lua, function);
+}
+
 static int load_table(lua_State* lua, const std::string& name) {
   const std::string path = project_file(name);
   lua_settop(lua, 0);
-  if (luaL_loadfile(lua, path.c_str()) != LUA_OK || lua_pcall(lua, 0, 1, 0) != LUA_OK) {
+  if (luaL_loadfile(lua, path.c_str()) != LUA_OK) {
     const char* error = lua_tostring(lua, -1);
     throw std::runtime_error(error ? error : name + ": Lua error");
   }
+  call_lua(lua, 0, 1, name);
   if (!lua_istable(lua, -1)) {
     throw std::runtime_error(name + ": expected a returned table");
   }
@@ -126,7 +146,7 @@ static int table_field(lua_State* lua, int table, const char* key,
   return lua_gettop(lua);
 }
 
-static void validate_scene(lua_State* lua, const std::string& name) {
+static std::string validate_scene(lua_State* lua, const std::string& name) {
   const int scene = load_table(lua, name);
   string_field(lua, scene, "background", name);
   const std::string script = string_field(lua, scene, "script", name);
@@ -140,7 +160,25 @@ static void validate_scene(lua_State* lua, const std::string& name) {
     const char* error = lua_tostring(lua, -1);
     throw std::runtime_error(error ? error : script + ": Lua syntax error");
   }
-  lua_pop(lua, 1);  // Syntax-check only; callbacks run in the next step.
+  lua_pop(lua, 1);
+  return script;
+}
+
+static void call_callback(lua_State* lua, int script_table, const std::string& script,
+                          const char* name, bool has_dt) {
+  lua_pushstring(lua, name);
+  lua_rawget(lua, script_table);
+  if (lua_isnil(lua, -1)) {
+    lua_pop(lua, 1);
+    return;
+  }
+  if (!lua_isfunction(lua, -1)) {
+    throw std::runtime_error(script + ": '" + name + "' must be a function");
+  }
+  if (has_dt) {
+    lua_pushnumber(lua, 1.0 / 60.0);
+  }
+  call_lua(lua, has_dt ? 1 : 0, 0, script);
 }
 
 static void run_project(const fs::path& path) {
@@ -187,11 +225,20 @@ static void run_project(const fs::path& path) {
   if (!found_first) {
     throw std::runtime_error("game.lua: first_scene '" + first_scene + "' is not in scenes");
   }
+  std::string first_script;
   for (const auto& scene : scenes) {
-    validate_scene(lua.get(), scene.second);
+    const std::string script = validate_scene(lua.get(), scene.second);
+    if (scene.first == first_scene) {
+      first_script = script;
+    }
   }
 
+  const int script_table = load_table(lua.get(), first_script);
   std::cout << "ThreePoint: started '" << title << "' at scene '" << first_scene << "'\n";
+  call_callback(lua.get(), script_table, first_script, "start", false);
+  call_callback(lua.get(), script_table, first_script, "fixed_update", true);
+  call_callback(lua.get(), script_table, first_script, "update", true);
+  call_callback(lua.get(), script_table, first_script, "draw", false);
   std::cout << "ThreePoint: stopped\n";
 }
 
