@@ -8,5 +8,6 @@
 - Keep complete games authorable from source and CLI alone. Editor changes must write the same scene/project files, and the exported runtime must not require editor state or clicks.
 - Implement one small, independently testable phase at a time. Add unit tests, Lua integration tests, and an entry in the all-feature test scene for every new component or public API. Test failure paths as well as the normal path.
 - Run relevant automated tests before calling a phase complete. Do not claim Linux or graphical behavior passed unless actually tested with a real render capture or live window check.
+- For a windowed source scene, also run its interactive launch without `--frames`; fixed-frame captures can miss first-frame callback timing.
 - Update README/PLAN status honestly and commit each completed step. Leave user-created untracked projects untouched.
 - Use [feature-slice](project_skills/feature-slice/SKILL.md) for implementation phases and [release-check](project_skills/release-check/SKILL.md) for final validation.
