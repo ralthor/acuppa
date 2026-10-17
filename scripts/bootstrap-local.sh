@@ -42,4 +42,4 @@ ZIG_GLOBAL_CACHE_DIR="$tools_dir/zig-cache" "$tools_dir/venv/bin/cmake" --fresh 
   -DLUA_LIBRARY="$sysroot_dir/usr/lib/x86_64-linux-gnu/liblua5.4.so" \
   -DLUA_MATH_LIBRARY=m
 ZIG_GLOBAL_CACHE_DIR="$tools_dir/zig-cache" "$tools_dir/venv/bin/cmake" --build "$project_root/build"
-"$project_root/build/threepoint"
+"$project_root/build/threepoint" --version

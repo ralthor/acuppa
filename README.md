@@ -27,7 +27,7 @@
 
 ## Phase 1: project and scripting contract
 
-This section is the design for the first implementation phase. The commands and Lua functions below are **specified, not implemented yet**. The sketches are small design checks, not runnable games today.
+This section records the project contract. Later sections say which parts are implemented. The game sketches are design checks, not runnable games today.
 
 ### Project files
 
@@ -88,6 +88,7 @@ Ordinary Lua control flow, functions, tables, math, and project-local modules ar
 | `threepoint test <directory>` | Run `tests/*.test.lua` headlessly with controllable input and time. |
 | `threepoint build <directory> --out <directory>` | Produce a standalone playable game containing the runtime, Lua source, and referenced assets. |
 | `threepoint edit <directory>` | Open the optional visual editor on those same project files. |
+| `threepoint --version` | Show the linked SDL3 and Lua versions. |
 
 No command requires an editor project database or a click to finish a game.
 
@@ -210,7 +211,7 @@ return {
 
 ## Phase 2: build bootstrap
 
-The repository now has a minimal C++ executable that opens a Lua state and reads the linked SDL3 version. It does not open a game window yet. This verifies the compiler, CMake build, headers, and both libraries before runtime work begins.
+The repository now has a minimal C++ executable linked to SDL3 and Lua. It does not open a game window yet. This verifies the compiler, CMake build, headers, and both libraries before runtime work begins.
 
 On this Ubuntu 26.04 x86-64 machine, administrator access is unavailable to unattended commands. The tested setup keeps tools under ignored `.tools/` and build output under ignored `build/`:
 
@@ -220,4 +221,16 @@ bash scripts/bootstrap-local.sh
 
 The script needs `uv`, `apt-get`, and `dpkg-deb` on the machine. It pins Zig 0.17.0 as the local C++ compiler, CMake 4.4.4, Ninja 1.13.2, Ubuntu SDL3 3.4.2, and Lua 5.4.8. It downloads the SDL3 and Lua development packages without installing them system-wide, then configures, builds, and runs the executable. Internet access is needed the first time. On a machine with administrator access, the conventional alternative is to install `build-essential`, `cmake`, `ninja-build`, `libsdl3-dev`, and `liblua5.4-dev` with the system package manager, then run `cmake -S . -B build -G Ninja` and `cmake --build build`.
 
-**Step 2 check passed here:** `bash scripts/bootstrap-local.sh` completed and printed `ThreePoint bootstrap: SDL 3.4.2, Lua 5.4`. Window creation, input, and game commands remain for later steps.
+**Step 2 check passed here:** `bash scripts/bootstrap-local.sh` completed and printed `ThreePoint: SDL 3.4.2, Lua 5.4`. Window creation and input remain for later steps.
+
+## Phase 3: project commands
+
+`threepoint init <directory>` creates `game.lua`, a scene, a script, and an example test in a **new** directory. It refuses an existing directory rather than overwriting files. `threepoint run <directory>` loads `game.lua`, checks its API version, title, window, input table, first scene, and scene paths, then checks every scene table and script syntax. Errors name the project file; Lua syntax errors include a line number. For now, `run` reports startup and shutdown without opening a window or calling game callbacks. Those arrive in the next steps.
+
+After building, the command-line check is:
+
+```sh
+python3 tests/cli_test.py build/threepoint
+```
+
+**Step 3 check:** the test creates a project, runs it, confirms `init` cannot overwrite it, and checks syntax and missing-file errors.
