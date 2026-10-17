@@ -3,16 +3,19 @@
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 #include "threepoint/preview.hpp"
+#include "cube_demo.hpp"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <nvrhi/vulkan.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -64,6 +67,7 @@ public:
         if (device_ != VK_NULL_HANDLE) {
             vkDeviceWaitIdle(device_);
         }
+        cube_.reset();
         swapchain_textures_.clear();
         staging_ = nullptr;
         command_list_ = nullptr;
@@ -122,7 +126,9 @@ private:
         }
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         window_ = glfwCreateWindow(int(options_.width), int(options_.height),
-                                   "ThreePoint Vulkan preview", nullptr, nullptr);
+                                   options_.scene == PreviewOptions::Scene::Cube
+                                       ? "ThreePoint 3D cube" : "ThreePoint Vulkan preview",
+                                   nullptr, nullptr);
         if (!window_) {
             throw std::runtime_error("GLFW could not create the Vulkan window");
         }
@@ -176,6 +182,9 @@ private:
         command_list_ = nvrhi_device_->createCommandList();
         if (!command_list_) {
             throw std::runtime_error("nvrhi could not create a command list");
+        }
+        if (options_.scene == PreviewOptions::Scene::Cube) {
+            cube_ = std::make_unique<CubeDemo>(nvrhi_device_);
         }
         VkSemaphoreCreateInfo semaphore_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
         check(vkCreateSemaphore(device_, &semaphore_info, nullptr, &image_available_),
@@ -276,6 +285,7 @@ private:
             if (glfwWindowShouldClose(window_)) return;
         }
         check(vkDeviceWaitIdle(device_), "wait before swapchain resize");
+        if (cube_) cube_->release_size_dependent();
         swapchain_textures_.clear();
         if (swapchain_ != VK_NULL_HANDLE) {
             vkDestroySwapchainKHR(device_, swapchain_, nullptr);
@@ -373,6 +383,7 @@ private:
             if (!texture) throw std::runtime_error("nvrhi could not wrap a swapchain image");
             swapchain_textures_.push_back(texture);
         }
+        if (cube_) cube_->resize(swapchain_textures_, extent_.width, extent_.height);
         if (!options_.capture_path.empty()) {
             staging_ = nvrhi_device_->createStagingTexture(texture_desc,
                                                             nvrhi::CpuAccessMode::Read);
@@ -409,6 +420,12 @@ private:
         command_list_->clearTextureFloat(swapchain_textures_[image_index],
                                          nvrhi::AllSubresources,
                                          nvrhi::Color(0.08f, 0.18f, 0.38f, 1.0f));
+        if (cube_) {
+            const float angle = options_.capture_path.empty()
+                ? options_.cube_angle + float(glfwGetTime()) * 0.8f
+                : options_.cube_angle;
+            cube_->record(command_list_, image_index, angle);
+        }
         const bool capture_this_frame = staging_ && !captured_;
         if (capture_this_frame) {
             command_list_->copyTexture(staging_, nvrhi::TextureSlice{},
@@ -435,7 +452,7 @@ private:
             check(vkQueueWaitIdle(queue_), "wait for presented frame");
         }
         if (!nvrhi_device_->waitForIdle()) {
-            throw std::runtime_error("Vulkan device lost while clearing the frame");
+            throw std::runtime_error("Vulkan device lost while rendering the frame");
         }
         if (messages_.has_error()) throw std::runtime_error("nvrhi reported a rendering error");
         if (capture_this_frame) {
@@ -470,7 +487,9 @@ private:
         }
         nvrhi_device_->unmapStagingTexture(staging_);
         if (!output) throw std::runtime_error("failed to save capture: " + options_.capture_path.string());
-        std::cout << "Captured clear frame: " << options_.capture_path.string() << '\n';
+        std::cout << "Captured "
+                  << (cube_ ? "cube" : "clear") << " frame: "
+                  << options_.capture_path.string() << '\n';
     }
 
     PreviewOptions options_;
@@ -496,6 +515,7 @@ private:
     nvrhi::CommandListHandle command_list_;
     nvrhi::StagingTextureHandle staging_;
     std::vector<nvrhi::TextureHandle> swapchain_textures_;
+    std::unique_ptr<CubeDemo> cube_;
 };
 
 }  // namespace
@@ -503,6 +523,9 @@ private:
 PreviewResult run_preview(const PreviewOptions& options) {
     if (options.width == 0 || options.height == 0 || options.width > 8192 || options.height > 8192) {
         throw std::invalid_argument("preview width and height must be between 1 and 8192");
+    }
+    if (options.scene == PreviewOptions::Scene::Cube && !std::isfinite(options.cube_angle)) {
+        throw std::invalid_argument("cube angle must be finite");
     }
     return VulkanWindow(options).run();
 }

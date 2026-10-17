@@ -18,8 +18,8 @@ UV_CACHE_DIR="$tools_dir/uv-cache" uv pip install --python "$tools_dir/venv/bin/
   ziglang==0.17.0 cmake==4.4.4 ninja==1.13.2
 
 download_and_extract() {
-  local name="$1" version="$2"
-  local archive="$debs_dir/${name}_${version}_amd64.deb"
+  local name="$1" version="$2" architecture="${3:-amd64}"
+  local archive="$debs_dir/${name}_${version}_${architecture}.deb"
   if [ ! -f "$archive" ]; then
     (cd "$debs_dir" && apt-get download "$name=$version")
   fi
@@ -35,6 +35,7 @@ download_and_extract libglfw3 '3.4-4'
 download_and_extract libvulkan-dev '1.4.341.0-1'
 download_and_extract libvulkan1 '1.4.341.0-1'
 download_and_extract vulkan-validationlayers '1.4.341.0-1'
+download_and_extract glslang-tools '16.2.0-2'
 
 require_source() {
   local name="$1" url="$2" revision="$3"
@@ -56,6 +57,8 @@ require_source vulkan-headers https://github.com/KhronosGroup/Vulkan-Headers.git
   015e25c3c91b70eb1a754d36fb14c4ba6ad9b0b9
 require_source nvrhi https://github.com/NVIDIA-RTX/NVRHI.git \
   6b96fb03e07539f08327aea76c56d55f1de9d906
+require_source glm https://github.com/g-truc/glm.git \
+  0af55ccecd98d4e5a8d1fad7de25ba429d60e863
 
 gpu_tests=OFF
 if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then gpu_tests=ON; fi
@@ -67,15 +70,18 @@ ZIG_GLOBAL_CACHE_DIR="$tools_dir/zig-cache" "$tools_dir/venv/bin/cmake" --fresh 
   -DCMAKE_C_COMPILER_ARG1=cc \
   -DCMAKE_CXX_COMPILER="$tools_dir/venv/bin/python-zig" \
   -DCMAKE_CXX_COMPILER_ARG1=c++ \
+  -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_CXX_FLAGS="-I$sysroot_dir/usr/include/x86_64-linux-gnu" \
   -DSDL3_DIR="$sysroot_dir/usr/lib/x86_64-linux-gnu/cmake/SDL3" \
   -DLUA_INCLUDE_DIR="$sysroot_dir/usr/include/lua5.4" \
   -DLUA_LIBRARY="$sysroot_dir/usr/lib/x86_64-linux-gnu/liblua5.4.so" \
   -DLUA_MATH_LIBRARY=m \
   -Dglfw3_DIR="$sysroot_dir/usr/lib/x86_64-linux-gnu/cmake/glfw3" \
+  -DTHREEPOINT_GLSLANG_VALIDATOR="$sysroot_dir/usr/bin/glslangValidator" \
   -DTHREEPOINT_VULKAN_LOADER="$sysroot_dir/usr/lib/x86_64-linux-gnu/libvulkan.so" \
   -DFETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS="$tools_dir/vendor/vulkan-headers" \
   -DFETCHCONTENT_SOURCE_DIR_NVRHI="$tools_dir/vendor/nvrhi" \
+  -DFETCHCONTENT_SOURCE_DIR_GLM="$tools_dir/vendor/glm" \
   -DTHREEPOINT_BUILD_2D_PROTOTYPE=ON \
   -DTHREEPOINT_ENABLE_GPU_TESTS="$gpu_tests"
 ZIG_GLOBAL_CACHE_DIR="$tools_dir/zig-cache" "$tools_dir/venv/bin/cmake" --build "$project_root/build"

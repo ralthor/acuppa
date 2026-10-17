@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Linux graphics dependencies
-        run: sudo apt-get update && sudo apt-get install -y libglfw3-dev libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers xvfb xauth
+        run: sudo apt-get update && sudo apt-get install -y libglfw3-dev libvulkan-dev glslang-tools mesa-vulkan-drivers vulkan-validationlayers xvfb xauth
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DTHREEPOINT_ENABLE_GPU_TESTS=ON
       - name: Build

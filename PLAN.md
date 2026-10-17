@@ -4,7 +4,7 @@
 
 ## Current state and course correction
 
-The earlier commits built a **2D SDL3/Lua prototype** with project creation, Lua callbacks, a window, and simple drawing. It is not the requested 3D engine and has no 3D physics. It now lives in an optional legacy target while the new GLFW/Vulkan/nvrhi runtime is developed. No 3D geometry or Lua-driven 3D scene exists yet.
+The earlier commits built a **2D SDL3/Lua prototype** with project creation, Lua callbacks, a window, and simple drawing. It is not the requested 3D engine and has no 3D physics. It now lives in an optional legacy target while the GLFW/Vulkan/nvrhi runtime is developed. The runtime has a built-in 3D cube demo; a Lua-driven 3D scene is still Phase 4.
 
 The core will be a C++ static library with separate game runtime and editor executables. Projects remain source files: `game.lua`, literal `scenes/*.scene.lua` data, `scripts/*.lua`, and referenced assets. The editor edits the same files; it must not introduce hidden game state. `threepoint run`, `test`, and `build` must work without opening the editor. Exported games include a runtime without editing tools. Lua remains the scripting language. Choose and pin one 3D physics dependency during its integration phase; **Jolt Physics** is the initial choice.
 
@@ -15,6 +15,8 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 **Phase 1 status (2026-10-17):** The static core, separate runtime/editor targets, optional legacy prototype, source-only feature-scene skeleton, dependency record, and Ubuntu 24+ CI workflow are implemented. Local core and legacy checks pass. The hosted CI gate remains unverified because this repository has no Git remote configured; that does not block local Phase 2 development.
 
 **Phase 2 status (2026-10-17):** On this Linux machine, GLFW opens a Vulkan window, nvrhi wraps and clears swapchain images, resize recreates the swapchain, and shutdown succeeds. A GPU readback test checks every pixel of a clear frame; an automated smoke test also checks resize and the missing-driver error. Vulkan validation is enabled for local and hosted GPU tests. Vulkan errors are reported by name, including device loss, but a physical device-loss event was not induced. The live local test passed on an NVIDIA GeForce GTX 1660. The Ubuntu 24.04 hosted CI job is configured but has not run without a Git remote. The first 3D geometry is still Phase 3.
+
+**Phase 3 status (2026-10-17):** glm supplies a tested perspective camera and model transforms. The built-in indexed cube runs through an nvrhi graphics pipeline with a D32 depth attachment and rotates in `threepoint --preview`. GPU readbacks at two angles verify visible faces and depth occlusion; a live window smoke test verifies resize under Vulkan validation. Both captured views were visually inspected. All eight local tests pass. The authored Lua scene remains Phase 4, and the Ubuntu 24.04 hosted CI gate remains unverified without a Git remote.
 
 | Phase | Deliverable | Check before commit |
 | --- | --- | --- |
@@ -44,7 +46,7 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 | 23 | Build a small 3D room/puzzle game from Lua and source assets only. | It exercises glTF, PBR, HDRI, shadows, SSAO, physics, audio, UI, save/load, and export. |
 | 24 | Harden and release: automated feature-scene coverage audit, sanitizers, asset-failure cases, performance budgets, Linux packaging, and documentation. | Ubuntu 24+ release builds pass unit, integration, visual, packaged-game, and stability gates. |
 
-Phase 3 is the first 3D visual milestone; Phase 4 is the first 3D demo authored wholly in Lua. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
+Phase 3 is the first 3D visual milestone and is locally complete; Phase 4 is the first 3D demo authored wholly in Lua. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
 
 | README requirement | Covered in phases |
 | --- | --- |

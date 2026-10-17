@@ -1,6 +1,6 @@
 # Dependency record
 
-The core and editor targets use C++17 and its standard library. The runtime now also uses GLFW, Vulkan, and nvrhi. CMake 3.25 or newer is required; the local bootstrap installs CMake **4.4.4**, Zig **0.17.0**, and Ninja **1.13.2** in ignored `.tools/`.
+The core and editor targets use C++17 and its standard library. The runtime also uses GLFW, Vulkan, nvrhi, and glm. CMake 3.25 or newer is required; the local bootstrap installs CMake **4.4.4**, Zig **0.17.0**, and Ninja **1.13.2** in ignored `.tools/`.
 
 | Product dependency | Pinned source or local package | Role |
 | --- | --- | --- |
@@ -9,9 +9,11 @@ The core and editor targets use C++17 and its standard library. The runtime now 
 | GLFW (zlib/libpng) | Local Ubuntu package `libglfw3` and `libglfw3-dev` **3.4-4** | Linux window, input events, and Vulkan surface. |
 | Vulkan loader | Local Ubuntu packages `libvulkan1` and `libvulkan-dev` **1.4.341.0-1** | Loader library; an installed Vulkan driver is also needed at runtime. |
 | Vulkan validation layer | Local Ubuntu package `vulkan-validationlayers` **1.4.341.0-1** | Checks Vulkan API use during GPU tests. |
+| glm (MIT) | `g-truc/glm` 1.0.1, commit `0af55ccecd98d4e5a8d1fad7de25ba429d60e863` | Perspective camera and 3D model transforms. |
+| glslang (BSD-3-Clause) | Local Ubuntu package `glslang-tools` **16.2.0-2** | Build-time GLSL to SPIR-V compiler; generated shaders are embedded in the runtime. |
 
-CMake fetches the pinned nvrhi and Vulkan-Headers commits into the build tree for a clean checkout. `scripts/bootstrap-local.sh` downloads those sources and exact Ubuntu packages into ignored `.tools/` and supplies them to CMake. The Ubuntu 24.04 CI runner uses its distribution GLFW/Vulkan packages and runs the GPU test through Xvfb and Mesa; that hosted job has not run yet.
+CMake fetches the pinned nvrhi, Vulkan-Headers, and glm commits into the build tree for a clean checkout. `scripts/bootstrap-local.sh` downloads those sources and exact Ubuntu packages into ignored `.tools/` and supplies them to CMake. The Ubuntu 24.04 CI runner uses its distribution GLFW/Vulkan/glslang packages and runs the GPU test through Xvfb and Mesa; that hosted job has not run yet.
 
 The older optional 2D prototype is built only with `THREEPOINT_BUILD_2D_PROTOTYPE=ON`. The local bootstrap pins its Ubuntu packages to SDL3 **3.4.2+ds-1ubuntu1** and Lua **5.4.8-1build1**. It is retained for regression checks, not used as the 3D renderer.
 
-Pin the exact source revision or release and record its license, retrieval method, and platform build options when each remaining 3D dependency first enters the product: glm in Phase 3, Jolt Physics in Phase 14, and miniaudio in Phase 16. The eventual Lua binding must also use one pinned Lua version. Keep downloads and build tools within this repository's ignored directories for local development.
+Pin the exact source revision or release and record its license, retrieval method, and platform build options when each remaining 3D dependency first enters the product: Jolt Physics in Phase 14 and miniaudio in Phase 16. The eventual Lua binding must also use one pinned Lua version. Keep downloads and build tools within this repository's ignored directories for local development.
