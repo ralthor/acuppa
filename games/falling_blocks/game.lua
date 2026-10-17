@@ -10,6 +10,8 @@ return {
     rotate = {keyboard = "up", gamepad_button = "a"},
     soft_drop = {keyboard = "down", gamepad_button = "dpad_down"},
     hard_drop = {keyboard = "space", gamepad_button = "b"},
-    restart = {keyboard = "r", gamepad_button = "start"},
+    hold = {keyboard = "c", gamepad_button = "x"},
+    pause = {keyboard = "p", gamepad_button = "start"},
+    restart = {keyboard = "r", gamepad_button = "back"},
   },
 }

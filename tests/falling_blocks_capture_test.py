@@ -27,8 +27,13 @@ with tempfile.TemporaryDirectory() as directory:
     normal = capture(temp / "normal.ppm")
     left = capture(temp / "left.ppm", "--hold-key", "left")
     dropped = capture(temp / "drop.ppm", "--hold-key", "space")
+    held = capture(temp / "hold.ppm", "--hold-key", "c")
+    paused = capture(temp / "pause.ppm", "--hold-key", "p")
     assert normal != left, "left action did not change the rendered piece"
     assert normal != dropped, "hard drop did not change the rendered board"
-    assert normal[:3] == left[:3] == dropped[:3], "background changed unexpectedly"
+    assert normal != held, "hold did not change the rendered previews"
+    assert normal != paused, "pause did not change the rendered status"
+    assert normal[:3] == left[:3] == dropped[:3] == held[:3] == paused[:3], \
+        "background changed unexpectedly"
 
 print("Falling-block input changed the Vulkan frame")

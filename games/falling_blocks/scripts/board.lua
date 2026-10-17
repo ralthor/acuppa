@@ -18,17 +18,36 @@ local function empty_row()
   return {}
 end
 
-function Board.new()
+function Board.new(seed)
+  seed = seed or 16
+  assert(type(seed) == "number" and seed == math.floor(seed) and
+         seed > 0 and seed < 2147483647, "invalid random seed")
   local self = setmetatable({rows = {}, active = nil, game_over = false,
-                            sequence_index = 1}, Board)
+                            random_state = seed, queue = {}, held_kind = nil,
+                            hold_used = false}, Board)
   for y = 1, Board.height do self.rows[y] = empty_row() end
   return self
 end
 
+local function refill(self)
+  if #self.queue > 0 then return end
+  local bag = {table.unpack(Board.kinds)}
+  for i = #bag, 2, -1 do
+    self.random_state = self.random_state * 48271 % 2147483647
+    local j = self.random_state % i + 1
+    bag[i], bag[j] = bag[j], bag[i]
+  end
+  self.queue = bag
+end
+
+function Board:peek_kind()
+  refill(self)
+  return self.queue[1]
+end
+
 function Board:next_kind()
-  local kind = Board.kinds[self.sequence_index]
-  self.sequence_index = self.sequence_index % #Board.kinds + 1
-  return kind
+  refill(self)
+  return table.remove(self.queue, 1)
 end
 
 function Board:cells(piece)
@@ -80,10 +99,33 @@ end
 
 function Board:rotate()
   if not self.active or self.game_over then return false end
-  local trial = {kind = self.active.kind, x = self.active.x,
-                 y = self.active.y, rotation = (self.active.rotation + 1) % 4}
-  if not self:can_place(trial) then return false end
-  self.active = trial
+  local kicks = {{0, 0}, {-1, 0}, {1, 0}, {-2, 0}, {2, 0},
+                 {0, 1}, {-1, 1}, {1, 1}, {-2, 1}, {2, 1}}
+  for _, offset in ipairs(kicks) do
+    local trial = {kind = self.active.kind, x = self.active.x + offset[1],
+                   y = self.active.y + offset[2],
+                   rotation = (self.active.rotation + 1) % 4}
+    if self:can_place(trial) then self.active = trial; return true end
+  end
+  return false
+end
+
+function Board:ghost_cells()
+  if not self.active then return {} end
+  local ghost = {kind = self.active.kind, x = self.active.x,
+                 y = self.active.y, rotation = self.active.rotation}
+  repeat ghost.y = ghost.y - 1 until not self:can_place(ghost)
+  ghost.y = ghost.y + 1
+  return self:cells(ghost)
+end
+
+function Board:hold()
+  if not self.active or self.game_over or self.hold_used then return false end
+  local kind = self.active.kind
+  self.active = nil
+  self:spawn(self.held_kind)
+  self.held_kind = kind
+  self.hold_used = true
   return true
 end
 
@@ -112,6 +154,7 @@ function Board:lock()
     self.rows[cell[2] + 1][cell[1] + 1] = kind
   end
   self.active = nil
+  self.hold_used = false
   return self:clear_lines()
 end
 
@@ -135,6 +178,18 @@ function Board.line_score(cleared, level)
   assert(type(level) == "number" and level == math.floor(level) and level >= 1,
          "invalid level")
   return points[cleared] * level
+end
+
+function Board.level_for_lines(lines)
+  assert(type(lines) == "number" and lines == math.floor(lines) and lines >= 0,
+         "invalid total lines")
+  return math.floor(lines / 10) + 1
+end
+
+function Board.gravity_interval(level, soft_drop)
+  assert(type(level) == "number" and level == math.floor(level) and level >= 1,
+         "invalid level")
+  return soft_drop and 0.07 or math.max(0.08, 0.7 * 0.78 ^ (level - 1))
 end
 
 return Board
