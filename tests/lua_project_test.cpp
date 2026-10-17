@@ -12,6 +12,9 @@ int main(int argc, char* argv[]) {
     threepoint::LuaProject project(argv[1]);
     expect(project.width() == 1280 && project.height() == 720,
            "window settings were not read from game.lua");
+    const auto startup = project.step(0.0);
+    expect(!startup.quit && startup.cubes.size() == 1,
+           "first draw before a fixed update failed");
     auto first = project.step(1.0 / 60.0);
     expect(!first.quit && first.cubes.size() == 1, "start() did not create one cube");
     expect(first.cubes[0].id == 1, "cube ID is unstable");

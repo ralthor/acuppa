@@ -1,6 +1,5 @@
 local threepoint = require("threepoint")
 local cube
-local fixed_ticks = 0
 
 return {
   start = function()
@@ -45,7 +44,6 @@ return {
   end,
   fixed_update = function(dt)
     assert(dt > 0)
-    fixed_ticks = fixed_ticks + 1
   end,
   update = function(dt)
     assert(dt >= 0)
@@ -59,6 +57,6 @@ return {
     assert(ray.direction[3] < 0)
   end,
   draw = function()
-    assert(fixed_ticks > 0)
+    assert(threepoint.entity_exists(cube))
   end,
 }
