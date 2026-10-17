@@ -183,6 +183,9 @@ if(BUILD_TESTING)
     add_test(NAME falling_blocks_lit_capture COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/falling_blocks_capture_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit")
+    add_test(NAME falling_blocks_lit_ssao COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/falling_blocks_lit_ssao_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit")
     add_test(NAME falling_blocks_lit_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit")

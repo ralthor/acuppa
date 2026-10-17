@@ -31,8 +31,13 @@ int main(int argc, char* argv[]) {
     threepoint::LuaProject game(argv[1]);
     auto frame = game.step(0);
     expect(frame.environment && frame.lights.size() == 1 &&
-           std::abs(frame.exposure - 0.85f) < 0.001f,
-           "copied game did not configure the HDRI, exposure, and studio light");
+           std::abs(frame.exposure - 0.85f) < 0.001f &&
+           frame.ssao_quality == 2 && std::abs(frame.ssao_radius - 1.15f) < 0.001f &&
+           std::abs(frame.ssao_strength - 0.6f) < 0.001f,
+           "copied game did not configure the HDRI, exposure, light, and SSAO");
+    threepoint::LuaProject unoccluded(argv[1], "ssao_off");
+    expect(unoccluded.step(0).ssao_quality == 0,
+           "game's SSAO comparison scene did not disable the effect");
     expect(count_at(frame, -0.45f) == 1 && count_at(frame, 0.25f) == 4 &&
            count_at(frame, 0.2f) == 4 && frame.cubes.size() > 70,
            "panel, colored pieces, or source-authored display did not appear");

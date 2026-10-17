@@ -3,7 +3,7 @@ return {
   title = "Falling Blocks — Lit",
   window = {width = 1280, height = 720},
   first_scene = "main",
-  scenes = {main = "scenes/main.scene.lua"},
+  scenes = {main = "scenes/main.scene.lua", ssao_off = "scenes/main.scene.lua"},
   input = {
     left = {keyboard = "left", gamepad_button = "dpad_left"},
     right = {keyboard = "right", gamepad_button = "dpad_right"},

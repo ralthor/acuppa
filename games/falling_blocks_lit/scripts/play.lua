@@ -131,6 +131,7 @@ return {
     tp.set_camera({eye = {0, 0, 24}, target = {0, 0, 0}, fov = 60})
     tp.set_exposure(0.85)
     tp.set_environment("assets/studio.hdr", 0.7)
+    if tp.scene_name() ~= "ssao_off" then tp.set_ssao(2, 1.15, 0.6) end
     rendered, status, message, previous, hold_time = {}, {}, {}, {}, {}
     local border = {}
     for y = 0, Board.height - 1 do

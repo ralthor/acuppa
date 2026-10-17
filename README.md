@@ -51,7 +51,7 @@ The requirements above are the source of truth. [PLAN.md](PLAN.md) maps each req
 
 Phases 10–12 provide a tested full match: a shuffled seven-piece queue, movement, wall kicks, hold, next/ghost previews, line clears, speed levels, visible score, pause, game over, and restart. Run `build/threepoint run games/falling_blocks` to play it now. The separate export/package step remains Phase 24.
 
-The separate [Falling Blocks Lit](games/falling_blocks_lit/README.md) copy applies the Phase 13–14 renderer to the same game. It uses source-generated glTF tiles with seven PBR colors, a dark board panel, a directional light, and a checked-in studio HDRI. Run `build/threepoint run games/falling_blocks_lit` to compare it with the original; both projects run directly from source without editor interaction. The art generator and rendered assets are in the copied project.
+The separate [Falling Blocks Lit](games/falling_blocks_lit/README.md) copy uses source-generated glTF tiles with seven PBR colors, a dark board panel, a directional light, a checked-in studio HDRI, and SSAO. Run `build/threepoint run games/falling_blocks_lit` to compare it with the original, or add `--scene ssao_off` to compare the lit game without SSAO. Both projects run directly from source without editor interaction. The art generator and rendered assets are in the copied project.
 
 ## Current implementation
 
