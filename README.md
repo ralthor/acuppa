@@ -49,6 +49,8 @@ The requirements above are the source of truth. [PLAN.md](PLAN.md) maps each req
 
 ## Current implementation
 
-Phase 1's C++ static core, separate runtime/editor targets, source-only feature-scene skeleton, dependency record, and three-platform CI workflow are in the repository. The new executables currently check a project's `game.lua` entry point; they do not run or edit a 3D game yet. The old 2D SDL3/Lua program is available as the optional `threepoint-2d-prototype` target. Local core and prototype tests pass; Phase 1's Windows, macOS, and Ubuntu CI gate remains unverified until the workflow runs.
+**Platform scope update (2026-10-17):** The current target is Linux (Ubuntu 24+). Windows and macOS are no longer implementation or release gates, per the latest project direction. The original brief above is retained as supplied; this update supersedes only its platform list.
+
+Phase 1's C++ static core, separate runtime/editor targets, source-only feature-scene skeleton, dependency record, and Linux CI workflow are in the repository. The new executables currently check a project's `game.lua` entry point; they do not run or edit a 3D game yet. The old 2D SDL3/Lua program is available as the optional `threepoint-2d-prototype` target. Local core and prototype tests pass; the Ubuntu 24+ CI gate remains unverified until the workflow runs.
 
 On this Ubuntu development machine, `bash scripts/bootstrap-local.sh` builds both targets and runs all available tests. The new CLI check is `build/threepoint --check-project tests/feature_scene`. Future games will be created and run from source files, with no required editor clicks.

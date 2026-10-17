@@ -1,6 +1,6 @@
 # ThreePoint 3D implementation plan
 
-[README.md](README.md) is the user-provided source of truth. This plan may clarify implementation order, but cannot narrow or replace the 3D, physics, editor, platform, or code-only game requirements. The engine name **ThreePoint** was already chosen in this project, so no naming question is needed.
+[README.md](README.md) is the user-provided source of truth. The latest direction narrows the platform target to Linux (Ubuntu 24+); Windows and macOS checks are removed. The 3D, physics, editor, and code-only game requirements remain. The engine name **ThreePoint** was already chosen in this project, so no naming question is needed.
 
 ## Current state and course correction
 
@@ -12,13 +12,13 @@ The core will be a C++ static library with separate game runtime and editor exec
 
 Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implementation phase adds relevant unit or integration tests, runs them, and extends that scene for each new component and Lua API. Never claim a phase complete until its check passes. Keep the feature scene runnable from source once the 3D Lua runtime exists and, once export exists, from a packaged build.
 
-**Phase 1 status (2026-10-17):** The static core, separate runtime/editor targets, optional legacy prototype, source-only feature-scene skeleton, dependency record, and Windows/macOS/Ubuntu CI workflow are implemented. Local core and legacy checks pass. The phase gate remains open until all three CI jobs actually run; this repository has no Git remote configured, so those results are not available yet.
+**Phase 1 status (2026-10-17):** The static core, separate runtime/editor targets, optional legacy prototype, source-only feature-scene skeleton, dependency record, and Ubuntu 24+ CI workflow are implemented. Local core and legacy checks pass. The hosted CI gate remains unverified because this repository has no Git remote configured; that does not block local Phase 2 development.
 
 | Phase | Deliverable | Check before commit |
 | --- | --- | --- |
 | 0 | Restore this 3D brief, this roadmap, `AGENTS.md`, and project-local development skills. | Requirements for every item in README map to a phase; no 2D plan is presented as the goal. |
-| 1 | Restructure CMake into a static core library and separate runtime/editor targets; pin dependencies, create the feature-scene skeleton, and start Windows, macOS, Ubuntu 24+ CI. | All targets compile on the three platforms; core unit-test target runs. |
-| 2 | Replace the SDL window path with GLFW, Vulkan, and nvrhi device/swapchain setup. | Runtime opens, clears, resizes, and closes on each platform; device-loss and missing-Vulkan errors are clear. |
+| 1 | Restructure CMake into a static core library and separate runtime/editor targets; pin dependencies, create the feature-scene skeleton, and start Ubuntu 24+ CI. | Product targets compile and core unit tests run on Linux; hosted Ubuntu CI runs when a remote is available. |
+| 2 | Replace the SDL window path with GLFW, Vulkan, and nvrhi device/swapchain setup. | Runtime opens, clears, resizes, and closes on Linux; device-loss and missing-Vulkan errors are clear. |
 | 3 | Add glm transforms, depth testing, a perspective camera, and a built-in cube mesh. | **First visible 3D demo:** a cube rotates with correct depth in an automated frame capture and a manual window check. |
 | 4 | Connect Lua projects to the 3D scene/camera/render path and a repeatable fixed/update/draw loop. | **First code-only 3D demo:** a Lua scene creates and animates the cube with no editor action. |
 | 5 | Add keyboard, mouse, and controller actions plus pointer-to-world ray creation. | Injected events drive the cube/camera predictably in tests. |
@@ -40,13 +40,13 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 | 21 | Implement `threepoint test` and `threepoint build` to run tests headlessly and export a standalone, non-editable game. | A small source-only fixture exports and runs without the installed editor or development files. |
 | 22 | Build a complete 3D falling-block game from Lua and source assets only. | A match can finish with `threepoint run`; rule tests and export smoke test pass. |
 | 23 | Build a small 3D room/puzzle game from Lua and source assets only. | It exercises glTF, PBR, HDRI, shadows, SSAO, physics, audio, UI, save/load, and export. |
-| 24 | Harden and release: automated feature-scene coverage audit, sanitizers, asset-failure cases, performance budgets, platform packaging, and documentation. | Windows, macOS, and Ubuntu 24+ release builds pass unit, integration, visual, packaged-game, and stability gates. |
+| 24 | Harden and release: automated feature-scene coverage audit, sanitizers, asset-failure cases, performance budgets, Linux packaging, and documentation. | Ubuntu 24+ release builds pass unit, integration, visual, packaged-game, and stability gates. |
 
 Phase 3 is the first 3D visual milestone; Phase 4 is the first 3D demo authored wholly in Lua. Work may be split into smaller commits if a check proves too large, but do not skip tests or silently defer a requirement.
 
 | README requirement | Covered in phases |
 | --- | --- |
-| Windows, macOS, Ubuntu 24+, production testing, all-feature scene | 0–1, every feature phase, 24 |
+| Ubuntu 24+, production testing, all-feature scene | 0–1, every feature phase, 24 |
 | C++/CMake static core, runtime/editor, GLFW, nvrhi, Vulkan, glm | 1–4, 18–20 |
 | miniaudio and Lua behavior | 4, 6–7, 16 |
 | AI-authored source-only games, human editor, distributable export | 4, 7, 18–23 |
