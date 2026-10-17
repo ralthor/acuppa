@@ -86,16 +86,25 @@ public:
         initialize();
         PreviewResult result;
         bool requested_resize = false;
+        double previous_time = glfwGetTime();
         while (!glfwWindowShouldClose(window_) &&
                (options_.frame_limit == 0 || result.frames < options_.frame_limit)) {
             glfwPollEvents();
             if (glfwWindowShouldClose(window_)) break;
+            const double current_time = glfwGetTime();
+            if (options_.on_frame) {
+                const double dt = options_.fixed_delta > 0.0
+                    ? options_.fixed_delta : std::clamp(current_time - previous_time, 0.0, 0.25);
+                scene_frame_ = options_.on_frame(dt);
+                if (scene_frame_.quit) break;
+            }
+            previous_time = current_time;
             if (resized_) {
                 recreate_swapchain();
                 ++result.swapchain_rebuilds;
             }
             if (glfwWindowShouldClose(window_)) break;
-            if (!draw_frame()) continue;
+            if (!draw_frame(result.frames + 1)) continue;
             ++result.frames;
             if (options_.resize_after != 0 && !requested_resize &&
                 result.frames == options_.resize_after) {
@@ -127,7 +136,8 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         window_ = glfwCreateWindow(int(options_.width), int(options_.height),
                                    options_.scene == PreviewOptions::Scene::Cube
-                                       ? "ThreePoint 3D cube" : "ThreePoint Vulkan preview",
+                                       ? "ThreePoint 3D cube" : options_.scene == PreviewOptions::Scene::Project
+                                           ? "ThreePoint game" : "ThreePoint Vulkan preview",
                                    nullptr, nullptr);
         if (!window_) {
             throw std::runtime_error("GLFW could not create the Vulkan window");
@@ -183,7 +193,7 @@ private:
         if (!command_list_) {
             throw std::runtime_error("nvrhi could not create a command list");
         }
-        if (options_.scene == PreviewOptions::Scene::Cube) {
+        if (options_.scene != PreviewOptions::Scene::Clear) {
             cube_ = std::make_unique<CubeDemo>(nvrhi_device_);
         }
         VkSemaphoreCreateInfo semaphore_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
@@ -393,7 +403,7 @@ private:
         std::cout << "Swapchain: " << extent_.width << 'x' << extent_.height << '\n';
     }
 
-    bool draw_frame() {
+    bool draw_frame(uint32_t next_frame) {
         if (swapchain_ == VK_NULL_HANDLE) return false;
         uint32_t image_index = 0;
         VkResult acquire = vkAcquireNextImageKHR(device_, swapchain_, UINT64_MAX,
@@ -421,12 +431,17 @@ private:
                                          nvrhi::AllSubresources,
                                          nvrhi::Color(0.08f, 0.18f, 0.38f, 1.0f));
         if (cube_) {
-            const float angle = options_.capture_path.empty()
-                ? options_.cube_angle + float(glfwGetTime()) * 0.8f
-                : options_.cube_angle;
-            cube_->record(command_list_, image_index, angle);
+            if (options_.scene == PreviewOptions::Scene::Cube) {
+                const float angle = options_.capture_path.empty()
+                    ? options_.cube_angle + float(glfwGetTime()) * 0.8f
+                    : options_.cube_angle;
+                scene_frame_.cubes = {CubeInstance{1, glm::vec3(0.0f),
+                    glm::vec3(0.30f, angle, 0.0f), glm::vec3(1.0f)}};
+            }
+            cube_->record(command_list_, image_index, scene_frame_);
         }
-        const bool capture_this_frame = staging_ && !captured_;
+        const bool capture_this_frame = staging_ && !captured_ &&
+                                        next_frame == options_.capture_frame;
         if (capture_this_frame) {
             command_list_->copyTexture(staging_, nvrhi::TextureSlice{},
                                        swapchain_textures_[image_index], nvrhi::TextureSlice{});
@@ -488,7 +503,8 @@ private:
         nvrhi_device_->unmapStagingTexture(staging_);
         if (!output) throw std::runtime_error("failed to save capture: " + options_.capture_path.string());
         std::cout << "Captured "
-                  << (cube_ ? "cube" : "clear") << " frame: "
+                  << (options_.scene == PreviewOptions::Scene::Project ? "project" :
+                      cube_ ? "cube" : "clear") << " frame: "
                   << options_.capture_path.string() << '\n';
     }
 
@@ -516,6 +532,7 @@ private:
     nvrhi::StagingTextureHandle staging_;
     std::vector<nvrhi::TextureHandle> swapchain_textures_;
     std::unique_ptr<CubeDemo> cube_;
+    SceneFrame scene_frame_;
 };
 
 }  // namespace
@@ -526,6 +543,12 @@ PreviewResult run_preview(const PreviewOptions& options) {
     }
     if (options.scene == PreviewOptions::Scene::Cube && !std::isfinite(options.cube_angle)) {
         throw std::invalid_argument("cube angle must be finite");
+    }
+    if (options.capture_frame == 0 || !std::isfinite(options.fixed_delta) ||
+        options.fixed_delta < 0.0 ||
+        (options.frame_limit != 0 && !options.capture_path.empty() &&
+         options.capture_frame > options.frame_limit)) {
+        throw std::invalid_argument("invalid preview frame or timing options");
     }
     return VulkanWindow(options).run();
 }

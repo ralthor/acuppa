@@ -1,5 +1,7 @@
 #pragma once
 
+#include "threepoint/scene_frame.hpp"
+
 #include <nvrhi/nvrhi.h>
 
 #include <cstdint>
@@ -13,7 +15,8 @@ public:
     void release_size_dependent();
     void resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t width,
                 uint32_t height);
-    void record(nvrhi::ICommandList* commands, uint32_t image_index, float angle);
+    void record(nvrhi::ICommandList* commands, uint32_t image_index,
+                const SceneFrame& scene);
 
 private:
     nvrhi::IDevice* device_;

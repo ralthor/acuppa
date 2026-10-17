@@ -1,19 +1,25 @@
 #pragma once
 
+#include "threepoint/scene_frame.hpp"
+
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 
 namespace threepoint {
 
 struct PreviewOptions {
-    enum class Scene { Clear, Cube };
+    enum class Scene { Clear, Cube, Project };
     Scene scene = Scene::Clear;
     uint32_t width = 960;
     uint32_t height = 540;
     uint32_t frame_limit = 0;       // Zero runs until the window is closed.
     uint32_t resize_after = 0;      // Zero disables the automated resize check.
-    std::filesystem::path capture_path; // Optional PPM readback of the first frame.
+    std::filesystem::path capture_path; // Optional PPM readback.
+    uint32_t capture_frame = 1;
     float cube_angle = 0.0f;     // Capture angle in radians; live preview rotates over time.
+    double fixed_delta = 0.0;    // Positive value drives deterministic scripted frames.
+    std::function<SceneFrame(double)> on_frame;
 };
 
 struct PreviewResult {

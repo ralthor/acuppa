@@ -1,13 +1,13 @@
 # 3D feature-scene coverage
 
-This is the source-only project used for integration checks. In Phase 1 only its file layout is checked; it cannot run in the new 3D runtime yet. Each feature phase must add a scene/script case and an automated assertion before marking its row covered. Renderer rows also need captured-frame checks; editor and export rows need their own tests.
+This is the source-only project used for integration checks. It runs in the 3D runtime with no editor action. Each feature phase must add a scene/script case and an automated assertion before marking its row covered. Renderer rows also need captured-frame checks; editor and export rows need their own tests.
 
 | Capability | Phase | Scene/script case | Automated check | Status |
 | --- | --- | --- | --- | --- |
 | Project source layout | 1 | `game.lua`, `scenes/main.scene.lua`, `scripts/main.lua` | `core_project_check`, CLI checks | Covered |
 | Vulkan window, clear, resize, missing driver | 2 | N/A: renderer bootstrap precedes Lua scene loading | `vulkan_smoke_test.py` GPU capture and live resize | Local covered; hosted CI pending |
-| Transforms, camera, depth, cube | 3 | Built-in cube preview until source scene loading in Phase 4 | `camera_math`, `cube_capture` GPU angle/depth/resize checks | Local covered; Lua scene and hosted CI pending |
-| Lua 3D callbacks and source scene | 4 | Pending | Pending | Pending |
+| Transforms, camera, depth, cube | 3 | Built-in cube preview and Phase 4 Lua cube | `camera_math`, `cube_capture` GPU angle/depth/resize checks | Local covered; hosted CI pending |
+| Lua 3D callbacks and source scene | 4 | `game.lua`, `scenes/main.scene.lua`, `scripts/main.lua`: spawn, rotate, time, fixed/update/draw | `lua_scene_logic`, `lua_scene_capture`; invalid API and path cases | Local covered; hosted CI pending |
 | Keyboard, mouse, controller, screen ray | 5 | Pending | Pending | Pending |
 | Entity IDs, components, lights | 6 | Pending | Pending | Pending |
 | Prefabs, spawn/destroy, scene switching | 7 | Pending | Pending | Pending |

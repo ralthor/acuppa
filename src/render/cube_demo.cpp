@@ -141,16 +141,14 @@ void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t 
     require(pipeline_, "create cube graphics pipeline");
 }
 
-void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index, float angle) {
+void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
+                      const SceneFrame& scene) {
     if (image_index >= framebuffers_.size()) {
         throw std::runtime_error("invalid cube framebuffer index");
     }
     commands->clearDepthStencilTexture(depth_, nvrhi::AllSubresources, true, 1.0f, false, 0);
-    const PerspectiveCamera camera;
-    const glm::mat4 model = glm::rotate(
-        glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0)),
-        0.30f, glm::vec3(1, 0, 0));
-    const glm::mat4 mvp = camera.view_projection(float(width_) / float(height_)) * model;
+    const glm::mat4 view_projection = scene.camera.view_projection(
+        float(width_) / float(height_));
     nvrhi::GraphicsState state;
     state.setPipeline(pipeline_).setFramebuffer(framebuffers_[image_index]);
     state.viewport.addViewportAndScissorRect(nvrhi::Viewport(float(width_), float(height_)));
@@ -159,8 +157,16 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index, float
         .setIndexBuffer(nvrhi::IndexBufferBinding().setBuffer(indices_)
             .setFormat(nvrhi::Format::R16_UINT).setOffset(0));
     commands->setGraphicsState(state);
-    commands->setPushConstants(glm::value_ptr(mvp), sizeof(mvp));
-    commands->drawIndexed(nvrhi::DrawArguments().setVertexCount(36));
+    for (const CubeInstance& cube : scene.cubes) {
+        const glm::mat4 model = glm::scale(
+            glm::rotate(glm::rotate(glm::rotate(
+                glm::translate(glm::mat4(1.0f), cube.position), cube.rotation.y,
+                glm::vec3(0, 1, 0)), cube.rotation.x, glm::vec3(1, 0, 0)),
+                cube.rotation.z, glm::vec3(0, 0, 1)), cube.scale);
+        const glm::mat4 mvp = view_projection * model;
+        commands->setPushConstants(glm::value_ptr(mvp), sizeof(mvp));
+        commands->drawIndexed(nvrhi::DrawArguments().setVertexCount(36));
+    }
 }
 
 }  // namespace threepoint

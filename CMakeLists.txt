@@ -25,6 +25,19 @@ FetchContent_Declare(glm
   GIT_TAG 0af55ccecd98d4e5a8d1fad7de25ba429d60e863)
 FetchContent_MakeAvailable(glm)
 
+FetchContent_Declare(lua
+  URL https://www.lua.org/ftp/lua-5.4.8.tar.gz
+  URL_HASH SHA256=4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae)
+FetchContent_MakeAvailable(lua)
+file(GLOB THREEPOINT_LUA_SOURCES CONFIGURE_DEPENDS "${lua_SOURCE_DIR}/src/*.c")
+list(REMOVE_ITEM THREEPOINT_LUA_SOURCES
+  "${lua_SOURCE_DIR}/src/lua.c" "${lua_SOURCE_DIR}/src/luac.c")
+add_library(threepoint_lua STATIC ${THREEPOINT_LUA_SOURCES})
+target_include_directories(threepoint_lua PUBLIC "${lua_SOURCE_DIR}/src")
+target_compile_features(threepoint_lua PUBLIC c_std_99)
+target_compile_definitions(threepoint_lua PRIVATE LUA_USE_LINUX)
+target_link_libraries(threepoint_lua PUBLIC m ${CMAKE_DL_LIBS})
+
 find_package(glfw3 3.3 CONFIG REQUIRED)
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 find_program(THREEPOINT_GLSLANG_VALIDATOR glslangValidator REQUIRED)
@@ -45,10 +58,11 @@ foreach(stage IN ITEMS vert frag)
   list(APPEND THREEPOINT_SHADER_HEADERS "${shader_header}")
 endforeach()
 
-add_library(threepoint_core STATIC src/core/project.cpp src/core/camera.cpp)
+add_library(threepoint_core STATIC src/core/project.cpp src/core/camera.cpp
+            src/core/lua_project.cpp)
 target_compile_features(threepoint_core PUBLIC cxx_std_17)
 target_include_directories(threepoint_core PUBLIC include)
-target_link_libraries(threepoint_core PUBLIC glm::glm)
+target_link_libraries(threepoint_core PUBLIC glm::glm threepoint_lua)
 target_compile_definitions(threepoint_core PUBLIC THREEPOINT_VERSION="${PROJECT_VERSION}")
 
 add_executable(threepoint src/runtime/main.cpp)
@@ -72,6 +86,10 @@ if(BUILD_TESTING)
   add_executable(threepoint_camera_test tests/camera_test.cpp)
   target_link_libraries(threepoint_camera_test PRIVATE threepoint_core)
   add_test(NAME camera_math COMMAND threepoint_camera_test)
+  add_executable(threepoint_lua_test tests/lua_project_test.cpp)
+  target_link_libraries(threepoint_lua_test PRIVATE threepoint_core)
+  add_test(NAME lua_scene_logic COMMAND threepoint_lua_test
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   add_test(NAME core_project_check COMMAND threepoint_core_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   add_test(NAME runtime_project_check COMMAND threepoint --check-project
@@ -84,6 +102,9 @@ if(BUILD_TESTING)
              "${PROJECT_SOURCE_DIR}/tests/vulkan_smoke_test.py" $<TARGET_FILE:threepoint>)
     add_test(NAME cube_capture COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/cube_capture_test.py" $<TARGET_FILE:threepoint>)
+    add_test(NAME lua_scene_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/lua_scene_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   endif()
 endif()
 

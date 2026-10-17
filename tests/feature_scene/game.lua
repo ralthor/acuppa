@@ -1,4 +1,4 @@
--- Source project fixture for the eventual 3D runtime. Phase 1 checks its layout only.
+-- Source-only 3D project. No editor state or manual scene setup is required.
 return {
   api = 1,
   title = "ThreePoint Feature Scene",

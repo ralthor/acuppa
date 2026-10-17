@@ -6,7 +6,7 @@ tools_dir="$project_root/.tools"
 debs_dir="$tools_dir/debs"
 sysroot_dir="$tools_dir/sysroot"
 
-for tool in uv apt-get dpkg-deb git; do
+for tool in uv apt-get dpkg-deb git curl sha256sum; do
   command -v "$tool" >/dev/null || { echo "Missing setup tool: $tool" >&2; exit 1; }
 done
 
@@ -60,6 +60,19 @@ require_source nvrhi https://github.com/NVIDIA-RTX/NVRHI.git \
 require_source glm https://github.com/g-truc/glm.git \
   0af55ccecd98d4e5a8d1fad7de25ba429d60e863
 
+lua_archive="$debs_dir/lua-5.4.8.tar.gz"
+lua_hash=4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae
+if [ ! -f "$lua_archive" ]; then
+  curl -fL --retry 3 https://www.lua.org/ftp/lua-5.4.8.tar.gz -o "$lua_archive"
+fi
+if [ "$(sha256sum "$lua_archive" | cut -d ' ' -f 1)" != "$lua_hash" ]; then
+  echo "Pinned Lua archive hash mismatch" >&2
+  exit 1
+fi
+if [ ! -d "$tools_dir/vendor/lua-5.4.8/src" ]; then
+  tar -xzf "$lua_archive" -C "$tools_dir/vendor"
+fi
+
 gpu_tests=OFF
 if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then gpu_tests=ON; fi
 
@@ -82,6 +95,7 @@ ZIG_GLOBAL_CACHE_DIR="$tools_dir/zig-cache" "$tools_dir/venv/bin/cmake" --fresh 
   -DFETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS="$tools_dir/vendor/vulkan-headers" \
   -DFETCHCONTENT_SOURCE_DIR_NVRHI="$tools_dir/vendor/nvrhi" \
   -DFETCHCONTENT_SOURCE_DIR_GLM="$tools_dir/vendor/glm" \
+  -DFETCHCONTENT_SOURCE_DIR_LUA="$tools_dir/vendor/lua-5.4.8" \
   -DTHREEPOINT_BUILD_2D_PROTOTYPE=ON \
   -DTHREEPOINT_ENABLE_GPU_TESTS="$gpu_tests"
 ZIG_GLOBAL_CACHE_DIR="$tools_dir/zig-cache" "$tools_dir/venv/bin/cmake" --build "$project_root/build"
