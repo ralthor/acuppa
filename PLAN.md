@@ -4,7 +4,7 @@
 
 ## Current state and course correction
 
-The existing commits built a **2D SDL3/Lua prototype** with project creation, Lua callbacks, a window, and simple drawing. It is not the requested 3D engine, does not use GLFW/nvrhi/Vulkan, and has no 3D physics. Treat it as exploratory code: retain useful project/Lua tests, then replace or refactor the runtime when the new foundation is ready. No 3D milestone below is complete.
+The earlier commits built a **2D SDL3/Lua prototype** with project creation, Lua callbacks, a window, and simple drawing. It is not the requested 3D engine and has no 3D physics. It now lives in an optional legacy target while the new GLFW/Vulkan/nvrhi runtime is developed. No 3D geometry or Lua-driven 3D scene exists yet.
 
 The core will be a C++ static library with separate game runtime and editor executables. Projects remain source files: `game.lua`, literal `scenes/*.scene.lua` data, `scripts/*.lua`, and referenced assets. The editor edits the same files; it must not introduce hidden game state. `threepoint run`, `test`, and `build` must work without opening the editor. Exported games include a runtime without editing tools. Lua remains the scripting language. Choose and pin one 3D physics dependency during its integration phase; **Jolt Physics** is the initial choice.
 
@@ -13,6 +13,8 @@ The core will be a C++ static library with separate game runtime and editor exec
 Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implementation phase adds relevant unit or integration tests, runs them, and extends that scene for each new component and Lua API. Never claim a phase complete until its check passes. Keep the feature scene runnable from source once the 3D Lua runtime exists and, once export exists, from a packaged build.
 
 **Phase 1 status (2026-10-17):** The static core, separate runtime/editor targets, optional legacy prototype, source-only feature-scene skeleton, dependency record, and Ubuntu 24+ CI workflow are implemented. Local core and legacy checks pass. The hosted CI gate remains unverified because this repository has no Git remote configured; that does not block local Phase 2 development.
+
+**Phase 2 status (2026-10-17):** On this Linux machine, GLFW opens a Vulkan window, nvrhi wraps and clears swapchain images, resize recreates the swapchain, and shutdown succeeds. A GPU readback test checks every pixel of a clear frame; an automated smoke test also checks resize and the missing-driver error. Vulkan validation is enabled for local and hosted GPU tests. Vulkan errors are reported by name, including device loss, but a physical device-loss event was not induced. The live local test passed on an NVIDIA GeForce GTX 1660. The Ubuntu 24.04 hosted CI job is configured but has not run without a Git remote. The first 3D geometry is still Phase 3.
 
 | Phase | Deliverable | Check before commit |
 | --- | --- | --- |

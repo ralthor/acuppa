@@ -5,7 +5,7 @@ This is the source-only project used for integration checks. In Phase 1 only its
 | Capability | Phase | Scene/script case | Automated check | Status |
 | --- | --- | --- | --- | --- |
 | Project source layout | 1 | `game.lua`, `scenes/main.scene.lua`, `scripts/main.lua` | `core_project_check`, CLI checks | Covered |
-| Vulkan window, resize, errors | 2 | Pending | Pending | Pending |
+| Vulkan window, clear, resize, missing driver | 2 | N/A: renderer bootstrap precedes Lua scene loading | `vulkan_smoke_test.py` GPU capture and live resize | Local covered; hosted CI pending |
 | Transforms, camera, depth, cube | 3 | Pending | Pending | Pending |
 | Lua 3D callbacks and source scene | 4 | Pending | Pending | Pending |
 | Keyboard, mouse, controller, screen ray | 5 | Pending | Pending | Pending |

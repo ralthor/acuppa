@@ -1,4 +1,4 @@
-name: Core foundation
+name: Linux engine
 
 on:
   push:
@@ -10,9 +10,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Install Linux graphics dependencies
+        run: sudo apt-get update && sudo apt-get install -y libglfw3-dev libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers xvfb xauth
       - name: Configure
-        run: cmake -S . -B build -DBUILD_TESTING=ON
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DTHREEPOINT_ENABLE_GPU_TESTS=ON
       - name: Build
         run: cmake --build build --config Release --parallel
       - name: Test
-        run: ctest --test-dir build -C Release --output-on-failure
+        run: VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation xvfb-run -a ctest --test-dir build -C Release --output-on-failure
