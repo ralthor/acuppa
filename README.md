@@ -1,5 +1,7 @@
 # AI Game Engine
 
+**ThreePoint today:** a source-authored 3D engine and three playable Linux sample projects. [See real screenshots](#screenshots), [run a game](#try-it), or [check the visual editor's status](#visual-scene-editor-status). The original project brief below is retained as the source of truth; the later Linux-only decision supersedes its platform list.
+
 We're building a production-grade, simple and straight-forward 3D Game Engine for Windows, macOS and Linux (Ubuntu 24+). This is professional-grade software that needs to be stable, fully-tested, and real-world deployable. No hacks, no shortcuts - solid as a rock.
 
 ## Dev Workflow
@@ -42,6 +44,57 @@ We're building a production-grade, simple and straight-forward 3D Game Engine fo
 - Scripting with Lua (or other chosen language)
 - Control entities/components and run in update loop, and entity destruction/creation
 - Spawn new entities/prefabs
+
+## Screenshots
+
+These are Vulkan captures of the checked-in games and feature scenes on Linux. The games run from Lua, scene files, and assets without editor clicks.
+
+### Garage Run
+
+The Lua-authored car game uses a Jolt four-wheel vehicle, collision and checkpoint triggers, PBR glTF meshes, HDRI lighting, spatial audio, and a chase camera. The obstacle faces shown here have SSAO disabled to avoid camera-dependent bands.
+
+![Garage Run car driving toward the second checkpoint in a 3D practice yard](docs/images/garage-run.png)
+
+### Falling Blocks
+
+The original game and its separate PBR-lit version use the same source-authored rules: a seven-piece bag, wall kicks, hold, next and ghost pieces, scoring, levels, pause, and restart. The lit version adds glTF materials, an HDRI, and tile shadows.
+
+| Original | PBR-lit version |
+| --- | --- |
+| ![Original Falling Blocks game with a dropped piece](docs/images/falling-blocks.png) | ![Falling Blocks Lit with colored 3D tiles and shadows](docs/images/falling-blocks-lit.png) |
+
+### Renderer and physics examples
+
+The feature scene exercises HDRI-lit PBR materials. Its physics example shows a Lua-authored body before and after falling onto a Jolt collider (left: first frame; right: frame 120).
+
+![Three PBR material spheres illuminated by a source-authored HDRI](docs/images/pbr-hdri.png)
+
+![Physics example before and after a cube falls onto the floor](docs/images/physics-before-after.png)
+
+### Scene editor viewport
+
+The editor screenshot shows a selected entity and its translation gizmo in the current windowed viewport.
+
+![ThreePoint scene editor with a selected cube and X, Y, Z move handles](docs/images/editor.png)
+
+## Try it
+
+On Ubuntu 24+ with `uv`, `git`, `curl`, `apt-get`, and a working Vulkan driver, run from the repository root:
+
+```sh
+bash scripts/bootstrap-local.sh
+build/threepoint run games/garage_run
+build/threepoint run games/falling_blocks
+build/threepoint run games/falling_blocks_lit
+```
+
+`bootstrap-local.sh` keeps pinned build tools and dependencies in the project's ignored `.tools/` directory and runs the available tests. [RELEASE.md](RELEASE.md) covers standalone Linux game archives.
+
+## Visual scene editor status
+
+The editor is an early scene viewport plus source-file commands. In the window, you can open a declarative Lua scene, select a cube or imported glTF bound, orbit with right-drag, and drag X/Y/Z handles to change an entity's position. Releasing a handle saves the transform to the same `.scene.lua` file used by the game. Try `build/threepoint-editor viewport tests/feature_scene editor --select actor`; close the window with the window manager.
+
+The `threepoint-editor` CLI can list and inspect entities, add entities, change component fields, and read or replace Lua source. Games remain fully authorable through those files and CLI commands. The window does not yet have a scene tree, component inspector, asset browser, or rotation and scale gizmos. It cannot graphically edit computed Lua scenes or move a parented imported mesh. See [Phases 20–22](PLAN.md) for the tested editor scope.
 
 ## Implementation plan
 
