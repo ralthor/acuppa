@@ -84,6 +84,8 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 
 **Phase 27 writable-save export substep complete (2026-10-18):** Exported games now derive a stable, validated `game.id` from the source project folder name and write saves under XDG user data, with a HOME fallback. Source runs retain their existing project-local saves. A relocated, read-only bundle test writes and reloads a save across processes and rejects a path-like tampered ID. Linux archive packaging and clean-checkout validation remain.
 
+**Phase 27 Linux archive packaging substep complete (2026-10-18):** The release script assembles four Linux archives: an engine CLI/editor/player package and a separate standalone package for each sample game. It embeds third-party notices and SHA-256 hashes. A device-free test extracts every archive, checks all three players, exports another game with the packaged CLI, and rejects an occupied output directory. Clean-checkout and final visual/stability gates remain.
+
 **Falling Blocks Lit visual follow-up (2026-10-17):** The game's previous 1.15-unit SSAO radius caused blocky halos around stacked and ghost pieces. The game now uses restrained SSAO plus directional shadow maps for actual colored tiles. Meshes expose a `casts_shadows` switch to source scenes and Lua; the game turns it off for HUD, border, and ghost cubes. A dropped-piece Vulkan capture checks that tile shadows remain visible without dark title or ghost artifacts. The feature scene checks the new Lua setting and invalid input.
 
 | Phase | Deliverable | Check before commit |

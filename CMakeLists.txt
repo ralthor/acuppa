@@ -315,6 +315,13 @@ if(BUILD_TESTING)
            "${PROJECT_SOURCE_DIR}/tests/export_game_test.py" $<TARGET_FILE:threepoint>
            "${PROJECT_SOURCE_DIR}/tests/project_test_fixture"
            "${PROJECT_BINARY_DIR}/export_files_fixture")
+  if(NOT THREEPOINT_ENABLE_SANITIZERS)
+    add_test(NAME linux_release_archives COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/package_linux_release_test.py"
+             "${PROJECT_SOURCE_DIR}/scripts/package-linux-release.sh"
+             $<TARGET_FILE:threepoint>
+             "${PROJECT_BINARY_DIR}/release_archive_fixture")
+  endif()
   add_test(NAME project_asset_failure_matrix COMMAND "${Python3_EXECUTABLE}"
            "${PROJECT_SOURCE_DIR}/tests/asset_failure_matrix.py" $<TARGET_FILE:threepoint>
            "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit"
