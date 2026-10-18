@@ -6,4 +6,6 @@ Extract the engine archive and run `./threepoint --version`. To run a source pro
 
 After building and testing the repository, run `bash scripts/package-linux-release.sh`. It exports and checks all three sample games, writes four deterministic archives under `build/release/`, and records SHA-256 hashes in `SHA256SUMS`. The archives include the notices for statically linked dependencies. Verify an archive with `sha256sum -c SHA256SUMS` from that folder.
 
+Run `bash scripts/verify-clean-release.sh` to build only committed source in an isolated directory and run the complete unit, integration, Vulkan capture, live-startup, and archive suite. It uses the locally bootstrapped pinned toolchain and dependencies. The separate sanitizer gate is `bash scripts/test-sanitizers-local.sh`.
+
 This release target is Linux only. Hosted Ubuntu 24+ CI and speaker playback on user hardware remain separate validation gates until they are run on those machines.
