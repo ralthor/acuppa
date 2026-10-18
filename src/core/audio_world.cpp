@@ -22,6 +22,11 @@ void require_volume(float volume) {
         throw std::invalid_argument("sound volume must be from 0 to 4");
 }
 
+void require_pitch(float pitch) {
+    if (!std::isfinite(pitch) || pitch < 0.25f || pitch > 4.0f)
+        throw std::invalid_argument("sound pitch must be from 0.25 to 4");
+}
+
 std::runtime_error audio_error(const char* action, ma_result result) {
     return std::runtime_error(std::string(action) + ": " + ma_result_description(result));
 }
@@ -81,6 +86,7 @@ AudioWorld::~AudioWorld() = default;
 
 uint64_t AudioWorld::play(const fs::path& file, SoundState settings) {
     require_volume(settings.volume);
+    require_pitch(settings.pitch);
     if (!finite(settings.position)) throw std::invalid_argument("sound position must be finite");
     if (!fs::is_regular_file(file) || fs::file_size(file) > 16 * 1024 * 1024)
         throw std::invalid_argument("sound file is missing or exceeds 16 MiB");
@@ -95,6 +101,7 @@ uint64_t AudioWorld::play(const fs::path& file, SoundState settings) {
     ma_sound_set_position(&entry->sound, settings.position.x, settings.position.y,
                           settings.position.z);
     ma_sound_set_volume(&entry->sound, settings.volume);
+    ma_sound_set_pitch(&entry->sound, settings.pitch);
     ma_sound_set_looping(&entry->sound, settings.looping ? MA_TRUE : MA_FALSE);
     const ma_result started = ma_sound_start(&entry->sound);
     if (started != MA_SUCCESS) {
@@ -119,6 +126,13 @@ void AudioWorld::set_volume(uint64_t id, float volume) {
     auto& entry = impl_->require(id);
     ma_sound_set_volume(&entry.sound, volume);
     entry.state.volume = volume;
+}
+
+void AudioWorld::set_pitch(uint64_t id, float pitch) {
+    require_pitch(pitch);
+    auto& entry = impl_->require(id);
+    ma_sound_set_pitch(&entry.sound, pitch);
+    entry.state.pitch = pitch;
 }
 
 void AudioWorld::set_position(uint64_t id, glm::vec3 position) {

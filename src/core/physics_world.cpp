@@ -114,12 +114,19 @@ struct PhysicsWorld::Impl : JPH::ContactListener {
     }
 
     void OnContactAdded(const JPH::Body& a, const JPH::Body& b,
-                        const JPH::ContactManifold&, JPH::ContactSettings&) override {
+                        const JPH::ContactManifold& manifold, JPH::ContactSettings&) override {
         const std::pair<uint64_t, uint64_t> pair{
             std::min(a.GetUserData(), b.GetUserData()),
             std::max(a.GetUserData(), b.GetUserData())};
-        if (active_contacts.emplace(pair, a.IsSensor() || b.IsSensor()).second)
-            events.push_back({pair.first, pair.second, a.IsSensor() || b.IsSensor(), true});
+        if (active_contacts.emplace(pair, a.IsSensor() || b.IsSensor()).second) {
+            const JPH::Vec3 normal = manifold.mWorldSpaceNormal;
+            const JPH::Vec3 relative = b.GetLinearVelocity() - a.GetLinearVelocity();
+            const float speed = std::max(0.0f, -relative.Dot(normal));
+            const float sign = a.GetUserData() == pair.first ? 1.0f : -1.0f;
+            events.push_back({pair.first, pair.second, a.IsSensor() || b.IsSensor(),
+                              true, {sign * normal.GetX(), sign * normal.GetY(),
+                                     sign * normal.GetZ()}, speed});
+        }
     }
 
     void OnContactRemoved(const JPH::SubShapeIDPair& pair) override {

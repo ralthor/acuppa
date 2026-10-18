@@ -37,6 +37,9 @@ struct PhysicsContact {
     uint64_t second = 0;
     bool trigger = false;
     bool began = true;
+    // Unit normal from first to second; closing speed along that normal at entry.
+    glm::vec3 normal{0.0f};
+    float closing_speed = 0.0f;
 };
 
 struct PhysicsRayHit {

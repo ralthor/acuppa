@@ -105,6 +105,7 @@ struct LuaProject::Impl {
     static int sound_play(lua_State* lua);
     static int sound_stop(lua_State* lua);
     static int sound_set_volume(lua_State* lua);
+    static int sound_set_pitch(lua_State* lua);
     static int sound_set_position(lua_State* lua);
     static int sound_set_listener(lua_State* lua);
     static int sound_state(lua_State* lua);
@@ -828,6 +829,7 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("sound_play", &sound_play);
     add_function("sound_stop", &sound_stop);
     add_function("sound_set_volume", &sound_set_volume);
+    add_function("sound_set_pitch", &sound_set_pitch);
     add_function("sound_set_position", &sound_set_position);
     add_function("sound_set_listener", &sound_set_listener);
     add_function("sound_state", &sound_state);
@@ -1520,11 +1522,13 @@ int LuaProject::Impl::physics_contacts(lua_State* lua) {
     const auto& events = context(lua).physics->contacts();
     lua_createtable(lua, int(events.size()), 0);
     for (size_t i = 0; i < events.size(); ++i) {
-        lua_createtable(lua, 0, 4);
+        lua_createtable(lua, 0, 6);
         lua_pushinteger(lua, lua_Integer(events[i].first)); lua_setfield(lua, -2, "first");
         lua_pushinteger(lua, lua_Integer(events[i].second)); lua_setfield(lua, -2, "second");
         lua_pushboolean(lua, events[i].trigger); lua_setfield(lua, -2, "trigger");
         lua_pushboolean(lua, events[i].began); lua_setfield(lua, -2, "began");
+        push_vec3(lua, events[i].normal); lua_setfield(lua, -2, "normal");
+        lua_pushnumber(lua, events[i].closing_speed); lua_setfield(lua, -2, "closing_speed");
         lua_rawseti(lua, -2, lua_Integer(i + 1));
     }
     return 1;
@@ -1602,12 +1606,14 @@ int LuaProject::Impl::sound_play(lua_State* lua) {
             settings.spatial = optional_boolean(lua, 2, "spatial", positioned);
             settings.looping = optional_boolean(lua, 2, "loop", false);
             settings.volume = optional_number(lua, 2, "volume", 1.0f, "sound");
+            settings.pitch = optional_number(lua, 2, "pitch", 1.0f, "sound");
             lua_pushnil(lua);
             while (lua_next(lua, 2) != 0) {
                 if (lua_type(lua, -2) != LUA_TSTRING)
                     throw std::invalid_argument("sound setting names must be strings");
                 const std::string key = lua_tostring(lua, -2);
-                if (key != "position" && key != "volume" && key != "spatial" && key != "loop")
+                if (key != "position" && key != "volume" && key != "pitch" &&
+                    key != "spatial" && key != "loop")
                     throw std::invalid_argument("unknown sound setting: " + key);
                 lua_pop(lua, 1);
             }
@@ -1638,6 +1644,17 @@ int LuaProject::Impl::sound_set_volume(lua_State* lua) {
     return 0;
 }
 
+int LuaProject::Impl::sound_set_pitch(lua_State* lua) {
+    if (lua_gettop(lua) != 2) return luaL_error(lua, "sound_set_pitch() expects ID and pitch");
+    try {
+        const auto id = checked_id(lua, 1);
+        if (lua_type(lua, 2) != LUA_TNUMBER)
+            throw std::invalid_argument("sound pitch must be a number");
+        context(lua).ensure_audio().set_pitch(id, float(lua_tonumber(lua, 2)));
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
 int LuaProject::Impl::sound_set_position(lua_State* lua) {
     if (lua_gettop(lua) != 2) return luaL_error(lua, "sound_set_position() expects ID and position");
     try {
@@ -1664,11 +1681,12 @@ int LuaProject::Impl::sound_state(lua_State* lua) {
         const auto id = checked_id(lua, 1);
         const auto result = state.audio ? state.audio->state(id) : std::nullopt;
         if (!result) { lua_pushnil(lua); return 1; }
-        lua_createtable(lua, 0, 5);
+        lua_createtable(lua, 0, 6);
         lua_pushboolean(lua, result->playing); lua_setfield(lua, -2, "playing");
         lua_pushboolean(lua, result->spatial); lua_setfield(lua, -2, "spatial");
         lua_pushboolean(lua, result->looping); lua_setfield(lua, -2, "loop");
         lua_pushnumber(lua, result->volume); lua_setfield(lua, -2, "volume");
+        lua_pushnumber(lua, result->pitch); lua_setfield(lua, -2, "pitch");
         push_vec3(lua, result->position); lua_setfield(lua, -2, "position");
     } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
     return 1;

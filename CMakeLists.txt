@@ -246,6 +246,11 @@ if(BUILD_TESTING)
   add_test(NAME garage_run_driving_rules COMMAND threepoint_garage_run_rules_test
            "${PROJECT_SOURCE_DIR}/games/garage_run/scripts/driving.lua"
            "${PROJECT_SOURCE_DIR}/tests/garage_run_rules.lua")
+  add_executable(threepoint_garage_run_impact_test tests/garage_run_impact_test.cpp)
+  target_link_libraries(threepoint_garage_run_impact_test PRIVATE threepoint_lua)
+  add_test(NAME garage_run_impact_camera COMMAND threepoint_garage_run_impact_test
+           "${PROJECT_SOURCE_DIR}/games/garage_run/scripts/impact.lua"
+           "${PROJECT_SOURCE_DIR}/tests/garage_run_impact.lua")
   add_executable(threepoint_garage_run_game_test tests/garage_run_game_test.cpp)
   target_link_libraries(threepoint_garage_run_game_test PRIVATE threepoint_core)
   add_test(NAME garage_run_gameplay COMMAND threepoint_garage_run_game_test

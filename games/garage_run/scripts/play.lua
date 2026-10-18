@@ -1,7 +1,8 @@
 local tp = require("threepoint")
 local Drive = require("scripts.driving")
+local Impact = require("scripts.impact")
 
-local car, sun, motor, drive, best
+local car, sun, motor, skid, drive, impact, best
 local checkpoint_1, checkpoint_2, parking
 local wheels = {}
 local barriers = {}
@@ -16,8 +17,12 @@ local function show_camera(state)
   local yaw = state.rotation[2]
   local behind_x, behind_z = -math.sin(yaw), -math.cos(yaw)
   local p = state.position
-  local eye = {p[1] + behind_x * 9, p[2] + 5.2, p[3] + behind_z * 9}
-  tp.set_camera({eye = eye, target = {p[1], p[2] + 0.15, p[3]}, fov = 58, far = 150})
+  local shake = impact:step(1 / 60)
+  local eye = {p[1] + behind_x * 9 + shake[1], p[2] + 5.2 + shake[2],
+               p[3] + behind_z * 9 + shake[3]}
+  tp.set_camera({eye = eye, target = {p[1] + shake[1] * 0.25,
+                 p[2] + 0.15 + shake[2] * 0.25, p[3] + shake[3] * 0.25},
+                 fov = 58, far = 150})
   tp.sound_set_listener(eye, {-behind_x, -0.5, -behind_z}, {0, 1, 0})
   tp.component_set(sun, "transform", {position = {p[1], 0, p[3]}})
 end
@@ -45,6 +50,7 @@ return {
                             wheel_radius = 0.28, engine_torque = 350,
                             rear_grip = 0.75})
     drive = Drive.new()
+    impact = Impact.new()
     local saved = tp.load("best")
     best = saved and saved.seconds or nil
     tp.set_exposure(0.9)
@@ -53,6 +59,8 @@ return {
     show_camera(assert(tp.physics_state(car)))
     motor = tp.sound_play("assets/motor.wav", {position = {0, 0.75, 16},
                                                   volume = 0.35, loop = true})
+    skid = tp.sound_play("assets/skid.wav", {position = {0, 0.75, 16},
+                                               volume = 0, loop = true})
   end,
   fixed_update = function(dt)
     local state = assert(tp.physics_state(car))
@@ -79,8 +87,11 @@ return {
           end
         elseif contact.began and barriers[other] then
           drive:hit()
-          if bump_cooldown == 0 then
-            cue("assets/bump.wav", state.position, 1.0)
+          local normal = contact.first == car and contact.normal or
+                         {-contact.normal[1], -contact.normal[2], -contact.normal[3]}
+          local strength = impact:hit(normal, contact.closing_speed)
+          if bump_cooldown == 0 and strength > 0 then
+            cue("assets/bump.wav", state.position, 0.25 + strength * 0.9)
             bump_cooldown = 0.35
           end
         end
@@ -107,6 +118,11 @@ return {
     end
     tp.sound_set_position(motor, state.position)
     tp.sound_set_volume(motor, clamp(0.25 + speed * 0.04 + math.abs(throttle) * 0.16, 0, 1))
+    tp.sound_set_pitch(motor, clamp(0.72 + vehicle.engine_rpm / 4200, 0.72, 2.0))
+    local slip = math.max(math.abs(vehicle.wheels[3].lateral_slip),
+                          math.abs(vehicle.wheels[4].lateral_slip))
+    tp.sound_set_position(skid, state.position)
+    tp.sound_set_volume(skid, clamp((slip - 0.4) * 0.35, 0, 0.7))
     show_camera(state)
   end,
   update = function()

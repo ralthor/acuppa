@@ -15,6 +15,7 @@ struct SoundState {
     bool spatial = false;
     bool looping = false;
     float volume = 1;
+    float pitch = 1;
     glm::vec3 position{0};
 };
 
@@ -29,6 +30,7 @@ public:
     uint64_t play(const std::filesystem::path& file, SoundState settings);
     void stop(uint64_t id);
     void set_volume(uint64_t id, float volume);
+    void set_pitch(uint64_t id, float pitch);
     void set_position(uint64_t id, glm::vec3 position);
     void set_listener(glm::vec3 position, glm::vec3 forward, glm::vec3 up);
     std::optional<SoundState> state(uint64_t id) const;

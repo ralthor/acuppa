@@ -117,3 +117,5 @@ sound("checkpoint", 0.28, lambda t: math.exp(-12 * t) *
       0.6 * math.sin(2 * math.pi * 880 * t))
 sound("bump", 0.22, lambda t: math.exp(-18 * t) *
       0.5 * math.sin(2 * math.pi * 105 * t))
+sound("skid", 1, lambda t: 0.15 * (math.sin(2 * math.pi * 710 * t) +
+      math.sin(2 * math.pi * 1470 * t)) * (0.65 + 0.35 * math.sin(2 * math.pi * 29 * t)))

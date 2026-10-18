@@ -35,6 +35,18 @@ int main(int argc, char* argv[]) {
     expect(left > right * 1.2, "3D sound did not pan toward the left listener channel");
     expect(audio.state(id) && audio.state(id)->playing && audio.state(id)->spatial,
            "playing sound state is unavailable");
+    audio.set_pitch(id, 1.5f);
+    expect(audio.state(id)->pitch == 1.5f, "sound pitch did not update");
+    threepoint::AudioWorld normal_pitch(false);
+    normal_pitch.set_listener({0, 0, 0}, {0, 0, -1}, {0, 1, 0});
+    settings.pitch = 1.0f;
+    normal_pitch.play(argv[1], settings);
+    const auto unpitched = normal_pitch.render_offline(2400);
+    const auto pitched = audio.render_offline(2400);
+    double pitch_difference = 0;
+    for (size_t i = 0; i < pitched.size(); ++i)
+        pitch_difference += std::abs(pitched[i] - unpitched[i]);
+    expect(pitch_difference > 1.0, "sound pitch did not alter decoded PCM output");
     audio.set_position(id, {2, 0, -3});
     audio.set_volume(id, 0);
     expect(audio.state(id)->position.x == 2 && audio.state(id)->volume == 0,
@@ -53,6 +65,18 @@ int main(int argc, char* argv[]) {
     try { audio.set_volume(id, 1); }
     catch (const std::invalid_argument&) { rejected = true; }
     expect(rejected, "unknown sound ID accepted");
+    rejected = false;
+    try { audio.set_pitch(id, 2); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    expect(rejected, "unknown sound pitch target accepted");
+    rejected = false;
+    try { audio.play(argv[1], threepoint::SoundState{.pitch = 0}); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    expect(rejected, "invalid initial sound pitch accepted");
+    rejected = false;
+    try { audio.set_pitch(following, 4.1f); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    expect(rejected, "out-of-range sound pitch accepted");
     rejected = false;
     try { audio.play("missing.wav", settings); }
     catch (const std::invalid_argument&) { rejected = true; }

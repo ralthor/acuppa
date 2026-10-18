@@ -4,6 +4,9 @@
 #include <filesystem>
 #include <stdexcept>
 #include <string>
+#include <fstream>
+#include <iterator>
+#include <glm/geometric.hpp>
 
 namespace fs = std::filesystem;
 
@@ -111,4 +114,35 @@ int main(int argc, char* argv[]) {
     expect(has_text(reopened.step(0), "BEST"), "best time did not restore in a fresh game");
     reopened.inject({threepoint::InputDevice::Keyboard, "escape", 1});
     expect(reopened.step(0).quit, "Escape did not exit the game");
+
+    const fs::path crash_work = work.parent_path() / "garage_run_crash_fixture";
+    fs::remove_all(crash_work);
+    fs::copy(argv[1], crash_work, fs::copy_options::recursive);
+    const fs::path crash_scene = crash_work / "scenes/course.scene.lua";
+    std::ifstream source(crash_scene);
+    std::string scene(std::istreambuf_iterator<char>{source}, {});
+    const auto start = scene.find("position = {0, 0.75, 16}");
+    expect(start != std::string::npos, "crash fixture could not find car start");
+    scene.replace(start, std::string("position = {0, 0.75, 16}").size(),
+                  "position = {0, 0.75, -35}");
+    source.close();
+    std::ofstream(crash_scene, std::ios::trunc) << scene;
+    threepoint::LuaProject crash(crash_work, "course", threepoint::LuaProject::Mode::Game, false);
+    crash.step(0);
+    crash.inject({threepoint::InputDevice::Keyboard, "w", 1});
+    bool hit_wall = false, shocked = false;
+    for (int i = 0; i < 360; ++i) {
+        const auto hit_frame = crash.step(1.0 / 60.0);
+        hit_wall |= has_text(hit_frame, "HITS 1");
+        for (const auto& item : hit_frame.imported) {
+            if (item.id != 4) continue;
+            const glm::vec3 forward = glm::normalize(glm::vec3(item.transform[2]));
+            const glm::vec3 expected = glm::vec3(item.transform[3]) - 9.0f * forward +
+                                       glm::vec3(0, 5.2f, 0);
+            if (hit_wall && glm::length(hit_frame.camera.eye - expected) > 0.02f)
+                shocked = true;
+        }
+        if (shocked) break;
+    }
+    expect(hit_wall && shocked, "wall collision did not move the camera from its chase pose");
 }

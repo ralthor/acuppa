@@ -43,13 +43,21 @@ int main() {
 
     const float start = world.state(2)->position.y;
     bool collided = false;
+    float impact_speed = 0;
     for (int i = 0; i < 180; ++i) {
         world.step();
-        collided |= touched(world, 1, 2, false);
+        for (const auto& contact : world.contacts()) {
+            if (contact.first == 1 && contact.second == 2 && !contact.trigger && contact.began) {
+                collided = true;
+                impact_speed = contact.closing_speed;
+                expect(contact.normal.y > 0.9f, "floor contact normal has wrong direction");
+            }
+        }
     }
     const auto settled = world.state(2);
     expect(start > settled->position.y, "gravity did not make the ball fall");
     expect(collided, "solid floor collision was not reported");
+    expect(impact_speed > 1.0f, "solid contact did not report closing speed");
     expect(std::abs(settled->position.y - 0.5f) < 0.03f,
            "ball did not rest on the floor without penetrating it");
     expect(std::abs(settled->velocity.y) < 0.05f, "resting ball kept falling");
