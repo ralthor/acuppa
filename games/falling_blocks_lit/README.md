@@ -11,3 +11,5 @@ Pieces come from deterministic, shuffled seven-piece bags. They fall with fixed-
 `make_assets.py` uses only Python's standard library to generate the checked-in `assets/` files. To regenerate them, run `python3 games/falling_blocks_lit/make_assets.py` from the repository root. The game itself only needs ThreePoint; Python is not required to play. To test the copied game after building, run `ctest --test-dir build -R falling_blocks_lit --output-on-failure`.
 
 The HDRI lights the PBR tiles and panel; it is not drawn as a sky. Sound and animation remain future game work.
+
+To export a standalone Linux game from the repository root, run `build/threepoint build games/falling_blocks_lit build/falling_blocks_lit_release`, then launch `build/falling_blocks_lit_release/threepoint-game`. The bundle contains the source gameplay files and an executable player; no editor, Python generator, or CMake is needed to play it. `build/falling_blocks_lit_release/threepoint-game --check` validates the bundle without opening a window.

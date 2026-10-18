@@ -26,6 +26,7 @@ int main(int argc, char* argv[]) {
         }
         uint32_t frames = 0;
         std::filesystem::path capture;
+        std::string held_key;
         for (int i = 1; i < argc; ++i) {
             const std::string_view option = argv[i];
             if (option == "--frames" && i + 1 < argc && frames == 0) {
@@ -40,11 +41,16 @@ int main(int argc, char* argv[]) {
             } else if (option == "--capture" && i + 1 < argc && capture.empty()) {
                 capture = argv[++i];
                 if (capture.empty()) throw std::invalid_argument("--capture needs a path");
+            } else if (option == "--hold-key" && i + 1 < argc && held_key.empty()) {
+                held_key = argv[++i];
+                if (held_key.empty()) throw std::invalid_argument("--hold-key needs a name");
             } else throw std::invalid_argument("unknown or repeated player option: " + std::string(option));
         }
         if (!capture.empty() && frames == 0)
             throw std::invalid_argument("--capture requires --frames");
         threepoint::LuaProject project(root);
+        if (!held_key.empty())
+            project.inject({threepoint::InputDevice::Keyboard, held_key, 1.0f});
         threepoint::PreviewOptions options;
         options.scene = threepoint::PreviewOptions::Scene::Project;
         options.width = project.width();

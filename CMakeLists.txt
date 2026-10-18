@@ -272,6 +272,12 @@ if(BUILD_TESTING)
   target_link_libraries(threepoint_falling_blocks_lit_game_test PRIVATE threepoint_core)
   add_test(NAME falling_blocks_lit_game_logic COMMAND threepoint_falling_blocks_lit_game_test
            "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit")
+  add_test(NAME falling_blocks_export COMMAND "${Python3_EXECUTABLE}"
+           "${PROJECT_SOURCE_DIR}/tests/falling_blocks_export_test.py"
+           $<TARGET_FILE:threepoint>
+           "${PROJECT_SOURCE_DIR}/games/falling_blocks"
+           "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit"
+           "${PROJECT_BINARY_DIR}/falling_blocks_export_fixture")
   add_test(NAME core_project_check COMMAND threepoint_core_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   add_test(NAME runtime_project_check COMMAND threepoint --check-project
@@ -321,6 +327,12 @@ if(BUILD_TESTING)
     add_test(NAME falling_blocks_lit_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit")
+    add_test(NAME falling_blocks_export_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/falling_blocks_export_test.py"
+             $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/games/falling_blocks"
+             "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit"
+             "${PROJECT_BINARY_DIR}/falling_blocks_export_capture" --graphical)
     add_test(NAME garage_run_capture COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/garage_run_capture_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/games/garage_run" "${PROJECT_BINARY_DIR}/garage_run_capture")
