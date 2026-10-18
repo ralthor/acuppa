@@ -35,5 +35,7 @@ rear tire slip raises skid volume; harder hits make louder bumps. The small chec
 `make_assets.py`; this is only needed when changing the asset generator.
 
 Automated rules, gameplay, asset, Vulkan capture, and interactive startup tests
-run with the engine suite. This source project has not yet been checked as a
-standalone exported game because the export command remains a later phase.
+run with the engine suite. The standalone export passes device-free gameplay checks, a Vulkan capture, and
+interactive startup. From the repository root, run `build/threepoint build
+games/garage_run build/garage_run_release`, then launch
+`build/garage_run_release/threepoint-game`. No editor or asset generator is needed.
