@@ -78,6 +78,8 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 
 **Phase 27 asset-failure substep complete (2026-10-18):** Whole-game headless checks now remove or corrupt a glTF buffer, an HDRI, a WAV, and a glTF mesh, then repeat a missing-sound check in an exported Garage Run bundle. Every case exits cleanly and names the offending file; miniaudio decode/start errors now include the project audio path. The new matrix passes in the normal and ASan/UBSan suites. HDRI quality/performance and Linux release packaging checks remain.
 
+**Phase 27 HDRI prefilter core substep complete (2026-10-18):** The core now deterministically converts validated Radiance images into a 64×32 cosine-weighted diffuse map and seven GGX specular roughness levels, 256×128 down to 4×2. A device-free test checks the pyramid, finite output, highlight blurring, and invalid data. The renderer still uses per-pixel sampling until the next substep connects these maps; Linux release checks remain.
+
 **Falling Blocks Lit visual follow-up (2026-10-17):** The game's previous 1.15-unit SSAO radius caused blocky halos around stacked and ghost pieces. The game now uses restrained SSAO plus directional shadow maps for actual colored tiles. Meshes expose a `casts_shadows` switch to source scenes and Lua; the game turns it off for HUD, border, and ghost cubes. A dropped-piece Vulkan capture checks that tile shadows remain visible without dark title or ghost artifacts. The feature scene checks the new Lua setting and invalid input.
 
 | Phase | Deliverable | Check before commit |

@@ -133,7 +133,7 @@ add_library(threepoint_core STATIC src/core/project.cpp src/core/scene_document.
             src/core/ui_canvas.cpp
             src/core/world.cpp src/core/physics_world.cpp src/core/save_data.cpp
             src/core/gltf_asset.cpp src/core/cgltf_impl.c src/core/stb_image_impl.c
-            src/core/hdr_image.cpp src/core/lua_project.cpp)
+            src/core/hdr_image.cpp src/core/environment_filter.cpp src/core/lua_project.cpp)
 target_compile_features(threepoint_core PUBLIC cxx_std_17)
 target_include_directories(threepoint_core PUBLIC include PRIVATE "${cgltf_SOURCE_DIR}"
                            "${stb_SOURCE_DIR}")
@@ -255,6 +255,10 @@ if(BUILD_TESTING)
   add_test(NAME hdr_image_validation COMMAND threepoint_hdr_image_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene"
            "${PROJECT_BINARY_DIR}/hdr_image_fixture")
+  add_executable(threepoint_environment_filter_test tests/environment_filter_test.cpp)
+  target_link_libraries(threepoint_environment_filter_test PRIVATE threepoint_core)
+  add_test(NAME environment_prefilter COMMAND threepoint_environment_filter_test
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene/assets/test_gradient.hdr")
   add_executable(threepoint_falling_blocks_rules_test tests/falling_blocks_rules_test.cpp)
   target_link_libraries(threepoint_falling_blocks_rules_test PRIVATE threepoint_lua)
   add_test(NAME falling_blocks_rules COMMAND threepoint_falling_blocks_rules_test
