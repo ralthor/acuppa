@@ -1,6 +1,7 @@
 #include "threepoint/lua_project.hpp"
 
 #include "threepoint/project.hpp"
+#include "threepoint/audio_world.hpp"
 #include "threepoint/physics_world.hpp"
 #include "threepoint/save_data.hpp"
 #include "threepoint/world.hpp"
@@ -31,7 +32,8 @@ namespace fs = std::filesystem;
 
 struct LuaProject::Impl {
     struct ScriptRefs;
-    explicit Impl(const fs::path& directory, const std::string& initial_scene, Mode selected_mode);
+    explicit Impl(const fs::path& directory, const std::string& initial_scene,
+                  Mode selected_mode, bool audio_output);
     ~Impl() { if (lua) lua_close(lua); }
 
     SceneFrame step(double dt);
@@ -96,6 +98,13 @@ struct LuaProject::Impl {
     static int ui_button(lua_State* lua);
     static int ui_focus(lua_State* lua);
     static int viewport_size(lua_State* lua);
+    static int sound_play(lua_State* lua);
+    static int sound_stop(lua_State* lua);
+    static int sound_set_volume(lua_State* lua);
+    static int sound_set_position(lua_State* lua);
+    static int sound_set_listener(lua_State* lua);
+    static int sound_state(lua_State* lua);
+    AudioWorld& ensure_audio();
     void sync_physics();
     void add_ui_element(UiElement element);
     static glm::vec3 vector_field(lua_State* lua, int table, const char* field,
@@ -104,6 +113,7 @@ struct LuaProject::Impl {
 
     fs::path root;
     Mode mode = Mode::Game;
+    bool audio_output = true;
     lua_State* lua = nullptr;
     uint32_t width = 960;
     uint32_t height = 540;
@@ -146,6 +156,7 @@ struct LuaProject::Impl {
     SceneFrame frame;
     World world;
     std::unique_ptr<PhysicsWorld> physics = std::make_unique<PhysicsWorld>();
+    std::unique_ptr<AudioWorld> audio;
     InputState input;
 };
 
@@ -369,7 +380,8 @@ void push_saved(lua_State* lua, const SaveValue& value) {
 }  // namespace
 
 LuaProject::Impl::Impl(const fs::path& directory, const std::string& initial_scene,
-                       Mode selected_mode) : mode(selected_mode) {
+                       Mode selected_mode, bool use_audio_output)
+    : mode(selected_mode), audio_output(use_audio_output) {
     const auto paths = require_project(directory);
     root = fs::canonical(paths.root);
     lua = luaL_newstate();
@@ -630,6 +642,7 @@ void LuaProject::Impl::load_scene(const std::string& name) {
     clear_callbacks();
     world = World{};
     physics = std::make_unique<PhysicsWorld>();
+    audio.reset();
     frame.exposure = 1.0f;
     frame.ssao_quality = 0;
     frame.ssao_radius = 0.35f;
@@ -804,6 +817,12 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("physics_raycast", &physics_raycast);
     add_function("physics_overlap_sphere", &physics_overlap_sphere);
     add_function("physics_contacts", &physics_contacts);
+    add_function("sound_play", &sound_play);
+    add_function("sound_stop", &sound_stop);
+    add_function("sound_set_volume", &sound_set_volume);
+    add_function("sound_set_position", &sound_set_position);
+    add_function("sound_set_listener", &sound_set_listener);
+    add_function("sound_state", &sound_state);
     add_function("timer_start", &timer_start);
     add_function("timer_cancel", &timer_cancel);
     add_function("timer_remaining", &timer_remaining);
@@ -1486,6 +1505,98 @@ int LuaProject::Impl::physics_contacts(lua_State* lua) {
     return 1;
 }
 
+AudioWorld& LuaProject::Impl::ensure_audio() {
+    if (!audio) audio = std::make_unique<AudioWorld>(audio_output);
+    return *audio;
+}
+
+int LuaProject::Impl::sound_play(lua_State* lua) {
+    if (lua_gettop(lua) < 1 || lua_gettop(lua) > 2 || lua_type(lua, 1) != LUA_TSTRING ||
+        (lua_gettop(lua) == 2 && !lua_istable(lua, 2)))
+        return luaL_error(lua, "sound_play() expects a project audio path and optional settings table");
+    try {
+        Impl& state = context(lua);
+        SoundState settings;
+        if (lua_gettop(lua) == 2) {
+            lua_getfield(lua, 2, "position");
+            const bool positioned = !lua_isnil(lua, -1);
+            if (positioned) settings.position = vector_arg(lua, -1, false);
+            lua_pop(lua, 1);
+            settings.spatial = optional_boolean(lua, 2, "spatial", positioned);
+            settings.looping = optional_boolean(lua, 2, "loop", false);
+            settings.volume = optional_number(lua, 2, "volume", 1.0f, "sound");
+            lua_pushnil(lua);
+            while (lua_next(lua, 2) != 0) {
+                if (lua_type(lua, -2) != LUA_TSTRING)
+                    throw std::invalid_argument("sound setting names must be strings");
+                const std::string key = lua_tostring(lua, -2);
+                if (key != "position" && key != "volume" && key != "spatial" && key != "loop")
+                    throw std::invalid_argument("unknown sound setting: " + key);
+                lua_pop(lua, 1);
+            }
+        }
+        const fs::path file = state.project_file(lua_tostring(lua, 1));
+        lua_pushinteger(lua, lua_Integer(state.ensure_audio().play(file, settings)));
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 1;
+}
+
+int LuaProject::Impl::sound_stop(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "sound_stop() expects a sound ID");
+    try {
+        const auto id = checked_id(lua, 1);
+        context(lua).ensure_audio().stop(id);
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::sound_set_volume(lua_State* lua) {
+    if (lua_gettop(lua) != 2) return luaL_error(lua, "sound_set_volume() expects ID and volume");
+    try {
+        const auto id = checked_id(lua, 1);
+        if (lua_type(lua, 2) != LUA_TNUMBER)
+            throw std::invalid_argument("sound volume must be a number");
+        context(lua).ensure_audio().set_volume(id, float(lua_tonumber(lua, 2)));
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::sound_set_position(lua_State* lua) {
+    if (lua_gettop(lua) != 2) return luaL_error(lua, "sound_set_position() expects ID and position");
+    try {
+        const auto id = checked_id(lua, 1);
+        context(lua).ensure_audio().set_position(id, vector_arg(lua, 2, false));
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::sound_set_listener(lua_State* lua) {
+    if (lua_gettop(lua) != 3)
+        return luaL_error(lua, "sound_set_listener() expects position, forward, up");
+    try {
+        context(lua).ensure_audio().set_listener(vector_arg(lua, 1, false),
+            vector_arg(lua, 2, false), vector_arg(lua, 3, false));
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::sound_state(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "sound_state() expects a sound ID");
+    try {
+        Impl& state = context(lua);
+        const auto id = checked_id(lua, 1);
+        const auto result = state.audio ? state.audio->state(id) : std::nullopt;
+        if (!result) { lua_pushnil(lua); return 1; }
+        lua_createtable(lua, 0, 5);
+        lua_pushboolean(lua, result->playing); lua_setfield(lua, -2, "playing");
+        lua_pushboolean(lua, result->spatial); lua_setfield(lua, -2, "spatial");
+        lua_pushboolean(lua, result->looping); lua_setfield(lua, -2, "loop");
+        lua_pushnumber(lua, result->volume); lua_setfield(lua, -2, "volume");
+        push_vec3(lua, result->position); lua_setfield(lua, -2, "position");
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 1;
+}
+
 int LuaProject::Impl::timer_start(lua_State* lua) {
     if (lua_gettop(lua) < 2 || lua_gettop(lua) > 3)
         return luaL_error(lua, "timer_start() expects name, seconds, optional repeat");
@@ -1768,13 +1879,16 @@ SceneFrame LuaProject::Impl::step(double dt) {
         pending_scene.reset();
         load_scene(next);
     }
+    if (audio && !audio->output_available() && dt > 0)
+        audio->render_offline(uint64_t(std::llround(dt * 48000.0)));
     SceneFrame scene = snapshot();
     scene.quit = wants_quit;
     return scene;
 }
 
-LuaProject::LuaProject(const fs::path& root, std::string initial_scene, Mode mode)
-    : impl_(std::make_unique<Impl>(root, initial_scene, mode)) {}
+LuaProject::LuaProject(const fs::path& root, std::string initial_scene, Mode mode,
+                       bool audio_output)
+    : impl_(std::make_unique<Impl>(root, initial_scene, mode, audio_output)) {}
 LuaProject::~LuaProject() = default;
 uint32_t LuaProject::width() const { return impl_->width; }
 uint32_t LuaProject::height() const { return impl_->height; }

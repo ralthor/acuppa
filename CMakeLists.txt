@@ -58,6 +58,18 @@ FetchContent_Declare(stb
   GIT_TAG 2c980bb59875b0d32144a71867fbdebb2f77cd20)
 FetchContent_MakeAvailable(stb)
 
+set(MINIAUDIO_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(MINIAUDIO_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(MINIAUDIO_NO_EXTRA_NODES ON CACHE BOOL "" FORCE)
+set(MINIAUDIO_NO_LIBVORBIS ON CACHE BOOL "" FORCE)
+set(MINIAUDIO_NO_LIBOPUS ON CACHE BOOL "" FORCE)
+set(MINIAUDIO_NO_ENCODING ON CACHE BOOL "" FORCE)
+set(MINIAUDIO_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(miniaudio
+  GIT_REPOSITORY https://github.com/mackron/miniaudio.git
+  GIT_TAG 9634bedb5b5a2ca38c1ee7108a9358a4e233f14d)
+FetchContent_MakeAvailable(miniaudio)
+
 FetchContent_Declare(lua
   URL https://www.lua.org/ftp/lua-5.4.8.tar.gz
   URL_HASH SHA256=4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae)
@@ -106,6 +118,7 @@ list(APPEND THREEPOINT_SHADER_HEADERS "${shader_header}")
 
 add_library(threepoint_core STATIC src/core/project.cpp src/core/scene_document.cpp
             src/core/source_document.cpp
+            src/core/audio_world.cpp
             src/core/editor_gizmo.cpp src/core/editor_viewport.cpp
             src/core/camera.cpp src/core/input.cpp
             src/core/ui_canvas.cpp
@@ -115,7 +128,7 @@ add_library(threepoint_core STATIC src/core/project.cpp src/core/scene_document.
 target_compile_features(threepoint_core PUBLIC cxx_std_17)
 target_include_directories(threepoint_core PUBLIC include PRIVATE "${cgltf_SOURCE_DIR}"
                            "${stb_SOURCE_DIR}")
-target_link_libraries(threepoint_core PUBLIC glm::glm threepoint_lua PRIVATE Jolt)
+target_link_libraries(threepoint_core PUBLIC glm::glm threepoint_lua PRIVATE Jolt miniaudio)
 target_compile_definitions(threepoint_core PUBLIC THREEPOINT_VERSION="${PROJECT_VERSION}")
 
 add_executable(threepoint src/runtime/main.cpp)
@@ -134,6 +147,14 @@ target_link_libraries(threepoint_editor PRIVATE threepoint_core threepoint_rende
 include(CTest)
 option(THREEPOINT_ENABLE_GPU_TESTS "Run live Vulkan display checks" OFF)
 if(BUILD_TESTING)
+  add_executable(threepoint_audio_world_test tests/audio_world_test.cpp)
+  target_link_libraries(threepoint_audio_world_test PRIVATE threepoint_core)
+  add_test(NAME audio_decode_spatial_and_errors COMMAND threepoint_audio_world_test
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene/assets/contact.wav")
+  add_executable(threepoint_audio_scene_test tests/audio_scene_test.cpp)
+  target_link_libraries(threepoint_audio_scene_test PRIVATE threepoint_core)
+  add_test(NAME lua_audio_contact COMMAND threepoint_audio_scene_test
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   add_executable(threepoint_editor_viewport_test tests/editor_viewport_test.cpp)
   target_link_libraries(threepoint_editor_viewport_test PRIVATE threepoint_core)
   add_test(NAME editor_viewport_drag COMMAND threepoint_editor_viewport_test
@@ -296,6 +317,9 @@ if(BUILD_TESTING)
     add_test(NAME physics_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene" "physics")
+    add_test(NAME audio_live_startup COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene" "audio")
     add_test(NAME ui_menu_capture COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/ui_capture_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene" "${PROJECT_BINARY_DIR}")

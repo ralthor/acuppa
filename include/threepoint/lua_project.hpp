@@ -14,7 +14,8 @@ class LuaProject {
 public:
     enum class Mode { Game, EditorPreview };
     explicit LuaProject(const std::filesystem::path& root,
-                        std::string initial_scene = {}, Mode mode = Mode::Game);
+                        std::string initial_scene = {}, Mode mode = Mode::Game,
+                        bool audio_output = true);
     ~LuaProject();
     LuaProject(const LuaProject&) = delete;
     LuaProject& operator=(const LuaProject&) = delete;
