@@ -59,6 +59,8 @@ Garage Run now uses Jolt rear-wheel drive, front-wheel steering, tire grip and h
 
 `build/threepoint test <project>` loads every declared source scene in a separate device-free runtime, then runs one fixed, update, and draw tick without opening a window. It reports the scene name with any Lua or asset error. Use the existing CTest suite for longer gameplay and visual checks. The feature-scene project includes an intentionally broken HDRI scene for negative testing, so the aggregate command is intended for playable projects.
 
+`build/threepoint build <project> <output-directory>` checks every source scene and creates a standalone Linux bundle. Run `<output-directory>/threepoint-game` to play directly; the executable starts its bundled `game/` source files without an editor or development tools. `threepoint-game --check` validates that bundle without a window, while `--frames N --capture file.ppm` supports deterministic graphical checks. Export copies project Lua, glTF, binary buffers, textures, HDRIs, and WAV/MP3/FLAC files. It leaves out tests, saves, hidden files, README files, asset generators, and symlinks. The destination must be new and separate from the source project. The bundle needs the Linux GLFW runtime, Vulkan loader, and a working Vulkan driver.
+
 ## Current implementation
 
 **Platform scope update (2026-10-17):** The current target is Linux (Ubuntu 24+). Windows and macOS are no longer implementation or release gates, per the latest project direction. The original brief above is retained as supplied; this update supersedes only its platform list.

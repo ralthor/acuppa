@@ -131,7 +131,7 @@ target_include_directories(threepoint_core PUBLIC include PRIVATE "${cgltf_SOURC
 target_link_libraries(threepoint_core PUBLIC glm::glm threepoint_lua PRIVATE Jolt miniaudio)
 target_compile_definitions(threepoint_core PUBLIC THREEPOINT_VERSION="${PROJECT_VERSION}")
 
-add_executable(threepoint src/runtime/main.cpp)
+add_executable(threepoint src/runtime/main.cpp src/runtime/export_game.cpp)
 add_library(threepoint_render STATIC src/render/vulkan_window.cpp src/render/cube_demo.cpp
             ${THREEPOINT_SHADER_HEADERS})
 target_compile_features(threepoint_render PUBLIC cxx_std_17)
@@ -139,6 +139,10 @@ target_include_directories(threepoint_render PUBLIC include PRIVATE "${PROJECT_B
 target_link_libraries(threepoint_render PUBLIC threepoint_core glfw nvrhi_vk nvrhi Vulkan::Headers
                       "${THREEPOINT_VULKAN_LOADER}")
 target_link_libraries(threepoint PRIVATE threepoint_core threepoint_render)
+add_executable(threepoint_player src/runtime/player.cpp)
+set_target_properties(threepoint_player PROPERTIES OUTPUT_NAME threepoint-player)
+target_link_libraries(threepoint_player PRIVATE threepoint_core threepoint_render)
+add_dependencies(threepoint threepoint_player)
 
 add_executable(threepoint_editor src/editor/main.cpp)
 set_target_properties(threepoint_editor PROPERTIES OUTPUT_NAME threepoint-editor)
@@ -276,9 +280,18 @@ if(BUILD_TESTING)
            "${PROJECT_SOURCE_DIR}/tests/project_test_cli.py" $<TARGET_FILE:threepoint>
            "${PROJECT_SOURCE_DIR}/tests/project_test_fixture"
            "${PROJECT_BINARY_DIR}/headless_project_fixture")
+  add_test(NAME standalone_export_files COMMAND "${Python3_EXECUTABLE}"
+           "${PROJECT_SOURCE_DIR}/tests/export_game_test.py" $<TARGET_FILE:threepoint>
+           "${PROJECT_SOURCE_DIR}/tests/project_test_fixture"
+           "${PROJECT_BINARY_DIR}/export_files_fixture")
   add_test(NAME editor_project_check COMMAND threepoint_editor --check-project
            "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   if(THREEPOINT_ENABLE_GPU_TESTS)
+    add_test(NAME standalone_export_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/export_player_capture_test.py"
+             $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/project_test_fixture"
+             "${PROJECT_BINARY_DIR}/export_capture_fixture")
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
     add_test(NAME vulkan_smoke COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/vulkan_smoke_test.py" $<TARGET_FILE:threepoint>)

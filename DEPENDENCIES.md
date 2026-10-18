@@ -22,3 +22,5 @@ CMake fetches the pinned nvrhi, Vulkan-Headers, glm, cgltf, stb, and Jolt commit
 The older optional 2D prototype is built only with `THREEPOINT_BUILD_2D_PROTOTYPE=ON`. The local bootstrap pins its Ubuntu packages to SDL3 **3.4.2+ds-1ubuntu1** and Lua **5.4.8-1build1**. It is retained for regression checks, not used as the 3D renderer.
 
 The local bootstrap fetches miniaudio into ignored `.tools/vendor/miniaudio` at the exact commit above. Its examples, tests, extra nodes, external Vorbis/Opus decoders, encoder, and installer are disabled; the playback engine and built-in WAV/MP3/FLAC decoders remain enabled. Headless tests use miniaudio's device-free render mode. Keep downloads and build tools within this repository's ignored directories for local development.
+
+Phase 23 exports a standalone `threepoint-game` player with the core, Lua, Jolt, miniaudio, shaders, and nvrhi statically linked. It uses the target Linux system GLFW library, Vulkan loader, and GPU driver at runtime; no CMake, compiler, editor, source checkout, or pinned development directory is needed to launch a bundle.

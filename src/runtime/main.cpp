@@ -1,6 +1,7 @@
 #include "threepoint/lua_project.hpp"
 #include "threepoint/project.hpp"
 #include "threepoint/preview.hpp"
+#include "export_game.hpp"
 
 #include <charconv>
 #include <exception>
@@ -18,6 +19,26 @@ int main(int argc, char* argv[]) {
         return 0;
     }
     const std::string_view command = argc > 1 ? argv[1] : "";
+    if (command == "build" && argc == 4) {
+        try {
+            const std::filesystem::path root = argv[2];
+            const threepoint::LuaProject manifest(root, {},
+                threepoint::LuaProject::Mode::EditorPreview, false);
+            for (const auto& name : manifest.scene_names()) {
+                threepoint::LuaProject project(root, name,
+                    threepoint::LuaProject::Mode::Game, false);
+                project.step(0);
+                project.step(1.0 / 60.0);
+            }
+            const auto self = std::filesystem::read_symlink("/proc/self/exe");
+            export_game(root, argv[3], self.parent_path() / "threepoint-player");
+            std::cout << "Exported standalone game to " << argv[3] << '\n';
+            return 0;
+        } catch (const std::exception& error) {
+            std::cerr << "ThreePoint build: " << error.what() << '\n';
+            return 1;
+        }
+    }
     if (command == "test" && argc == 3) {
         try {
             const std::filesystem::path root = argv[2];
@@ -163,6 +184,6 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     }
-    std::cerr << "Usage: threepoint test <project> | threepoint run <project> [--scene name] [--frames N] [--capture file.ppm] [--hold-key name] | --version | --check-project <directory> | --preview | --smoke-vulkan | --smoke-cube | --capture-clear <file.ppm> | --capture-cube <file.ppm> [angle-radians]\n";
+    std::cerr << "Usage: threepoint build <project> <output-directory> | threepoint test <project> | threepoint run <project> [--scene name] [--frames N] [--capture file.ppm] [--hold-key name] | --version | --check-project <directory> | --preview | --smoke-vulkan | --smoke-cube | --capture-clear <file.ppm> | --capture-cube <file.ppm> [angle-radians]\n";
     return 2;
 }
