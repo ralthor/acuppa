@@ -1,5 +1,6 @@
 #include "threepoint/project.hpp"
 #include "threepoint/scene_document.hpp"
+#include "threepoint/source_document.hpp"
 #include "threepoint/editor_viewport.hpp"
 #include "threepoint/preview.hpp"
 
@@ -8,6 +9,7 @@
 #include <exception>
 #include <filesystem>
 #include <iostream>
+#include <iterator>
 #include <set>
 #include <string>
 #include <string_view>
@@ -48,6 +50,8 @@ void usage() {
               << "  threepoint-editor inspect <project> <scene> <entity>\n"
               << "  threepoint-editor add <project> <scene> <entity>\n"
               << "  threepoint-editor set <project> <scene> <entity> <component> <field> <Lua value>\n";
+    std::cerr << "  threepoint-editor source <project> <relative.lua>\n"
+              << "  threepoint-editor replace <project> <relative.lua>  (read Lua from stdin)\n";
     std::cerr << "  threepoint-editor viewport <project> <scene> [--select <entity>]"
                  " [--frames <count> --capture <ppm-file>]\n";
 }
@@ -67,6 +71,26 @@ int main(int argc, char* argv[]) {
         }
         if (argc >= 4) {
             const std::string_view command = argv[1];
+            if (argc == 4 && (command == "source" || command == "replace")) {
+                threepoint::SourceDocument document(argv[2], argv[3]);
+                if (command == "source") {
+                    std::cout.write(document.text().data(),
+                                    static_cast<std::streamsize>(document.text().size()));
+                } else {
+                    std::string source;
+                    for (char block[4096]; std::cin;) {
+                        std::cin.read(block, sizeof(block));
+                        const auto count = std::cin.gcount();
+                        if (count > 0) source.append(block, static_cast<size_t>(count));
+                        if (source.size() > 1024 * 1024)
+                            throw std::invalid_argument("Lua source exceeds 1 MiB");
+                    }
+                    if (std::cin.bad()) throw std::runtime_error("cannot read Lua source from stdin");
+                    document.replace(source);
+                    std::cout << "Updated " << document.path().string() << '\n';
+                }
+                return 0;
+            }
             if (command == "viewport") {
                 threepoint::EditorViewport viewport(argv[2], argv[3]);
                 uint32_t frames = 0;

@@ -105,6 +105,7 @@ add_custom_command(OUTPUT "${shader_header}"
 list(APPEND THREEPOINT_SHADER_HEADERS "${shader_header}")
 
 add_library(threepoint_core STATIC src/core/project.cpp src/core/scene_document.cpp
+            src/core/source_document.cpp
             src/core/editor_gizmo.cpp src/core/editor_viewport.cpp
             src/core/camera.cpp src/core/input.cpp
             src/core/ui_canvas.cpp
@@ -150,6 +151,16 @@ if(BUILD_TESTING)
            "${PROJECT_SOURCE_DIR}/tests/editor_cli_test.py" $<TARGET_FILE:threepoint_editor>
            "${PROJECT_SOURCE_DIR}/tests/feature_scene"
            "${PROJECT_BINARY_DIR}/editor_cli_fixture")
+  add_executable(threepoint_source_document_test tests/source_document_test.cpp)
+  target_link_libraries(threepoint_source_document_test PRIVATE threepoint_core)
+  add_test(NAME editor_raw_source_roundtrip COMMAND threepoint_source_document_test
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene"
+           "${PROJECT_BINARY_DIR}/source_document_fixture")
+  add_test(NAME editor_raw_source_commands COMMAND "${Python3_EXECUTABLE}"
+           "${PROJECT_SOURCE_DIR}/tests/editor_source_cli_test.py"
+           $<TARGET_FILE:threepoint_editor>
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene"
+           "${PROJECT_BINARY_DIR}/editor_source_cli_fixture")
   add_executable(threepoint_ui_menu_test tests/ui_menu_test.cpp)
   target_link_libraries(threepoint_ui_menu_test PRIVATE threepoint_core)
   add_test(NAME source_ui_menu_and_save COMMAND threepoint_ui_menu_test
