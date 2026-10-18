@@ -11,6 +11,7 @@ return {
     right = {keyboard = "d", gamepad_button = "dpad_right"},
     steer = {gamepad_axis = "left_x"},
     brake = {keyboard = "space", gamepad_button = "a"},
+    drift = {keyboard = "left_shift", gamepad_button = "b"},
     restart = {keyboard = "r", gamepad_button = "back"},
     exit = {keyboard = "escape", gamepad_button = "start"},
   },

@@ -179,7 +179,7 @@ int main() {
         vehicle_world.set_vehicle_input(21, 1, 0, 0, 0);
         vehicle_world.step();
     }
-    expect(vehicle_world.state(21)->position.z < -1.0f,
+    expect(vehicle_world.state(21)->position.z > 1.0f,
            "rear driven wheels did not move the chassis forward");
     expect(vehicle_world.vehicle_state(21)->engine_rpm > 0,
            "vehicle engine did not advance");

@@ -55,6 +55,8 @@ The separate [Falling Blocks Lit](games/falling_blocks_lit/README.md) copy uses 
 
 [Garage Run](games/garage_run/README.md) is the second source-only 3D game. Drive a rigid-body car through two ordered gates, avoid walls, and brake in a parking bay. Its Lua project uses PBR glTF assets, physics triggers and collisions, HDRI lighting, shadows, SSAO, spatial sound, UI, and best-time saving. Run `build/threepoint run games/garage_run` from the repository root. The game and its assets need no editor clicks; standalone export remains in Phase 23.
 
+Garage Run now uses Jolt rear-wheel drive, front-wheel steering, tire grip and handbrake slip in a 90×90 practice yard. Steering at rest turns the wheels without rotating the chassis. The larger yard includes a marked drift pad, scattered solid obstacles, two checkpoint gates, and a parking bay. The impact camera and more responsive sound are still planned follow-ups.
+
 ## Current implementation
 
 **Platform scope update (2026-10-17):** The current target is Linux (Ubuntu 24+). Windows and macOS are no longer implementation or release gates, per the latest project direction. The original brief above is retained as supplied; this update supersedes only its platform list.

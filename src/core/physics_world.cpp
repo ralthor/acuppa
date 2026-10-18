@@ -278,19 +278,20 @@ void PhysicsWorld::add_vehicle(uint64_t id, const VehicleConfig& config) {
     JPH::BodyLockWrite lock(impl_->system.GetBodyLockInterface(), body->second);
     if (!lock.Succeeded()) throw std::runtime_error("vehicle body lock failed");
     JPH::VehicleConstraintSettings settings;
-    settings.mForward = JPH::Vec3(0, 0, -1);
+    settings.mForward = JPH::Vec3(0, 0, 1);
     settings.mMaxPitchRollAngle = JPH::DegreesToRadians(65.0f);
     for (int i = 0; i < 4; ++i) {
         auto* wheel = new JPH::WheelSettingsWV;
         wheel->mPosition = JPH::Vec3(i % 2 == 0 ? -config.half_track : config.half_track,
-                                    -0.1f, i < 2 ? -config.half_wheelbase : config.half_wheelbase);
+                                    -0.1f, i < 2 ? config.half_wheelbase : -config.half_wheelbase);
         wheel->mWheelForward = settings.mForward;
         wheel->mRadius = config.wheel_radius;
         wheel->mWidth = 0.16f;
-        wheel->mSuspensionMinLength = 0.18f;
-        wheel->mSuspensionMaxLength = 0.45f;
-        wheel->mSuspensionSpring.mFrequency = 2.5f;
-        wheel->mSuspensionSpring.mDamping = 0.75f;
+        wheel->mSuspensionMinLength = 0.15f;
+        wheel->mSuspensionMaxLength = 0.8f;
+        wheel->mSuspensionPreloadLength = -0.4f;
+        wheel->mSuspensionSpring.mFrequency = 1.5f;
+        wheel->mSuspensionSpring.mDamping = 0.9f;
         wheel->mMaxSteerAngle = i < 2 ? 0.55f : 0.0f;
         wheel->mMaxHandBrakeTorque = i < 2 ? 0.0f : 4000.0f;
         settings.mWheels.push_back(wheel);

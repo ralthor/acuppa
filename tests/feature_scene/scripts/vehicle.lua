@@ -28,7 +28,7 @@ return {
       tp.vehicle_set_input(car, {throttle = 1})
     end
     if ticks == 210 then
-      assert(tp.physics_state(car).position[3] < -1)
+      assert(tp.physics_state(car).position[3] > 1)
       assert(tp.vehicle_state(car).engine_rpm > 0)
     end
   end,

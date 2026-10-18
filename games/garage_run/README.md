@@ -9,20 +9,25 @@ From the repository root, run:
 build/threepoint run games/garage_run
 ```
 
-Drive through the two pairs of gold posts in order, then stop inside the green
-parking bay. The top bar shows the current goal, elapsed time, and wall hits.
-Finishing saves the best time in this project's `saves/` directory.
+The 90×90 yard leaves room to practice turns and handbrake drifts; the marked
+area to the right is an open drift pad. Drive through the two pairs of gold
+posts in order, then brake early and stop inside the green parking bay. The
+top bar shows the current goal, elapsed time, and wall hits. Finishing saves
+the best time in this project's `saves/` directory, and you can keep driving.
 
 | Action | Keyboard | Controller |
 | --- | --- | --- |
 | Accelerate / reverse | W / S | Right / left trigger |
 | Steer | A / D | Left stick or D-pad |
+| Drift handbrake | Left Shift | B button |
 | Brake | Space | A button |
 | Restart | R | Back |
 | Exit | Escape | Start |
 
-The car is a dynamic Jolt box body with Lua arcade steering; walls and the
-obstacle are solid bodies, while gates and the parking bay are triggers. The
+The car uses a Jolt four-wheel vehicle constraint: the rear wheels receive
+drive torque, the front wheels steer, and the handbrake reduces rear tire grip.
+Steering at rest turns the wheels without rotating the chassis. Walls and
+obstacles are solid bodies, while gates and the parking bay are triggers. The
 course uses PBR glTF meshes, an HDRI, a shadowed light, SSAO, spatial engine and
 impact sounds, and Lua UI. The small checked-in assets reproduce exactly with
 `make_assets.py`; this is only needed when changing the asset generator.
