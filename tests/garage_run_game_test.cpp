@@ -39,9 +39,9 @@ int main(int argc, char* argv[]) {
     fs::copy(argv[1], work, fs::copy_options::recursive);
     threepoint::LuaProject game(work, "course", threepoint::LuaProject::Mode::Game, false);
     auto frame = game.step(0);
-    expect(frame.imported.size() >= 15 && frame.environment && frame.ssao_quality == 2 &&
+    expect(frame.imported.size() >= 15 && frame.environment && frame.ssao_quality == 0 &&
            frame.lights.size() == 1 && frame.lights[0].shadows,
-           "source car scene omitted PBR assets, HDRI, shadows, or SSAO");
+           "source car scene omitted PBR assets, HDRI, shadows, or clean-surface SSAO setting");
     expect(std::abs(car_x(frame)) < 0.01f && std::abs(car_z(frame) - 16) < 0.01f &&
            has_text(frame, "GATE 1"), "car did not start at the first checkpoint");
 

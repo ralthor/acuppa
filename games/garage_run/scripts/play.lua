@@ -55,7 +55,7 @@ return {
     best = saved and saved.seconds or nil
     tp.set_exposure(0.9)
     tp.set_environment("assets/sunset.hdr", 0.6)
-    tp.set_ssao(2, 0.4, 0.6)
+    tp.set_ssao(0)
     show_camera(assert(tp.physics_state(car)))
     motor = tp.sound_play("assets/motor.wav", {position = {0, 0.75, 16},
                                                   volume = 0.35, loop = true})

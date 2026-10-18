@@ -28,11 +28,14 @@ The car uses a Jolt four-wheel vehicle constraint: the rear wheels receive
 drive torque, the front wheels steer, and the handbrake reduces rear tire grip.
 Steering at rest turns the wheels without rotating the chassis. Walls and
 obstacles are solid bodies, while gates and the parking bay are triggers. The
-course uses PBR glTF meshes, an HDRI, a shadowed light, SSAO, spatial engine,
+course uses PBR glTF meshes, an HDRI, a shadowed light, spatial engine,
 skid, and impact sounds, and Lua UI. A wall hit moves the chase camera according
 to contact angle and speed, then the view settles. Engine RPM raises motor pitch;
 rear tire slip raises skid volume; harder hits make louder bumps. The small checked-in assets reproduce exactly with
 `make_assets.py`; this is only needed when changing the asset generator.
+
+SSAO is off in this game because it created camera-dependent bands on the flat
+obstacles. The engine's SSAO feature remains available for other scenes.
 
 Automated rules, gameplay, asset, Vulkan capture, and interactive startup tests
 run with the engine suite. The standalone export passes device-free gameplay checks, a Vulkan capture, and

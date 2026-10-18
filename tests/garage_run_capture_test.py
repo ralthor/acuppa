@@ -31,8 +31,8 @@ red = sum(1 for i in range(0, len(first), 3)
           first[i] > first[i + 2] * 1.4)
 assert red > 100, "the red PBR car is not visible in the Vulkan capture"
 
-# The right obstacle's oblique face is a single flat mesh face. Depth-derived
-# SSAO normals once varied every few pixels here, producing camera-moving bands.
+# The right obstacle's oblique face is a single flat mesh face. SSAO produced
+# camera-moving bands here; the game leaves it off until that effect is fixed.
 for y, left, right in [(460, 960, 1000), (480, 970, 1000)]:
     face = [driven[(y * 1280 + x) * 3] for x in range(left, right)]
     assert max(face) - min(face) <= 4, "SSAO striped the flat obstacle face"
