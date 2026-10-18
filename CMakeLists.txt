@@ -237,6 +237,11 @@ if(BUILD_TESTING)
   add_test(NAME falling_blocks_rules COMMAND threepoint_falling_blocks_rules_test
            "${PROJECT_SOURCE_DIR}/games/falling_blocks/scripts/board.lua"
            "${PROJECT_SOURCE_DIR}/tests/falling_blocks_rules.lua")
+  add_executable(threepoint_garage_run_rules_test tests/garage_run_rules_test.cpp)
+  target_link_libraries(threepoint_garage_run_rules_test PRIVATE threepoint_lua)
+  add_test(NAME garage_run_driving_rules COMMAND threepoint_garage_run_rules_test
+           "${PROJECT_SOURCE_DIR}/games/garage_run/scripts/driving.lua"
+           "${PROJECT_SOURCE_DIR}/tests/garage_run_rules.lua")
   add_executable(threepoint_falling_blocks_game_test tests/falling_blocks_game_test.cpp)
   target_link_libraries(threepoint_falling_blocks_game_test PRIVATE threepoint_core)
   add_test(NAME falling_blocks_game_logic COMMAND threepoint_falling_blocks_game_test

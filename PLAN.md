@@ -64,6 +64,8 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 
 **Phase 26 in progress (2026-10-18):** The first small prerequisite exposes `tp.physics_set_pose(id, position, euler_rotation)` so Lua steering can rotate a rigid-body car and its visible transform together. The feature physics scene checks a kinematic pose change and rejects invalid IDs and rotations. The car game, its tests, and its final phase check remain open.
 
+**Phase 26 rules substep (2026-10-18):** `games/garage_run/scripts/driving.lua` now defines bounded acceleration, steering, braking, ordered checkpoints, collision count, and low-speed parking completion without a window or editor. `garage_run_driving_rules` checks normal progression and invalid inputs. The source scene, integrated physics driving, and rendered game remain open.
+
 **Falling Blocks Lit visual follow-up (2026-10-17):** The game's previous 1.15-unit SSAO radius caused blocky halos around stacked and ghost pieces. The game now uses restrained SSAO plus directional shadow maps for actual colored tiles. Meshes expose a `casts_shadows` switch to source scenes and Lua; the game turns it off for HUD, border, and ghost cubes. A dropped-piece Vulkan capture checks that tile shadows remain visible without dark title or ghost artifacts. The feature scene checks the new Lua setting and invalid input.
 
 | Phase | Deliverable | Check before commit |
