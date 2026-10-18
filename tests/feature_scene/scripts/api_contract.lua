@@ -1,0 +1,70 @@
+local tp = require("threepoint")
+
+-- Each public call must reject an invalid argument count. Normal uses live in
+-- the other feature scripts; quit runs in this scene's update callback.
+local invalid = {
+  action = function() tp.action() end,
+  component_get = function() tp.component_get() end,
+  component_remove = function() tp.component_remove() end,
+  component_set = function() tp.component_set() end,
+  entities = function() tp.entities(true) end,
+  entity_create = function() tp.entity_create("a", "b") end,
+  entity_destroy = function() tp.entity_destroy() end,
+  entity_exists = function() tp.entity_exists() end,
+  entity_find = function() tp.entity_find() end,
+  entity_name = function() tp.entity_name() end,
+  load = function() tp.load() end,
+  physics_apply_force = function() tp.physics_apply_force() end,
+  physics_apply_impulse = function() tp.physics_apply_impulse() end,
+  physics_contacts = function() tp.physics_contacts(true) end,
+  physics_move = function() tp.physics_move() end,
+  physics_overlap_sphere = function() tp.physics_overlap_sphere() end,
+  physics_raycast = function() tp.physics_raycast() end,
+  physics_set_pose = function() tp.physics_set_pose() end,
+  physics_set_velocity = function() tp.physics_set_velocity() end,
+  physics_state = function() tp.physics_state() end,
+  pointer = function() tp.pointer(true) end,
+  prefab_spawn = function() tp.prefab_spawn() end,
+  quit = function() tp.quit(true) end,
+  save = function() tp.save() end,
+  scene_name = function() tp.scene_name(true) end,
+  scene_reload = function() tp.scene_reload(true) end,
+  scene_switch = function() tp.scene_switch() end,
+  screen_ray = function() tp.screen_ray() end,
+  set_camera = function() tp.set_camera() end,
+  set_environment = function() tp.set_environment() end,
+  set_exposure = function() tp.set_exposure() end,
+  set_rotation = function() tp.set_rotation() end,
+  set_ssao = function() tp.set_ssao() end,
+  sound_play = function() tp.sound_play() end,
+  sound_set_listener = function() tp.sound_set_listener() end,
+  sound_set_pitch = function() tp.sound_set_pitch() end,
+  sound_set_position = function() tp.sound_set_position() end,
+  sound_set_volume = function() tp.sound_set_volume() end,
+  sound_state = function() tp.sound_state() end,
+  sound_stop = function() tp.sound_stop() end,
+  spawn = function() tp.spawn() end,
+  time = function() tp.time(true) end,
+  timer_cancel = function() tp.timer_cancel() end,
+  timer_events = function() tp.timer_events(true) end,
+  timer_remaining = function() tp.timer_remaining() end,
+  timer_start = function() tp.timer_start() end,
+  ui_button = function() tp.ui_button() end,
+  ui_focus = function() tp.ui_focus("a", "b") end,
+  ui_rect = function() tp.ui_rect() end,
+  ui_text = function() tp.ui_text() end,
+  vehicle_attach = function() tp.vehicle_attach() end,
+  vehicle_set_input = function() tp.vehicle_set_input() end,
+  vehicle_state = function() tp.vehicle_state() end,
+  viewport_size = function() tp.viewport_size(true) end,
+}
+
+return {
+  start = function()
+    for name, attempt in pairs(invalid) do
+      assert(not pcall(attempt), name .. " accepted invalid arguments")
+    end
+  end,
+  fixed_update = function(dt) assert(dt == 1 / 60) end,
+  update = function() tp.quit() end,
+}

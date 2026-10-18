@@ -159,6 +159,12 @@ if(BUILD_TESTING)
   target_link_libraries(threepoint_audio_scene_test PRIVATE threepoint_core)
   add_test(NAME lua_audio_contact COMMAND threepoint_audio_scene_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+  add_executable(threepoint_api_contract_scene_test tests/api_contract_scene_test.cpp)
+  target_link_libraries(threepoint_api_contract_scene_test PRIVATE threepoint_core)
+  add_test(NAME lua_api_contract_scene COMMAND threepoint_api_contract_scene_test
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+  add_test(NAME lua_api_coverage_audit COMMAND "${Python3_EXECUTABLE}"
+           "${PROJECT_SOURCE_DIR}/tests/api_coverage_audit.py" "${PROJECT_SOURCE_DIR}")
   add_executable(threepoint_editor_viewport_test tests/editor_viewport_test.cpp)
   target_link_libraries(threepoint_editor_viewport_test PRIVATE threepoint_core)
   add_test(NAME editor_viewport_drag COMMAND threepoint_editor_viewport_test

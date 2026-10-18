@@ -4,6 +4,7 @@ This is the source-only project used for integration checks. It runs in the 3D r
 
 | Capability | Phase | Scene/script case | Automated check | Status |
 | --- | --- | --- | --- | --- |
+| Public Lua API registration audit | 27 | `scenes/api_contract.scene.lua` and `scripts/api_contract.lua` exercise quit and invalid arguments for every registered function; other feature scripts provide normal examples | `lua_api_contract_scene` executes all error cases; `lua_api_coverage_audit` compares all 54 registrations against examples and invalid calls | Local covered; audit stays active as APIs grow |
 | Project source layout | 1 | `game.lua`, `scenes/main.scene.lua`, `scripts/main.lua` | `core_project_check`, CLI checks | Covered |
 | Vulkan window, clear, resize, missing driver | 2 | N/A: renderer bootstrap precedes Lua scene loading | `vulkan_smoke_test.py` GPU capture and live resize | Local covered; hosted CI pending |
 | Transforms, camera, depth, cube | 3 | Built-in cube preview and Phase 4 Lua cube | `camera_math`, `cube_capture` GPU angle/depth/resize checks | Local covered; hosted CI pending |
@@ -28,6 +29,6 @@ This is the source-only project used for integration checks. It runs in the 3D r
 | Spatial audio and Lua control | 25 | `scenes/audio.scene.lua`, `scripts/audio.lua`, and generated `assets/contact.wav` drop a physics body, play a positioned cue on contact, and exercise listener, 2D loop, volume, pitch, position, stop, state, and invalid calls | `audio_decode_spatial_and_errors` checks decoded PCM, pitch change, channel panning, mute, cleanup, and failures without hardware; `lua_audio_contact` checks the complete Lua scene; `audio_live_startup` checks the interactive Vulkan path | Local covered; physical speaker output quality remains unmeasured |
 | Both code-only sample games | 10–12, 24, 26 | `games/falling_blocks` and `games/garage_run` are separate source-only Lua games; the feature scene also checks project-local `require` and the car's `physics_set_pose` call | Rules, integrated gameplay, live startup, and Vulkan captures cover both games; `garage_run_assets` checks generated assets | Both source games and their standalone exports covered locally |
 
-The public Lua API checklist and sample-game requirements are in [PLAN.md](../../PLAN.md). The final coverage audit checks that each public call has a runnable example, an invalid-input test, and a feature-scene case.
+The public Lua API checklist and sample-game requirements are in [PLAN.md](../../PLAN.md). The coverage audit checks that each registered public call has a runnable example, an invalid-input case, and a feature-scene case.
 
 Phases 10–12 build and test the falling-block game in its own checked-in source project. New engine APIs added for that game must also get cases in this feature scene.

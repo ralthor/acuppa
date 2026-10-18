@@ -5,6 +5,7 @@ return {
   window = {width = 1280, height = 720},
   first_scene = "main",
   scenes = {main = "scenes/main.scene.lua", alternate = "scenes/alternate.scene.lua",
+            api_contract = "scenes/api_contract.scene.lua",
             imported = "scenes/imported.scene.lua",
             textured = "scenes/textured.scene.lua", spheres = "scenes/spheres.scene.lua",
             point = "scenes/point.scene.lua", hdr = "scenes/hdr.scene.lua",
