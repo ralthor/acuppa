@@ -105,7 +105,7 @@ add_custom_command(OUTPUT "${shader_header}"
 list(APPEND THREEPOINT_SHADER_HEADERS "${shader_header}")
 
 add_library(threepoint_core STATIC src/core/project.cpp src/core/camera.cpp src/core/input.cpp
-            src/core/world.cpp src/core/physics_world.cpp
+            src/core/world.cpp src/core/physics_world.cpp src/core/save_data.cpp
             src/core/gltf_asset.cpp src/core/cgltf_impl.c src/core/stb_image_impl.c
             src/core/hdr_image.cpp src/core/lua_project.cpp)
 target_compile_features(threepoint_core PUBLIC cxx_std_17)
@@ -130,6 +130,15 @@ target_link_libraries(threepoint_editor PRIVATE threepoint_core)
 include(CTest)
 option(THREEPOINT_ENABLE_GPU_TESTS "Run live Vulkan display checks" OFF)
 if(BUILD_TESTING)
+  add_executable(threepoint_save_data_test tests/save_data_test.cpp)
+  target_link_libraries(threepoint_save_data_test PRIVATE threepoint_core)
+  add_test(NAME save_file_integrity COMMAND threepoint_save_data_test
+           "${PROJECT_BINARY_DIR}/save_data_fixture")
+  add_executable(threepoint_save_lua_test tests/save_lua_test.cpp)
+  target_link_libraries(threepoint_save_lua_test PRIVATE threepoint_core)
+  add_test(NAME lua_save_roundtrip COMMAND threepoint_save_lua_test
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene"
+           "${PROJECT_BINARY_DIR}/save_lua_fixture")
   add_executable(threepoint_physics_test tests/feature_scene/physics_core_test.cpp)
   target_link_libraries(threepoint_physics_test PRIVATE threepoint_core)
   add_test(NAME physics_core COMMAND threepoint_physics_test)

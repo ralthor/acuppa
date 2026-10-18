@@ -2,6 +2,7 @@
 
 #include "threepoint/project.hpp"
 #include "threepoint/physics_world.hpp"
+#include "threepoint/save_data.hpp"
 #include "threepoint/world.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -19,6 +20,7 @@ extern "C" {
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -87,6 +89,8 @@ struct LuaProject::Impl {
     static int timer_cancel(lua_State* lua);
     static int timer_remaining(lua_State* lua);
     static int timer_events(lua_State* lua);
+    static int save(lua_State* lua);
+    static int load(lua_State* lua);
     void sync_physics();
     static glm::vec3 vector_field(lua_State* lua, int table, const char* field,
                                   glm::vec3 fallback, bool positive);
@@ -259,6 +263,89 @@ std::string timer_name(lua_State* lua, int index) {
         }))
         throw std::invalid_argument("timer name must use 1-64 letters, digits, or underscores");
     return name;
+}
+
+SaveValue from_lua(lua_State* lua, int index, unsigned depth,
+                   size_t& entries, std::set<const void*>& active) {
+    if (depth > 16) throw std::invalid_argument("save table nesting exceeds 16 levels");
+    index = lua_absindex(lua, index);
+    SaveValue value;
+    switch (lua_type(lua, index)) {
+    case LUA_TBOOLEAN:
+        value.type = SaveValue::Type::Boolean;
+        value.boolean = lua_toboolean(lua, index) != 0;
+        break;
+    case LUA_TNUMBER:
+        if (lua_isinteger(lua, index)) {
+            value.type = SaveValue::Type::Integer;
+            value.integer = lua_tointeger(lua, index);
+        } else {
+            value.type = SaveValue::Type::Number;
+            value.number = lua_tonumber(lua, index);
+            if (!std::isfinite(value.number))
+                throw std::invalid_argument("save number must be finite");
+        }
+        break;
+    case LUA_TSTRING: {
+        value.type = SaveValue::Type::String;
+        size_t size = 0;
+        const char* bytes = lua_tolstring(lua, index, &size);
+        if (size > 1024 * 1024) throw std::invalid_argument("save string exceeds 1 MiB");
+        value.text.assign(bytes, size);
+        break;
+    }
+    case LUA_TTABLE: {
+        value.type = SaveValue::Type::Table;
+        const void* pointer = lua_topointer(lua, index);
+        if (!active.insert(pointer).second)
+            throw std::invalid_argument("save table contains a cycle");
+        lua_pushnil(lua);
+        while (lua_next(lua, index) != 0) {
+            if (++entries > 10000) throw std::invalid_argument("save table exceeds 10000 entries");
+            SaveKey key;
+            if (lua_isinteger(lua, -2)) {
+                key.integer = true;
+                key.number = lua_tointeger(lua, -2);
+            } else if (lua_type(lua, -2) == LUA_TSTRING) {
+                size_t size = 0;
+                const char* bytes = lua_tolstring(lua, -2, &size);
+                if (size > 1024 * 1024)
+                    throw std::invalid_argument("save key exceeds 1 MiB");
+                key.text.assign(bytes, size);
+            } else throw std::invalid_argument("save table keys must be strings or integers");
+            value.entries.emplace_back(std::move(key), from_lua(lua, -1, depth + 1, entries, active));
+            lua_pop(lua, 1);
+        }
+        std::sort(value.entries.begin(), value.entries.end(), [](const auto& a, const auto& b) {
+            if (a.first.integer != b.first.integer) return a.first.integer;
+            if (a.first.integer) return a.first.number < b.first.number;
+            return a.first.text < b.first.text;
+        });
+        active.erase(pointer);
+        break;
+    }
+    default: throw std::invalid_argument("save value must be a boolean, number, string, or table");
+    }
+    return value;
+}
+
+void push_saved(lua_State* lua, const SaveValue& value) {
+    switch (value.type) {
+    case SaveValue::Type::Boolean: lua_pushboolean(lua, value.boolean); break;
+    case SaveValue::Type::Integer: lua_pushinteger(lua, lua_Integer(value.integer)); break;
+    case SaveValue::Type::Number: lua_pushnumber(lua, value.number); break;
+    case SaveValue::Type::String:
+        lua_pushlstring(lua, value.text.data(), value.text.size()); break;
+    case SaveValue::Type::Table:
+        lua_createtable(lua, 0, int(value.entries.size()));
+        for (const auto& [key, child] : value.entries) {
+            if (key.integer) lua_pushinteger(lua, lua_Integer(key.number));
+            else lua_pushlstring(lua, key.text.data(), key.text.size());
+            push_saved(lua, child);
+            lua_rawset(lua, -3);
+        }
+        break;
+    }
 }
 
 }  // namespace
@@ -693,6 +780,8 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("timer_cancel", &timer_cancel);
     add_function("timer_remaining", &timer_remaining);
     add_function("timer_events", &timer_events);
+    add_function("save", &save);
+    add_function("load", &load);
     return 1;
 }
 
@@ -1414,6 +1503,29 @@ int LuaProject::Impl::timer_events(lua_State* lua) {
         lua_pushstring(lua, events[i].c_str());
         lua_rawseti(lua, -2, lua_Integer(i + 1));
     }
+    return 1;
+}
+
+int LuaProject::Impl::save(lua_State* lua) {
+    if (lua_gettop(lua) != 2) return luaL_error(lua, "save() expects slot and value");
+    if (lua_type(lua, 1) != LUA_TSTRING) return luaL_error(lua, "save slot must be a string");
+    try {
+        size_t entries = 0;
+        std::set<const void*> active;
+        const SaveValue value = from_lua(lua, 2, 0, entries, active);
+        write_save(context(lua).root, lua_tostring(lua, 1), value);
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::load(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "load() expects a slot");
+    if (lua_type(lua, 1) != LUA_TSTRING) return luaL_error(lua, "save slot must be a string");
+    try {
+        const auto value = read_save(context(lua).root, lua_tostring(lua, 1));
+        if (value) push_saved(lua, *value);
+        else lua_pushnil(lua);
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
     return 1;
 }
 
