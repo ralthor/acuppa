@@ -82,6 +82,7 @@ struct LuaProject::Impl {
     static int physics_state(lua_State* lua);
     static int physics_set_velocity(lua_State* lua);
     static int physics_move(lua_State* lua);
+    static int physics_set_pose(lua_State* lua);
     static int physics_apply_force(lua_State* lua);
     static int physics_apply_impulse(lua_State* lua);
     static int physics_raycast(lua_State* lua);
@@ -812,6 +813,7 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("physics_state", &physics_state);
     add_function("physics_set_velocity", &physics_set_velocity);
     add_function("physics_move", &physics_move);
+    add_function("physics_set_pose", &physics_set_pose);
     add_function("physics_apply_force", &physics_apply_force);
     add_function("physics_apply_impulse", &physics_apply_impulse);
     add_function("physics_raycast", &physics_raycast);
@@ -1441,6 +1443,23 @@ int LuaProject::Impl::physics_move(lua_State* lua) {
         state.physics->move(id, position);
         auto transform = state.world.transform(id).value();
         transform.position = position;
+        state.world.set_transform(id, transform);
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::physics_set_pose(lua_State* lua) {
+    if (lua_gettop(lua) != 3)
+        return luaL_error(lua, "physics_set_pose() expects ID, position, Euler rotation");
+    try {
+        Impl& state = context(lua);
+        const EntityId id = checked_id(lua, 1);
+        const glm::vec3 position = vector_arg(lua, 2, false);
+        const glm::vec3 rotation = vector_arg(lua, 3, false);
+        state.physics->set_pose(id, position, physics_rotation(rotation));
+        auto transform = state.world.transform(id).value();
+        transform.position = position;
+        transform.rotation = rotation;
         state.world.set_transform(id, transform);
     } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
     return 0;
