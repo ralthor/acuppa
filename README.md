@@ -47,11 +47,13 @@ We're building a production-grade, simple and straight-forward 3D Game Engine fo
 
 The requirements above are the source of truth. [PLAN.md](PLAN.md) maps each requirement to small, testable phases and records the current state. The existing SDL3/Lua program is a 2D prototype; it does not satisfy the 3D renderer or physics requirements. The first visible 3D demo is complete in Phase 3, and the first Lua-authored 3D demo is complete in Phase 4.
 
-**Priority update (2026-10-17):** A complete source-only 3D [Falling Blocks game](games/falling_blocks/README.md) now runs: a 2D rules grid displayed with 3D blocks. Rules, controls, HUD, score, and restart are written in Lua and project files, with no editor clicks. Advanced graphics remain in Phases 13–16, and sound in Phase 25. The original 3D engine requirements above remain in scope.
+**Priority update (2026-10-17):** A complete source-only 3D [Falling Blocks game](games/falling_blocks/README.md) now runs: a 2D rules grid displayed with 3D blocks. Rules, controls, HUD, score, and restart are written in Lua and project files, with no editor clicks. Advanced graphics and sound were added in later phases. The original 3D engine requirements above remain in scope.
 
 Phases 10–12 provide a tested full match: a shuffled seven-piece queue, movement, wall kicks, hold, next/ghost previews, line clears, speed levels, visible score, pause, game over, and restart. Run `build/threepoint run games/falling_blocks` to play it now. The separate export/package step remains Phase 24.
 
 The separate [Falling Blocks Lit](games/falling_blocks_lit/README.md) copy uses source-generated glTF tiles with seven PBR colors, a dark board panel, a shadow-casting directional light, a checked-in studio HDRI, and restrained SSAO. Its colored tiles cast shadows; decorative cubes do not. Run `build/threepoint run games/falling_blocks_lit` to compare it with the original, or add `--scene ssao_off` to compare the lit game without SSAO. Both projects run directly from source without editor interaction. The art generator and rendered assets are in the copied project.
+
+[Garage Run](games/garage_run/README.md) is the second source-only 3D game. Drive a rigid-body car through two ordered gates, avoid walls, and brake in a parking bay. Its Lua project uses PBR glTF assets, physics triggers and collisions, HDRI lighting, shadows, SSAO, spatial sound, UI, and best-time saving. Run `build/threepoint run games/garage_run` from the repository root. The game and its assets need no editor clicks; standalone export remains in Phase 23.
 
 ## Current implementation
 
