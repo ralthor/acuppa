@@ -272,6 +272,10 @@ if(BUILD_TESTING)
            "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   add_test(NAME runtime_project_check COMMAND threepoint --check-project
            "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+  add_test(NAME headless_project_test COMMAND "${Python3_EXECUTABLE}"
+           "${PROJECT_SOURCE_DIR}/tests/project_test_cli.py" $<TARGET_FILE:threepoint>
+           "${PROJECT_SOURCE_DIR}/tests/project_test_fixture"
+           "${PROJECT_BINARY_DIR}/headless_project_fixture")
   add_test(NAME editor_project_check COMMAND threepoint_editor --check-project
            "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   if(THREEPOINT_ENABLE_GPU_TESTS)

@@ -18,6 +18,31 @@ int main(int argc, char* argv[]) {
         return 0;
     }
     const std::string_view command = argc > 1 ? argv[1] : "";
+    if (command == "test" && argc == 3) {
+        try {
+            const std::filesystem::path root = argv[2];
+            const threepoint::LuaProject manifest(root, {},
+                threepoint::LuaProject::Mode::EditorPreview, false);
+            const auto scenes = manifest.scene_names();
+            for (const auto& name : scenes) {
+                try {
+                    threepoint::LuaProject project(root, name,
+                        threepoint::LuaProject::Mode::Game, false);
+                    auto frame = project.step(0);
+                    for (int tick = 0; tick < 1 && !frame.quit; ++tick)
+                        frame = project.step(1.0 / 60.0);
+                    std::cout << "PASS " << name << '\n';
+                } catch (const std::exception& error) {
+                    throw std::runtime_error("scene '" + name + "': " + error.what());
+                }
+            }
+            std::cout << "Tested " << scenes.size() << " source scenes headlessly\n";
+            return 0;
+        } catch (const std::exception& error) {
+            std::cerr << "ThreePoint test: " << error.what() << '\n';
+            return 1;
+        }
+    }
     if (command == "run" && argc >= 3) {
         try {
             uint32_t frames = 0;
@@ -138,6 +163,6 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     }
-    std::cerr << "Usage: threepoint run <project> [--scene name] [--frames N] [--capture file.ppm] [--hold-key name] | --version | --check-project <directory> | --preview | --smoke-vulkan | --smoke-cube | --capture-clear <file.ppm> | --capture-cube <file.ppm> [angle-radians]\n";
+    std::cerr << "Usage: threepoint test <project> | threepoint run <project> [--scene name] [--frames N] [--capture file.ppm] [--hold-key name] | --version | --check-project <directory> | --preview | --smoke-vulkan | --smoke-cube | --capture-clear <file.ppm> | --capture-cube <file.ppm> [angle-radians]\n";
     return 2;
 }

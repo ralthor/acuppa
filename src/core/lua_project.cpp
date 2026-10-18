@@ -1987,6 +1987,12 @@ LuaProject::LuaProject(const fs::path& root, std::string initial_scene, Mode mod
 LuaProject::~LuaProject() = default;
 uint32_t LuaProject::width() const { return impl_->width; }
 uint32_t LuaProject::height() const { return impl_->height; }
+std::vector<std::string> LuaProject::scene_names() const {
+    std::vector<std::string> names;
+    names.reserve(impl_->scenes.size());
+    for (const auto& [name, _] : impl_->scenes) names.push_back(name);
+    return names;
+}
 void LuaProject::inject(const InputEvent& event) { impl_->input.inject(event); }
 void LuaProject::set_pointer(double x, double y) { impl_->input.set_pointer(x, y); }
 void LuaProject::set_viewport(uint32_t width, uint32_t height) {

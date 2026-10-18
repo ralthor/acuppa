@@ -57,6 +57,8 @@ The separate [Falling Blocks Lit](games/falling_blocks_lit/README.md) copy uses 
 
 Garage Run now uses Jolt rear-wheel drive, front-wheel steering, tire grip and handbrake slip in a 90×90 practice yard. Steering at rest turns the wheels without rotating the chassis. The larger yard includes a marked drift pad, scattered solid obstacles, two checkpoint gates, and a parking bay. Solid impacts move the chase camera according to contact direction and closing speed; a damped spring settles it. Engine RPM changes motor pitch, rear-wheel slip fades in a skid loop, and impact speed sets bump volume.
 
+`build/threepoint test <project>` loads every declared source scene in a separate device-free runtime, then runs one fixed, update, and draw tick without opening a window. It reports the scene name with any Lua or asset error. Use the existing CTest suite for longer gameplay and visual checks. The feature-scene project includes an intentionally broken HDRI scene for negative testing, so the aggregate command is intended for playable projects.
+
 ## Current implementation
 
 **Platform scope update (2026-10-17):** The current target is Linux (Ubuntu 24+). Windows and macOS are no longer implementation or release gates, per the latest project direction. The original brief above is retained as supplied; this update supersedes only its platform list.

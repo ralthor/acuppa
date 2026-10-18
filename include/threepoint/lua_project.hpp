@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace threepoint {
 
@@ -22,6 +23,7 @@ public:
 
     uint32_t width() const;
     uint32_t height() const;
+    std::vector<std::string> scene_names() const;
     void inject(const InputEvent& event);
     void set_pointer(double x, double y);
     void set_viewport(uint32_t width, uint32_t height);
