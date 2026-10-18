@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
            std::abs(frame.lights[0].shadow_range - 11.0f) < 0.001f &&
            std::abs(frame.exposure - 0.85f) < 0.001f &&
            frame.ssao_quality == 3 && std::abs(frame.ssao_radius - 0.65f) < 0.001f &&
-           std::abs(frame.ssao_strength - 0.15f) < 0.001f,
+           std::abs(frame.ssao_strength - 0.25f) < 0.001f,
            "copied game did not configure the HDRI, exposure, shadows, and SSAO");
     for (const auto& cube : frame.cubes)
         expect(!cube.casts_shadows, "HUD, border, or ghost cube casts a board shadow");

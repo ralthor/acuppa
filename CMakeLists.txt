@@ -259,6 +259,10 @@ if(BUILD_TESTING)
   target_link_libraries(threepoint_environment_filter_test PRIVATE threepoint_core)
   add_test(NAME environment_prefilter COMMAND threepoint_environment_filter_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene/assets/test_gradient.hdr")
+  add_executable(threepoint_shadow_layout_test tests/shadow_layout_test.cpp)
+  target_include_directories(threepoint_shadow_layout_test PRIVATE src/render)
+  target_link_libraries(threepoint_shadow_layout_test PRIVATE threepoint_core)
+  add_test(NAME shadow_atlas_packing COMMAND threepoint_shadow_layout_test)
   add_executable(threepoint_falling_blocks_rules_test tests/falling_blocks_rules_test.cpp)
   target_link_libraries(threepoint_falling_blocks_rules_test PRIVATE threepoint_lua)
   add_test(NAME falling_blocks_rules COMMAND threepoint_falling_blocks_rules_test

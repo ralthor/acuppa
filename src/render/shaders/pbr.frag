@@ -97,9 +97,10 @@ float shadow_visibility(int light_index, vec3 position, vec3 normal, vec3 light_
     float visible = 0.0;
     for (int y = -1; y <= 1; ++y) {
         for (int x = -1; x <= 1; ++x) {
-            vec2 tap = clamp(local + vec2(x, y) / 512.0,
-                             vec2(0.5 / 512.0), vec2(1.0 - 0.5 / 512.0));
-            vec2 atlas_uv = (vec2(float(face), float(light_index)) + tap) / vec2(6.0, 8.0);
+            vec2 tap = clamp(local + vec2(x, y) * 1.5 / 1024.0,
+                             vec2(0.5 / 1024.0), vec2(1.0 - 0.5 / 1024.0));
+            vec2 atlas_uv = (vec2(float(face), shadows.settings[light_index].y) + tap) /
+                            vec2(6.0, shadows.settings[light_index].z);
             float depth = texture(sampler2D(shadow_texture, shadow_sampler), atlas_uv).r;
             visible += projected.z - bias <= depth ? 1.0 : 0.0;
         }

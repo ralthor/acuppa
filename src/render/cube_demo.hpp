@@ -61,6 +61,7 @@ private:
     nvrhi::TextureHandle environment_texture_;
     nvrhi::TextureHandle environment_diffuse_texture_;
     nvrhi::TextureHandle shadow_atlas_;
+    uint32_t shadow_capacity_rows_ = 0;
     nvrhi::FramebufferHandle shadow_framebuffer_;
     nvrhi::GraphicsPipelineHandle shadow_cube_pipeline_;
     nvrhi::GraphicsPipelineHandle shadow_pbr_pipeline_;

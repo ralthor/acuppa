@@ -1,4 +1,5 @@
 #include "cube_demo.hpp"
+#include "shadow_layout.hpp"
 
 #include "threepoint/camera.hpp"
 #include "threepoint/environment_filter.hpp"
@@ -86,9 +87,8 @@ struct TonemapSettings {
 };
 static_assert(sizeof(TonemapSettings) == 96);
 
-constexpr uint32_t shadow_tile = 512;
-constexpr uint32_t shadow_columns = 6;
-constexpr uint32_t shadow_rows = 8;
+constexpr uint32_t shadow_tile = ShadowAtlasLayout::tile;
+constexpr uint32_t shadow_columns = ShadowAtlasLayout::columns;
 
 struct CubeMesh {
     std::vector<Vertex> vertices;
@@ -347,12 +347,16 @@ CubeDemo::CubeDemo(nvrhi::IDevice* device) : device_(device) {
 }
 
 void CubeDemo::prepare(const SceneFrame& scene) {
-    bool needs_shadows = false;
-    for (const auto& light : scene.lights) needs_shadows |= light.shadows;
-    if (needs_shadows && !shadow_atlas_) {
+    const ShadowAtlasLayout layout = plan_shadow_atlas(scene.lights);
+    if (layout.rows > shadow_capacity_rows_) {
+        if (shadow_atlas_) require(device_->waitForIdle(), "resize shadow atlas");
+        shadow_atlas_ = nullptr;
+        shadow_framebuffer_ = nullptr;
+        shadow_cube_pipeline_ = nullptr;
+        shadow_pbr_pipeline_ = nullptr;
         nvrhi::TextureDesc desc;
         desc.width = shadow_tile * shadow_columns;
-        desc.height = shadow_tile * shadow_rows;
+        desc.height = shadow_tile * layout.rows;
         desc.format = nvrhi::Format::D32;
         desc.isShaderResource = true;
         desc.isRenderTarget = true;
@@ -389,6 +393,7 @@ void CubeDemo::prepare(const SceneFrame& scene) {
         shadow_pbr_pipeline_ = device_->createGraphicsPipeline(
             imported_desc, shadow_framebuffer_->getFramebufferInfo());
         require(shadow_cube_pipeline_ && shadow_pbr_pipeline_, "create shadow pipelines");
+        shadow_capacity_rows_ = layout.rows;
     }
     if (scene.environment != environment_source_) {
         environment_source_ = scene.environment;
@@ -587,8 +592,8 @@ void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t 
         nvrhi::FramebufferDesc().addColorAttachment(hdr_color_).setDepthAttachment(depth_));
     require(hdr_framebuffer_, "create HDR scene framebuffer");
     nvrhi::TextureDesc ssao_desc;
-    ssao_desc.width = width;
-    ssao_desc.height = height;
+    ssao_desc.width = (width + 1) / 2;
+    ssao_desc.height = (height + 1) / 2;
     ssao_desc.format = nvrhi::Format::R16_FLOAT;
     ssao_desc.isShaderResource = true;
     ssao_desc.isRenderTarget = true;
@@ -692,6 +697,7 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
     frame.environment_params[0] = scene.environment ? scene.environment_intensity : 0.0f;
     ShadowFrame shadows{};
     bool has_shadows = false;
+    const ShadowAtlasLayout shadow_layout = plan_shadow_atlas(scene.lights);
     for (size_t i = 0; i < scene.lights.size(); ++i) {
         const auto& light = scene.lights[i];
         const glm::vec3 position = light.directional ? light.direction : light.position;
@@ -706,6 +712,8 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
         if (light.shadows) {
             has_shadows = true;
             shadows.settings[i][0] = 1.0f;
+            shadows.settings[i][1] = float(shadow_layout.row_for_light[i]);
+            shadows.settings[i][2] = float(shadow_capacity_rows_);
             for (int face = 0; face < (light.directional ? 1 : 6); ++face)
                 shadows.transforms[i * 6 + face] = shadow_matrix(light, face);
         }
@@ -723,7 +731,8 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
             for (int face = 0; face < (light.directional ? 1 : 6); ++face) {
                 const auto viewport = nvrhi::Viewport(
                     float(face * shadow_tile), float((face + 1) * shadow_tile),
-                    float(i * shadow_tile), float((i + 1) * shadow_tile), 0.0f, 1.0f);
+                    shadows.settings[i][1] * float(shadow_tile),
+                    (shadows.settings[i][1] + 1.0f) * float(shadow_tile), 0.0f, 1.0f);
                 const glm::mat4& light_matrix = shadows.transforms[i * 6 + face];
                 nvrhi::GraphicsState cube_state;
                 cube_state.setPipeline(shadow_cube_pipeline_).setFramebuffer(shadow_framebuffer_);
@@ -819,7 +828,7 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
         nvrhi::GraphicsState ssao_state;
         ssao_state.setPipeline(ssao_pipeline_).setFramebuffer(ssao_framebuffer_);
         ssao_state.viewport.addViewportAndScissorRect(
-            nvrhi::Viewport(float(width_), float(height_)));
+            nvrhi::Viewport(float((width_ + 1) / 2), float((height_ + 1) / 2)));
         ssao_state.addBindingSet(ssao_binding_set_);
         commands->setGraphicsState(ssao_state);
         commands->setPushConstants(&settings, sizeof(settings));
