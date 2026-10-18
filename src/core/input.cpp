@@ -95,6 +95,13 @@ float InputState::action(std::string_view name) const {
     return result;
 }
 
+float InputState::value(InputDevice device, std::string_view control) const {
+    if (!valid_control(device, control))
+        throw std::invalid_argument("invalid input control");
+    const auto found = values_.find(key(device, control));
+    return found == values_.end() ? 0.0f : found->second;
+}
+
 void InputState::set_pointer(double x, double y) {
     if (!std::isfinite(x) || !std::isfinite(y)) {
         throw std::invalid_argument("pointer coordinates must be finite");

@@ -7,6 +7,7 @@
 #include "pbr_frag_spv.hpp"
 #include "tonemap_vert_spv.hpp"
 #include "tonemap_frag_spv.hpp"
+#include "threepoint/ui_canvas.hpp"
 #include "ssao_frag_spv.hpp"
 #include "shadow_cube_vert_spv.hpp"
 #include "shadow_cube_frag_spv.hpp"
@@ -282,7 +283,9 @@ CubeDemo::CubeDemo(nvrhi::IDevice* device) : device_(device) {
             .addItem(nvrhi::BindingLayoutItem::Texture_SRV(2))
             .addItem(nvrhi::BindingLayoutItem::Sampler(3))
             .addItem(nvrhi::BindingLayoutItem::Texture_SRV(4))
-            .addItem(nvrhi::BindingLayoutItem::Sampler(5)));
+            .addItem(nvrhi::BindingLayoutItem::Sampler(5))
+            .addItem(nvrhi::BindingLayoutItem::Texture_SRV(6))
+            .addItem(nvrhi::BindingLayoutItem::Sampler(7)));
     tonemap_sampler_ = device_->createSampler(nvrhi::SamplerDesc()
         .setAllAddressModes(nvrhi::SamplerAddressMode::Clamp));
     depth_sampler_ = device_->createSampler(nvrhi::SamplerDesc()
@@ -527,6 +530,9 @@ void CubeDemo::release_size_dependent() {
     depth_ = nullptr;
     hdr_color_ = nullptr;
     ssao_color_ = nullptr;
+    ui_color_ = nullptr;
+    ui_uploaded_ = false;
+    ui_had_draws_ = false;
 }
 
 void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t width,
@@ -567,6 +573,14 @@ void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t 
     ssao_desc.enableAutomaticStateTracking(nvrhi::ResourceStates::RenderTarget);
     ssao_color_ = device_->createTexture(ssao_desc);
     require(ssao_color_, "create SSAO image");
+    nvrhi::TextureDesc ui_desc;
+    ui_desc.width = width;
+    ui_desc.height = height;
+    ui_desc.format = nvrhi::Format::RGBA8_UNORM;
+    ui_desc.debugName = "script UI overlay";
+    ui_desc.enableAutomaticStateTracking(nvrhi::ResourceStates::ShaderResource);
+    ui_color_ = device_->createTexture(ui_desc);
+    require(ui_color_, "create script UI image");
     ssao_framebuffer_ = device_->createFramebuffer(
         nvrhi::FramebufferDesc().addColorAttachment(ssao_color_));
     require(ssao_framebuffer_, "create SSAO framebuffer");
@@ -592,7 +606,9 @@ void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t 
             .addItem(nvrhi::BindingSetItem::Texture_SRV(2, depth_))
             .addItem(nvrhi::BindingSetItem::Sampler(3, depth_sampler_))
             .addItem(nvrhi::BindingSetItem::Texture_SRV(4, ssao_color_))
-            .addItem(nvrhi::BindingSetItem::Sampler(5, depth_sampler_)),
+            .addItem(nvrhi::BindingSetItem::Sampler(5, depth_sampler_))
+            .addItem(nvrhi::BindingSetItem::Texture_SRV(6, ui_color_))
+            .addItem(nvrhi::BindingSetItem::Sampler(7, depth_sampler_)),
         tonemap_binding_layout_);
     require(tonemap_binding_set_, "create tonemap binding set");
     nvrhi::GraphicsPipelineDesc pipeline_desc;
@@ -637,6 +653,12 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
                       const SceneFrame& scene) {
     if (image_index >= framebuffers_.size()) {
         throw std::runtime_error("invalid cube framebuffer index");
+    }
+    if (!ui_uploaded_ || !scene.ui.empty() || ui_had_draws_) {
+        const auto pixels = rasterize_ui(width_, height_, scene.ui);
+        commands->writeTexture(ui_color_, 0, 0, pixels.data(), size_t(width_) * 4);
+        ui_uploaded_ = true;
+        ui_had_draws_ = !scene.ui.empty();
     }
     if (scene.lights.size() > 8) throw std::runtime_error("scene exceeds eight PBR lights");
     PbrFrame frame{};

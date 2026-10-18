@@ -11,7 +11,7 @@ The core and editor targets use C++17 and its standard library. The runtime also
 | Vulkan validation layer | Local Ubuntu package `vulkan-validationlayers` **1.4.341.0-1** | Checks Vulkan API use during GPU tests. |
 | glm (MIT) | `g-truc/glm` 1.0.1, commit `0af55ccecd98d4e5a8d1fad7de25ba429d60e863` | Perspective camera and 3D model transforms. |
 | cgltf (MIT) | `jkuhlmann/cgltf` v1.15, commit `360db1a95480fe102ae9c69b27c5d101167ff5ba` | glTF 2.0 JSON/GLB parsing; ThreePoint limits file sizes and validates supported accessors before reading them. |
-| stb_image (public domain/MIT) | `nothings/stb` commit `2c980bb59875b0d32144a71867fbdebb2f77cd20` | Project-local PNG/JPEG decoding for glTF textures; source and decoded dimensions are bounded. |
+| stb_image / stb_easy_font (public domain/MIT) | `nothings/stb` commit `2c980bb59875b0d32144a71867fbdebb2f77cd20` | Project-local PNG/JPEG decoding for glTF textures and printable ASCII UI glyph geometry; inputs are bounded. |
 | glslang (BSD-3-Clause) | Local Ubuntu package `glslang-tools` **16.2.0-2** | Build-time GLSL to SPIR-V compiler; generated shaders are embedded in the runtime. |
 | Lua (MIT) | Official `lua-5.4.8.tar.gz`, SHA-256 `4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae` | Statically linked 3D game scripting runtime. |
 | Jolt Physics (MIT) | `jrouwe/JoltPhysics` v5.6.0, commit `e77f175595e64cb44218cc9d9d56fc365ad0e36a` | Static 3D rigid-body simulation; box/sphere colliders and sensors. |

@@ -105,6 +105,7 @@ add_custom_command(OUTPUT "${shader_header}"
 list(APPEND THREEPOINT_SHADER_HEADERS "${shader_header}")
 
 add_library(threepoint_core STATIC src/core/project.cpp src/core/camera.cpp src/core/input.cpp
+            src/core/ui_canvas.cpp
             src/core/world.cpp src/core/physics_world.cpp src/core/save_data.cpp
             src/core/gltf_asset.cpp src/core/cgltf_impl.c src/core/stb_image_impl.c
             src/core/hdr_image.cpp src/core/lua_project.cpp)
@@ -130,6 +131,11 @@ target_link_libraries(threepoint_editor PRIVATE threepoint_core)
 include(CTest)
 option(THREEPOINT_ENABLE_GPU_TESTS "Run live Vulkan display checks" OFF)
 if(BUILD_TESTING)
+  add_executable(threepoint_ui_menu_test tests/ui_menu_test.cpp)
+  target_link_libraries(threepoint_ui_menu_test PRIVATE threepoint_core)
+  add_test(NAME source_ui_menu_and_save COMMAND threepoint_ui_menu_test
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene"
+           "${PROJECT_BINARY_DIR}/ui_menu_fixture")
   add_executable(threepoint_save_data_test tests/save_data_test.cpp)
   target_link_libraries(threepoint_save_data_test PRIVATE threepoint_core)
   add_test(NAME save_file_integrity COMMAND threepoint_save_data_test
@@ -260,6 +266,12 @@ if(BUILD_TESTING)
     add_test(NAME physics_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene" "physics")
+    add_test(NAME ui_menu_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/ui_capture_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene" "${PROJECT_BINARY_DIR}")
+    add_test(NAME ui_menu_live_startup COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene" "menu")
     add_test(NAME shadow_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene" "shadow")

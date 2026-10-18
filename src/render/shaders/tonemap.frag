@@ -8,6 +8,8 @@ layout(set = 0, binding = 2) uniform texture2D depth_image;
 layout(set = 0, binding = 3) uniform sampler depth_sampler;
 layout(set = 0, binding = 4) uniform texture2D ssao_image;
 layout(set = 0, binding = 5) uniform sampler ssao_sampler;
+layout(set = 0, binding = 6) uniform texture2D ui_image;
+layout(set = 0, binding = 7) uniform sampler ui_sampler;
 layout(push_constant) uniform Settings {
     float exposure;
     int ssao_quality;
@@ -59,5 +61,6 @@ void main() {
     vec3 srgb = mix(mapped * 12.92,
                     1.055 * pow(mapped, vec3(1.0 / 2.4)) - 0.055,
                     greaterThan(mapped, vec3(0.0031308)));
-    out_color = vec4(srgb, 1.0);
+    vec4 overlay = texture(sampler2D(ui_image, ui_sampler), uv);
+    out_color = vec4(mix(srgb, overlay.rgb, overlay.a), 1.0);
 }

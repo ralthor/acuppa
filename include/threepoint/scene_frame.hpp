@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace threepoint {
@@ -40,6 +41,15 @@ struct LightInstance {
     float shadow_range = 25.0f;
 };
 
+struct UiElement {
+    enum class Type { Rectangle, Text, Button } type = Type::Rectangle;
+    float x = 0, y = 0, width = 0, height = 0;
+    float scale = 1;
+    std::string text;
+    uint8_t red = 255, green = 255, blue = 255, alpha = 255;
+    bool focused = false;
+};
+
 struct SceneFrame {
     PerspectiveCamera camera;
     float exposure = 1.0f;
@@ -51,6 +61,7 @@ struct SceneFrame {
     std::vector<CubeInstance> cubes;
     std::vector<ImportedInstance> imported;
     std::vector<LightInstance> lights;
+    std::vector<UiElement> ui;
     bool quit = false;
 };
 

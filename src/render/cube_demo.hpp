@@ -83,6 +83,9 @@ private:
     nvrhi::TextureHandle depth_;
     nvrhi::TextureHandle hdr_color_;
     nvrhi::TextureHandle ssao_color_;
+    nvrhi::TextureHandle ui_color_;
+    bool ui_uploaded_ = false;
+    bool ui_had_draws_ = false;
     nvrhi::GraphicsPipelineHandle pipeline_;
     nvrhi::GraphicsPipelineHandle pbr_pipeline_;
     nvrhi::GraphicsPipelineHandle tonemap_pipeline_;

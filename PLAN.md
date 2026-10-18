@@ -50,7 +50,7 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 
 **Phase 18 status (2026-10-18):** Source scenes and prefabs can declare a `physics` component after an unparented transform. Lua can add/read/remove it, set velocity or position, apply forces and impulses, inspect body state, raycast, overlap a sphere, and poll contact entry/exit events each fixed tick. Dynamic and kinematic body transforms update the render scene from Jolt; scene switches rebuild the physics world. The feature scene drives a falling cube through a trigger onto a solid floor, including invalid-call assertions. Core and Lua tests cover deterministic motion, queries, lifecycle, and contacts; Vulkan captures verify the cube visibly falls, and interactive startup verifies the source scene launches. A fuller game built on this API remains Phase 26.
 
-**Phase 19 progress (2026-10-18):** Deterministic named Lua timers now start, cancel, report remaining time, and emit one-shot/repeating events before `fixed_update`. The source-only timer fixture checks exact event ticks, cancellation, and invalid inputs. Versioned project-local save files now round-trip nested Lua state across fresh engine instances, with bounded decoding, invalid-input checks, and atomic replacement. Source-defined text/buttons/focus remain before Phase 19 is complete.
+**Phase 19 complete (2026-10-18):** Deterministic named Lua timers start, cancel, report remaining time, and emit one-shot/repeating events before `fixed_update`. Versioned project-local save files round-trip nested Lua state across fresh engine instances, with bounded decoding, invalid-input checks, and atomic replacement. Source-authored UI now draws rectangles, text, and focused buttons after tonemapping; Tab, Enter, and pointer clicks drive the menu. The source-only menu starts a game and saves/restores its visit count across fresh engine instances. Core, Lua, Vulkan capture, and interactive startup checks pass locally. The built-in font currently supports printable ASCII; richer typography is a future improvement.
 
 **Falling Blocks Lit visual follow-up (2026-10-17):** The game's previous 1.15-unit SSAO radius caused blocky halos around stacked and ghost pieces. The game now uses restrained SSAO plus directional shadow maps for actual colored tiles. Meshes expose a `casts_shadows` switch to source scenes and Lua; the game turns it off for HUD, border, and ghost cubes. A dropped-piece Vulkan capture checks that tile shadows remain visible without dark title or ghost artifacts. The feature scene checks the new Lua setting and invalid input.
 
@@ -110,7 +110,7 @@ Phases 3–18 are locally complete: the engine can display a 3D cube, run Lua-au
 | Rendering and assets | Mesh/glTF load, material and texture assignment, lights, environment HDRI, quality/exposure settings. |
 | Physics | Body/collider/trigger creation, forces and velocity, ray/shape queries, contact callbacks. |
 | Audio | Play, stop, volume, spatial source and listener. |
-| UI and game flow | Text, buttons, focus, timers, save/load. |
+| UI and game flow | Pixel-space rectangles/text, buttons, focus, viewport dimensions, timers, save/load. |
 | Testing | Start/reset a scene, inject input, step time, inspect entities/physics/UI, compare captures. |
 
 For each public call, add a runnable Lua example, invalid-input behavior, and an automated test in the feature scene. The editor must be able to author the same component values, while handwritten scripts can create or change them at runtime.

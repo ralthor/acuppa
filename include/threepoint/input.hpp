@@ -31,6 +31,7 @@ public:
     void bind(std::string action, InputDevice device, std::string control);
     void inject(const InputEvent& event);
     float action(std::string_view name) const;
+    float value(InputDevice device, std::string_view control) const;
     void set_pointer(double x, double y);
     std::pair<double, double> pointer() const { return {pointer_x_, pointer_y_}; }
 

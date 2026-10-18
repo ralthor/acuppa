@@ -91,7 +91,13 @@ struct LuaProject::Impl {
     static int timer_events(lua_State* lua);
     static int save(lua_State* lua);
     static int load(lua_State* lua);
+    static int ui_rect(lua_State* lua);
+    static int ui_text(lua_State* lua);
+    static int ui_button(lua_State* lua);
+    static int ui_focus(lua_State* lua);
+    static int viewport_size(lua_State* lua);
     void sync_physics();
+    void add_ui_element(UiElement element);
     static glm::vec3 vector_field(lua_State* lua, int table, const char* field,
                                   glm::vec3 fallback, bool positive);
     static glm::vec3 vector_arg(lua_State* lua, int index, bool positive);
@@ -125,6 +131,17 @@ struct LuaProject::Impl {
     struct Timer { double remaining; double interval; bool repeat; };
     std::map<std::string, Timer> timers;
     std::vector<std::string> expired_timers;
+    std::vector<std::string> previous_ui_buttons;
+    std::vector<std::string> current_ui_buttons;
+    std::string focused_ui_button;
+    bool ui_click_edge = false;
+    bool ui_enter_edge = false;
+    bool ui_tab_edge = false;
+    bool ui_activated = false;
+    bool ui_mouse_held = false;
+    bool ui_enter_held = false;
+    bool ui_tab_held = false;
+    bool drawing_ui = false;
     SceneFrame frame;
     World world;
     std::unique_ptr<PhysicsWorld> physics = std::make_unique<PhysicsWorld>();
@@ -507,6 +524,7 @@ SceneFrame LuaProject::Impl::snapshot() {
     scene.ssao_strength = frame.ssao_strength;
     scene.environment = frame.environment;
     scene.environment_intensity = frame.environment_intensity;
+    scene.ui = frame.ui;
     for (auto& instance : scene.imported) instance.asset = ensure_asset(instance.source);
     return scene;
 }
@@ -616,6 +634,10 @@ void LuaProject::Impl::load_scene(const std::string& name) {
     frame.ssao_strength = 2.0f;
     frame.environment.reset();
     frame.environment_intensity = 0.0f;
+    frame.ui.clear();
+    previous_ui_buttons.clear();
+    current_ui_buttons.clear();
+    focused_ui_button.clear();
     current_scene = name;
     timers.clear();
     expired_timers.clear();
@@ -782,6 +804,11 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("timer_events", &timer_events);
     add_function("save", &save);
     add_function("load", &load);
+    add_function("ui_rect", &ui_rect);
+    add_function("ui_text", &ui_text);
+    add_function("ui_button", &ui_button);
+    add_function("ui_focus", &ui_focus);
+    add_function("viewport_size", &viewport_size);
     return 1;
 }
 
@@ -1506,6 +1533,119 @@ int LuaProject::Impl::timer_events(lua_State* lua) {
     return 1;
 }
 
+namespace {
+
+float ui_number(lua_State* lua, int index, float low, float high) {
+    if (!lua_isnumber(lua, index)) throw std::invalid_argument("UI coordinate must be a number");
+    const double value = lua_tonumber(lua, index);
+    if (!std::isfinite(value) || value < low || value > high)
+        throw std::invalid_argument("UI number is outside its valid range");
+    return float(value);
+}
+
+std::string ui_label(lua_State* lua, int index, size_t maximum) {
+    if (lua_type(lua, index) != LUA_TSTRING)
+        throw std::invalid_argument("UI label must be a string");
+    size_t length = 0;
+    const char* chars = lua_tolstring(lua, index, &length);
+    if (length == 0 || length > maximum ||
+        !std::all_of(chars, chars + length, [](unsigned char c) {
+            return c >= 32 && c <= 126;
+        })) throw std::invalid_argument("UI label must contain printable ASCII within length limit");
+    return {chars, length};
+}
+
+}  // namespace
+
+void LuaProject::Impl::add_ui_element(UiElement element) {
+    if (!drawing_ui) throw std::invalid_argument("UI drawing is available only in draw()");
+    if (frame.ui.size() >= 256) throw std::runtime_error("UI element limit reached");
+    frame.ui.push_back(std::move(element));
+}
+
+int LuaProject::Impl::ui_rect(lua_State* lua) {
+    if (lua_gettop(lua) != 8)
+        return luaL_error(lua, "ui_rect() expects x, y, width, height, r, g, b, a");
+    try {
+        UiElement element;
+        element.x = ui_number(lua, 1, -8192, 8192);
+        element.y = ui_number(lua, 2, -8192, 8192);
+        element.width = ui_number(lua, 3, 1, 8192);
+        element.height = ui_number(lua, 4, 1, 8192);
+        element.red = uint8_t(std::round(ui_number(lua, 5, 0, 1) * 255));
+        element.green = uint8_t(std::round(ui_number(lua, 6, 0, 1) * 255));
+        element.blue = uint8_t(std::round(ui_number(lua, 7, 0, 1) * 255));
+        element.alpha = uint8_t(std::round(ui_number(lua, 8, 0, 1) * 255));
+        context(lua).add_ui_element(std::move(element));
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::ui_text(lua_State* lua) {
+    if (lua_gettop(lua) != 4)
+        return luaL_error(lua, "ui_text() expects x, y, text, scale");
+    try {
+        UiElement element;
+        element.type = UiElement::Type::Text;
+        element.x = ui_number(lua, 1, -8192, 8192);
+        element.y = ui_number(lua, 2, -8192, 8192);
+        element.text = ui_label(lua, 3, 256);
+        element.scale = ui_number(lua, 4, 1, 8);
+        context(lua).add_ui_element(std::move(element));
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::ui_button(lua_State* lua) {
+    if (lua_gettop(lua) != 6)
+        return luaL_error(lua, "ui_button() expects id, x, y, width, height, label");
+    try {
+        auto& state = context(lua);
+        const std::string id = ui_label(lua, 1, 64);
+        if (std::find(state.current_ui_buttons.begin(), state.current_ui_buttons.end(), id) !=
+            state.current_ui_buttons.end()) throw std::invalid_argument("duplicate UI button id");
+        UiElement element;
+        element.type = UiElement::Type::Button;
+        element.x = ui_number(lua, 2, -8192, 8192);
+        element.y = ui_number(lua, 3, -8192, 8192);
+        element.width = ui_number(lua, 4, 1, 8192);
+        element.height = ui_number(lua, 5, 1, 8192);
+        element.text = ui_label(lua, 6, 256);
+        element.scale = 2;
+        if (state.focused_ui_button.empty()) state.focused_ui_button = id;
+        const auto [px, py] = state.input.pointer();
+        const bool clicked = !state.ui_activated && state.ui_click_edge && px >= element.x &&
+            py >= element.y && px < element.x + element.width &&
+            py < element.y + element.height;
+        if (clicked) state.focused_ui_button = id;
+        const bool activated = clicked || (!state.ui_activated && state.ui_enter_edge &&
+                                         state.focused_ui_button == id);
+        state.ui_activated |= activated;
+        element.focused = state.focused_ui_button == id;
+        state.add_ui_element(std::move(element));
+        state.current_ui_buttons.push_back(id);
+        lua_pushboolean(lua, activated);
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 1;
+}
+
+int LuaProject::Impl::ui_focus(lua_State* lua) {
+    if (lua_gettop(lua) > 1) return luaL_error(lua, "ui_focus() expects zero or one button id");
+    try {
+        auto& state = context(lua);
+        if (lua_gettop(lua) == 1) state.focused_ui_button = ui_label(lua, 1, 64);
+        lua_pushstring(lua, state.focused_ui_button.c_str());
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 1;
+}
+
+int LuaProject::Impl::viewport_size(lua_State* lua) {
+    if (lua_gettop(lua) != 0) return luaL_error(lua, "viewport_size() expects no arguments");
+    lua_pushinteger(lua, context(lua).width);
+    lua_pushinteger(lua, context(lua).height);
+    return 2;
+}
+
 int LuaProject::Impl::save(lua_State* lua) {
     if (lua_gettop(lua) != 2) return luaL_error(lua, "save() expects slot and value");
     if (lua_type(lua, 1) != LUA_TSTRING) return luaL_error(lua, "save slot must be a string");
@@ -1586,11 +1726,36 @@ SceneFrame LuaProject::Impl::step(double dt) {
         sync_scripts();
         call_entity_scripts(&ScriptRefs::update, "update", dt, true);
     }
+    frame.ui.clear();
+    current_ui_buttons.clear();
+    const bool mouse = input.value(InputDevice::MouseButton, "left") > 0;
+    const bool enter = input.value(InputDevice::Keyboard, "enter") > 0;
+    const bool tab = input.value(InputDevice::Keyboard, "tab") > 0;
+    ui_click_edge = mouse && !ui_mouse_held;
+    ui_enter_edge = enter && !ui_enter_held;
+    ui_tab_edge = tab && !ui_tab_held;
+    ui_activated = false;
+    ui_mouse_held = mouse;
+    ui_enter_held = enter;
+    ui_tab_held = tab;
+    if (ui_tab_edge && !previous_ui_buttons.empty()) {
+        const auto found = std::find(previous_ui_buttons.begin(), previous_ui_buttons.end(),
+                                     focused_ui_button);
+        const size_t next = found == previous_ui_buttons.end() ? 0 :
+            (size_t(found - previous_ui_buttons.begin()) + 1) % previous_ui_buttons.size();
+        focused_ui_button = previous_ui_buttons[next];
+    }
+    drawing_ui = true;
     if (!wants_quit && !pending_scene) call(draw_ref, "draw", 0.0, false);
     if (!wants_quit && !pending_scene) {
         sync_scripts();
         call_entity_scripts(&ScriptRefs::draw, "draw", 0.0, false);
     }
+    drawing_ui = false;
+    if (!current_ui_buttons.empty() &&
+        std::find(current_ui_buttons.begin(), current_ui_buttons.end(), focused_ui_button) ==
+            current_ui_buttons.end()) focused_ui_button = current_ui_buttons.front();
+    previous_ui_buttons = current_ui_buttons;
     if (pending_scene && !wants_quit) {
         const std::string next = *pending_scene;
         pending_scene.reset();
