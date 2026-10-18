@@ -105,7 +105,7 @@ add_custom_command(OUTPUT "${shader_header}"
 list(APPEND THREEPOINT_SHADER_HEADERS "${shader_header}")
 
 add_library(threepoint_core STATIC src/core/project.cpp src/core/scene_document.cpp
-            src/core/editor_gizmo.cpp
+            src/core/editor_gizmo.cpp src/core/editor_viewport.cpp
             src/core/camera.cpp src/core/input.cpp
             src/core/ui_canvas.cpp
             src/core/world.cpp src/core/physics_world.cpp src/core/save_data.cpp
@@ -128,11 +128,16 @@ target_link_libraries(threepoint PRIVATE threepoint_core threepoint_render)
 
 add_executable(threepoint_editor src/editor/main.cpp)
 set_target_properties(threepoint_editor PROPERTIES OUTPUT_NAME threepoint-editor)
-target_link_libraries(threepoint_editor PRIVATE threepoint_core)
+target_link_libraries(threepoint_editor PRIVATE threepoint_core threepoint_render)
 
 include(CTest)
 option(THREEPOINT_ENABLE_GPU_TESTS "Run live Vulkan display checks" OFF)
 if(BUILD_TESTING)
+  add_executable(threepoint_editor_viewport_test tests/editor_viewport_test.cpp)
+  target_link_libraries(threepoint_editor_viewport_test PRIVATE threepoint_core)
+  add_test(NAME editor_viewport_drag COMMAND threepoint_editor_viewport_test
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene"
+           "${PROJECT_BINARY_DIR}/editor_viewport_fixture")
   add_executable(threepoint_editor_gizmo_test tests/editor_gizmo_test.cpp)
   target_link_libraries(threepoint_editor_gizmo_test PRIVATE threepoint_core)
   add_test(NAME editor_gizmo_math COMMAND threepoint_editor_gizmo_test)
@@ -286,6 +291,13 @@ if(BUILD_TESTING)
     add_test(NAME ui_menu_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene" "menu")
+    add_test(NAME editor_viewport_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/editor_viewport_capture_test.py"
+             $<TARGET_FILE:threepoint_editor> "${PROJECT_SOURCE_DIR}/tests/feature_scene"
+             "${PROJECT_BINARY_DIR}")
+    add_test(NAME editor_viewport_live_startup COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/editor_viewport_live_test.py"
+             $<TARGET_FILE:threepoint_editor> "${PROJECT_SOURCE_DIR}/tests/feature_scene")
     add_test(NAME shadow_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:threepoint>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene" "shadow")

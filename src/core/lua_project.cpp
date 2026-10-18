@@ -31,7 +31,7 @@ namespace fs = std::filesystem;
 
 struct LuaProject::Impl {
     struct ScriptRefs;
-    explicit Impl(const fs::path& directory, const std::string& initial_scene);
+    explicit Impl(const fs::path& directory, const std::string& initial_scene, Mode selected_mode);
     ~Impl() { if (lua) lua_close(lua); }
 
     SceneFrame step(double dt);
@@ -103,6 +103,7 @@ struct LuaProject::Impl {
     static glm::vec3 vector_arg(lua_State* lua, int index, bool positive);
 
     fs::path root;
+    Mode mode = Mode::Game;
     lua_State* lua = nullptr;
     uint32_t width = 960;
     uint32_t height = 540;
@@ -367,7 +368,8 @@ void push_saved(lua_State* lua, const SaveValue& value) {
 
 }  // namespace
 
-LuaProject::Impl::Impl(const fs::path& directory, const std::string& initial_scene) {
+LuaProject::Impl::Impl(const fs::path& directory, const std::string& initial_scene,
+                       Mode selected_mode) : mode(selected_mode) {
     const auto paths = require_project(directory);
     root = fs::canonical(paths.root);
     lua = luaL_newstate();
@@ -682,6 +684,10 @@ void LuaProject::Impl::load_scene(const std::string& name) {
     lua_pop(lua, 1);
     const std::string script_path = checked_string(lua, -1, "script");
     lua_pop(lua, 1);
+    if (mode == Mode::EditorPreview) {
+        project_file(script_path); // Validate the declared script path without executing it.
+        return;
+    }
     load_table(project_file(script_path));
     start_ref = callback_ref(lua, "start", true);
     fixed_ref = callback_ref(lua, "fixed_update", true);
@@ -1688,6 +1694,7 @@ SceneFrame LuaProject::Impl::step(double dt) {
     if (!std::isfinite(dt) || dt < 0.0 || dt > 0.25) {
         throw std::invalid_argument("frame delta must be finite and between 0 and 0.25 seconds");
     }
+    if (mode == Mode::EditorPreview) return snapshot();
     if (wants_quit) {
         SceneFrame scene = snapshot();
         scene.quit = true;
@@ -1766,8 +1773,8 @@ SceneFrame LuaProject::Impl::step(double dt) {
     return scene;
 }
 
-LuaProject::LuaProject(const fs::path& root, std::string initial_scene)
-    : impl_(std::make_unique<Impl>(root, initial_scene)) {}
+LuaProject::LuaProject(const fs::path& root, std::string initial_scene, Mode mode)
+    : impl_(std::make_unique<Impl>(root, initial_scene, mode)) {}
 LuaProject::~LuaProject() = default;
 uint32_t LuaProject::width() const { return impl_->width; }
 uint32_t LuaProject::height() const { return impl_->height; }

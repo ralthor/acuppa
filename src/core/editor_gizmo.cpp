@@ -120,7 +120,7 @@ std::optional<GizmoAxis> pick_gizmo_axis(const PerspectiveCamera& camera,
     std::optional<GizmoAxis> best;
     for (GizmoAxis axis : {GizmoAxis::X, GizmoAxis::Y, GizmoAxis::Z}) {
         const auto endpoint = project_to_screen(camera, width, height,
-                                                pivot + direction(axis) * 1.2f);
+                                                pivot + direction(axis) * 2.2f);
         if (!endpoint) continue;
         const glm::vec2 segment = *endpoint - *center;
         const float length_squared = glm::dot(segment, segment);

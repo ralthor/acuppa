@@ -1,8 +1,12 @@
 #include "threepoint/project.hpp"
 #include "threepoint/scene_document.hpp"
+#include "threepoint/editor_viewport.hpp"
+#include "threepoint/preview.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <set>
 #include <string>
@@ -44,6 +48,8 @@ void usage() {
               << "  threepoint-editor inspect <project> <scene> <entity>\n"
               << "  threepoint-editor add <project> <scene> <entity>\n"
               << "  threepoint-editor set <project> <scene> <entity> <component> <field> <Lua value>\n";
+    std::cerr << "  threepoint-editor viewport <project> <scene> [--select <entity>]"
+                 " [--frames <count> --capture <ppm-file>]\n";
 }
 
 }  // namespace
@@ -61,6 +67,49 @@ int main(int argc, char* argv[]) {
         }
         if (argc >= 4) {
             const std::string_view command = argv[1];
+            if (command == "viewport") {
+                threepoint::EditorViewport viewport(argv[2], argv[3]);
+                uint32_t frames = 0;
+                std::filesystem::path capture;
+                std::string selected;
+                for (int i = 4; i < argc; ++i) {
+                    const std::string_view option = argv[i];
+                    if (option == "--select" && i + 1 < argc && selected.empty()) {
+                        selected = argv[++i];
+                    } else if (option == "--frames" && i + 1 < argc && frames == 0) {
+                        const std::string value = argv[++i];
+                        unsigned parsed = 0;
+                        const auto result = std::from_chars(value.data(), value.data() + value.size(),
+                                                             parsed);
+                        if (result.ec != std::errc{} ||
+                            result.ptr != value.data() + value.size() ||
+                            parsed == 0 || parsed > 100000)
+                            throw std::invalid_argument("--frames must be from 1 to 100000");
+                        frames = parsed;
+                    } else if (option == "--capture" && i + 1 < argc && capture.empty()) {
+                        capture = argv[++i];
+                    } else throw std::invalid_argument("unknown or repeated viewport option");
+                }
+                if (!capture.empty() && frames == 0)
+                    throw std::invalid_argument("--capture requires --frames");
+                if (!selected.empty()) viewport.select(selected);
+                threepoint::PreviewOptions options;
+                options.scene = threepoint::PreviewOptions::Scene::Project;
+                options.width = viewport.width();
+                options.height = viewport.height();
+                options.frame_limit = frames;
+                options.capture_frame = frames == 0 ? 1 : frames;
+                options.capture_path = capture;
+                options.on_frame = [&](double) { return viewport.frame(); };
+                options.on_input = [&](const threepoint::InputEvent& event) { viewport.input(event); };
+                options.on_pointer = [&](double x, double y) { viewport.pointer(x, y); };
+                options.on_resize = [&](uint32_t width, uint32_t height) {
+                    viewport.resize(width, height);
+                };
+                const auto result = threepoint::run_preview(options);
+                std::cout << "Editor viewport rendered " << result.frames << " frames\n";
+                return result.frames == frames || frames == 0 ? 0 : 1;
+            }
             if ((command == "tree" && argc == 4) ||
                 ((command == "inspect" || command == "add") && argc == 5) ||
                 (command == "set" && argc == 8)) {

@@ -49,6 +49,15 @@ int main(int argc, char* argv[]) {
         expect(frame.cubes.size() == 2 && frame.cubes[1].position.x == 2,
                "editor-saved scene did not run identically from source");
     }
+    {
+        threepoint::LuaProject preview(work, "main", threepoint::LuaProject::Mode::EditorPreview);
+        expect(preview.step(0.2).cubes.empty(),
+               "editor preview executed a gameplay start callback");
+        threepoint::LuaProject static_scene(work, "editor",
+                                            threepoint::LuaProject::Mode::EditorPreview);
+        expect(static_scene.step(0.2).cubes.size() == 2,
+               "editor preview omitted authored scene geometry");
+    }
     bool rejected = false;
     try { threepoint::SceneDocument dynamic(work, "shadow"); }
     catch (const std::runtime_error&) { rejected = true; }
