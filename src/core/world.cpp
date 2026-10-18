@@ -66,6 +66,8 @@ void World::set_transform(EntityId id, const TransformComponent& value) {
         throw std::invalid_argument("transform position/rotation must be finite and scale positive");
     }
     require(id);
+    if (require(id).physics && value.parent)
+        throw std::invalid_argument("physics transform cannot have a parent");
     if (value.parent) {
         if (!exists(*value.parent) || *value.parent == id) {
             throw std::invalid_argument("transform parent must be another live entity");
@@ -131,13 +133,27 @@ void World::set_script(EntityId id, const ScriptComponent& value) {
     require(id).script = value;
 }
 
+void World::set_physics(EntityId id, const PhysicsComponent& value) {
+    if (!finite(value.half_extents) || value.half_extents.x <= 0.0f ||
+        value.half_extents.y <= 0.0f || value.half_extents.z <= 0.0f ||
+        !std::isfinite(value.radius) || value.radius <= 0.0f || !finite(value.velocity))
+        throw std::invalid_argument("physics collider dimensions must be finite and positive");
+    Entity& entity = require(id);
+    if (!entity.transform || entity.transform->parent)
+        throw std::invalid_argument("physics component requires an unparented transform");
+    entity.physics = value;
+}
+
 std::optional<TransformComponent> World::transform(EntityId id) const { return require(id).transform; }
 std::optional<CameraComponent> World::camera(EntityId id) const { return require(id).camera; }
 std::optional<LightComponent> World::light(EntityId id) const { return require(id).light; }
 std::optional<MeshComponent> World::mesh(EntityId id) const { return require(id).mesh; }
 std::optional<ScriptComponent> World::script(EntityId id) const { return require(id).script; }
+std::optional<PhysicsComponent> World::physics(EntityId id) const { return require(id).physics; }
 
 bool World::remove_transform(EntityId id) {
+    if (require(id).physics)
+        throw std::invalid_argument("remove physics before removing its transform");
     auto& component = require(id).transform;
     const bool removed = component.has_value();
     component.reset();
@@ -170,6 +186,12 @@ bool World::remove_mesh(EntityId id) {
 }
 bool World::remove_script(EntityId id) {
     auto& component = require(id).script;
+    const bool removed = component.has_value();
+    component.reset();
+    return removed;
+}
+bool World::remove_physics(EntityId id) {
+    auto& component = require(id).physics;
     const bool removed = component.has_value();
     component.reset();
     return removed;

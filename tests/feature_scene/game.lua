@@ -16,7 +16,8 @@ return {
             shadow_point_off = "scenes/shadow.scene.lua",
             shadow_point_second = "scenes/shadow.scene.lua",
             ssao = "scenes/ssao.scene.lua", ssao_off = "scenes/ssao.scene.lua",
-            ssao_low = "scenes/ssao.scene.lua", ssao_shift = "scenes/ssao.scene.lua"},
+            ssao_low = "scenes/ssao.scene.lua", ssao_shift = "scenes/ssao.scene.lua",
+            physics = "scenes/physics.scene.lua"},
   prefabs = {probe = "prefabs/probe.prefab.lua"},
   input = {
     turn = {keyboard = "space", gamepad_button = "a"},

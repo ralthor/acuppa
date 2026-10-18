@@ -69,11 +69,18 @@ int main() {
     trigger_world.add(sensor);
     trigger_world.add(ball);
     bool entered = false;
+    bool exited = false;
     for (int i = 0; i < 90; ++i) {
         trigger_world.step();
-        entered |= touched(trigger_world, 2, 3, true);
+        for (const auto& contact : trigger_world.contacts()) {
+            if (contact.trigger && contact.first == 2 && contact.second == 3) {
+                entered |= contact.began;
+                exited |= !contact.began;
+            }
+        }
     }
     expect(entered, "trigger entry was not reported");
+    expect(exited, "trigger exit was not reported");
     expect(trigger_world.state(2)->position.y < -4.0f,
            "trigger incorrectly stopped the falling ball");
 
@@ -99,6 +106,35 @@ int main() {
            std::abs(kinematic_world.state(7)->position.y) < 0.01f,
            "kinematic body did not follow its velocity without gravity");
 
+    const auto ray = world.raycast({2, 5, 0}, {0, -1, 0}, 10);
+    expect(!ray || ray->id != 4, "raycast found a removed body");
+    const auto floor_ray = world.raycast({3, 5, 0}, {0, -1, 0}, 10);
+    expect(floor_ray && floor_ray->id == 1 &&
+           std::abs(floor_ray->position.y) < 0.05f,
+           "raycast did not find the floor surface");
+    expect(world.overlap_sphere({0, 0.5f, 0}, 0.6f).size() >= 1,
+           "sphere overlap did not find the resting body");
+    expect(!world.raycast({0, 5, 0}, {0, 1, 0}, 2),
+           "raycast reported a hit in empty space");
+
+    PhysicsWorld driven;
+    ball.id = 8;
+    ball.position = {0, 1, 0};
+    driven.add(ball);
+    driven.set_velocity(8, {1, 0, 0});
+    driven.apply_force(8, {0, 20, 0});
+    driven.apply_impulse(8, {0, 1000, 0});
+    driven.step();
+    expect(driven.state(8)->position.x > 0 && driven.state(8)->velocity.y > 0,
+           "velocity, force, or impulse did not affect a dynamic body");
+    driven.move(8, {2, 3, 0});
+    expect(std::abs(driven.state(8)->position.x - 2) < 0.001f,
+           "moving a body did not update its position");
+    rejects([&] { driven.apply_force(999, {0, 1, 0}); }, "unknown force target accepted");
+    rejects([&] { driven.raycast({0, 0, 0}, {0, 0, 0}, 1); }, "zero ray accepted");
+    rejects([&] { driven.overlap_sphere({0, 0, 0}, 0); }, "zero overlap radius accepted");
+
+    ball.id = 2;
     rejects([&] { world.add(ball); }, "duplicate body ID accepted");
     ball.id = 0;
     rejects([&] { world.add(ball); }, "zero body ID accepted");

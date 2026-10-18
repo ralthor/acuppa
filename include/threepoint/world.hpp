@@ -1,6 +1,7 @@
 #pragma once
 
 #include "threepoint/scene_frame.hpp"
+#include "threepoint/physics_world.hpp"
 
 #include <cstdint>
 #include <map>
@@ -45,6 +46,15 @@ struct ScriptComponent {
     bool enabled = true;
 };
 
+struct PhysicsComponent {
+    PhysicsMotion motion = PhysicsMotion::Static;
+    ColliderShape shape = ColliderShape::Box;
+    glm::vec3 half_extents{0.5f};
+    float radius = 0.5f;
+    glm::vec3 velocity{0.0f};
+    bool trigger = false;
+};
+
 class World {
 public:
     EntityId create(std::string name = {});
@@ -59,18 +69,21 @@ public:
     void set_light(EntityId id, const LightComponent& value);
     void set_mesh(EntityId id, const MeshComponent& value);
     void set_script(EntityId id, const ScriptComponent& value);
+    void set_physics(EntityId id, const PhysicsComponent& value);
 
     std::optional<TransformComponent> transform(EntityId id) const;
     std::optional<CameraComponent> camera(EntityId id) const;
     std::optional<LightComponent> light(EntityId id) const;
     std::optional<MeshComponent> mesh(EntityId id) const;
     std::optional<ScriptComponent> script(EntityId id) const;
+    std::optional<PhysicsComponent> physics(EntityId id) const;
 
     bool remove_transform(EntityId id);
     bool remove_camera(EntityId id);
     bool remove_light(EntityId id);
     bool remove_mesh(EntityId id);
     bool remove_script(EntityId id);
+    bool remove_physics(EntityId id);
 
     std::optional<EntityId> active_camera() const;
     SceneFrame snapshot(const PerspectiveCamera& fallback_camera) const;
@@ -83,6 +96,7 @@ private:
         std::optional<LightComponent> light;
         std::optional<MeshComponent> mesh;
         std::optional<ScriptComponent> script;
+        std::optional<PhysicsComponent> physics;
     };
     Entity& require(EntityId id);
     const Entity& require(EntityId id) const;

@@ -1,7 +1,11 @@
 #include "threepoint/lua_project.hpp"
 
 #include "threepoint/project.hpp"
+#include "threepoint/physics_world.hpp"
 #include "threepoint/world.hpp"
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/euler_angles.hpp>
 
 extern "C" {
 #include <lauxlib.h>
@@ -70,6 +74,15 @@ struct LuaProject::Impl {
     static int scene_name(lua_State* lua);
     static int scene_switch(lua_State* lua);
     static int scene_reload(lua_State* lua);
+    static int physics_state(lua_State* lua);
+    static int physics_set_velocity(lua_State* lua);
+    static int physics_move(lua_State* lua);
+    static int physics_apply_force(lua_State* lua);
+    static int physics_apply_impulse(lua_State* lua);
+    static int physics_raycast(lua_State* lua);
+    static int physics_overlap_sphere(lua_State* lua);
+    static int physics_contacts(lua_State* lua);
+    void sync_physics();
     static glm::vec3 vector_field(lua_State* lua, int table, const char* field,
                                   glm::vec3 fallback, bool positive);
     static glm::vec3 vector_arg(lua_State* lua, int index, bool positive);
@@ -102,6 +115,7 @@ struct LuaProject::Impl {
     std::optional<std::string> pending_scene;
     SceneFrame frame;
     World world;
+    std::unique_ptr<PhysicsWorld> physics = std::make_unique<PhysicsWorld>();
     InputState input;
 };
 
@@ -197,12 +211,33 @@ void validate_entity_fields(lua_State* lua, int table) {
         const char* field = lua_tostring(lua, -2);
         bool known = false;
         for (const char* candidate : {"name", "prefab", "transform", "camera",
-                                      "light", "mesh", "script"}) {
+                                      "light", "mesh", "script", "physics"}) {
             if (std::strcmp(field, candidate) == 0) { known = true; break; }
         }
         if (!known) throw std::runtime_error("unknown entity field: " + std::string(field));
         lua_pop(lua, 1);
     }
+}
+
+glm::quat physics_rotation(glm::vec3 angles) {
+    return glm::angleAxis(angles.y, glm::vec3(0, 1, 0)) *
+           glm::angleAxis(angles.x, glm::vec3(1, 0, 0)) *
+           glm::angleAxis(angles.z, glm::vec3(0, 0, 1));
+}
+
+PhysicsBodyDesc physics_desc(EntityId id, const PhysicsComponent& component,
+                             const TransformComponent& transform, glm::vec3 velocity) {
+    PhysicsBodyDesc desc;
+    desc.id = id;
+    desc.motion = component.motion;
+    desc.shape = component.shape;
+    desc.position = transform.position;
+    desc.rotation = physics_rotation(transform.rotation);
+    desc.half_extents = component.half_extents;
+    desc.radius = component.radius;
+    desc.trigger = component.trigger;
+    desc.velocity = velocity;
+    return desc;
 }
 
 }  // namespace
@@ -410,7 +445,7 @@ void LuaProject::Impl::apply_components(EntityId id, int table,
         world.set_name(id, lua_tostring(lua, -1));
     }
     lua_pop(lua, 1);
-    for (const char* kind : {"transform", "camera", "light", "mesh", "script"}) {
+    for (const char* kind : {"transform", "camera", "light", "mesh", "script", "physics"}) {
         lua_getfield(lua, table, kind);
         if (lua_isnil(lua, -1)) { lua_pop(lua, 1); continue; }
         if (!lua_istable(lua, -1))
@@ -454,6 +489,7 @@ EntityId LuaProject::Impl::instantiate(int table,
     try {
         apply_components(id, table, names);
     } catch (...) {
+        physics->remove(id);
         world.destroy(id);
         throw;
     }
@@ -465,6 +501,7 @@ void LuaProject::Impl::load_scene(const std::string& name) {
     if (found == scenes.end()) throw std::runtime_error("unknown scene: " + name);
     clear_callbacks();
     world = World{};
+    physics = std::make_unique<PhysicsWorld>();
     frame.exposure = 1.0f;
     frame.ssao_quality = 0;
     frame.ssao_radius = 0.35f;
@@ -621,6 +658,14 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("scene_name", &scene_name);
     add_function("scene_switch", &scene_switch);
     add_function("scene_reload", &scene_reload);
+    add_function("physics_state", &physics_state);
+    add_function("physics_set_velocity", &physics_set_velocity);
+    add_function("physics_move", &physics_move);
+    add_function("physics_apply_force", &physics_apply_force);
+    add_function("physics_apply_impulse", &physics_apply_impulse);
+    add_function("physics_raycast", &physics_raycast);
+    add_function("physics_overlap_sphere", &physics_overlap_sphere);
+    add_function("physics_contacts", &physics_contacts);
     return 1;
 }
 
@@ -858,7 +903,11 @@ int LuaProject::Impl::entity_create(lua_State* lua) {
 int LuaProject::Impl::entity_destroy(lua_State* lua) {
     if (lua_gettop(lua) != 1) return luaL_error(lua, "entity_destroy() expects an ID");
     const EntityId id = checked_id(lua, 1);
-    try { context(lua).world.destroy(id); }
+    try {
+        Impl& state = context(lua);
+        state.world.destroy(id);
+        state.physics->remove(id);
+    }
     catch (const std::invalid_argument& error) { return luaL_error(lua, "%s", error.what()); }
     return 0;
 }
@@ -909,6 +958,8 @@ int LuaProject::Impl::component_set(lua_State* lua) {
             }
             lua_pop(lua, 1);
             state.world.set_transform(id, value);
+            if (state.world.physics(id))
+                state.physics->set_pose(id, value.position, physics_rotation(value.rotation));
         } else if (std::strcmp(kind, "camera") == 0) {
             CameraComponent value = state.world.camera(id).value_or(CameraComponent{});
             value.camera.eye = vector_field(lua, 3, "eye", value.camera.eye, false);
@@ -968,6 +1019,57 @@ int LuaProject::Impl::component_set(lua_State* lua) {
             }
             lua_pop(lua, 1);
             state.world.set_script(id, value);
+        } else if (std::strcmp(kind, "physics") == 0) {
+            PhysicsComponent value = state.world.physics(id).value_or(PhysicsComponent{});
+            lua_getfield(lua, 3, "motion");
+            if (!lua_isnil(lua, -1)) {
+                if (lua_type(lua, -1) != LUA_TSTRING)
+                    throw std::invalid_argument("physics.motion must be a string");
+                const char* motion = lua_tostring(lua, -1);
+                if (std::strcmp(motion, "static") == 0) value.motion = PhysicsMotion::Static;
+                else if (std::strcmp(motion, "dynamic") == 0) value.motion = PhysicsMotion::Dynamic;
+                else if (std::strcmp(motion, "kinematic") == 0) value.motion = PhysicsMotion::Kinematic;
+                else throw std::invalid_argument("physics.motion must be static, dynamic, or kinematic");
+            }
+            lua_pop(lua, 1);
+            lua_getfield(lua, 3, "shape");
+            if (!lua_isnil(lua, -1)) {
+                if (lua_type(lua, -1) != LUA_TSTRING)
+                    throw std::invalid_argument("physics.shape must be a string");
+                const char* shape = lua_tostring(lua, -1);
+                if (std::strcmp(shape, "box") == 0) value.shape = ColliderShape::Box;
+                else if (std::strcmp(shape, "sphere") == 0) value.shape = ColliderShape::Sphere;
+                else throw std::invalid_argument("physics.shape must be box or sphere");
+            }
+            lua_pop(lua, 1);
+            value.half_extents = vector_field(lua, 3, "half_extents", value.half_extents, true);
+            value.radius = optional_number(lua, 3, "radius", value.radius, "physics");
+            value.velocity = vector_field(lua, 3, "velocity", value.velocity, false);
+            value.trigger = optional_boolean(lua, 3, "trigger", value.trigger);
+            const auto transform = state.world.transform(id);
+            if (!transform || transform->parent)
+                throw std::invalid_argument("physics component requires an unparented transform");
+            const auto previous = state.world.physics(id);
+            const auto old_state = state.physics->state(id);
+            lua_getfield(lua, 3, "velocity");
+            const bool supplied_velocity = !lua_isnil(lua, -1);
+            lua_pop(lua, 1);
+            const glm::vec3 velocity = supplied_velocity ? value.velocity :
+                old_state && value.motion != PhysicsMotion::Static ? old_state->velocity :
+                value.velocity;
+            state.world.set_physics(id, value);
+            state.physics->remove(id);
+            try {
+                state.physics->add(physics_desc(id, value, *transform, velocity));
+            } catch (...) {
+                state.world.remove_physics(id);
+                if (previous) {
+                    state.world.set_physics(id, *previous);
+                    state.physics->add(physics_desc(id, *previous, *transform,
+                        old_state ? old_state->velocity : glm::vec3(0.0f)));
+                }
+                throw;
+            }
         } else {
             throw std::invalid_argument(std::string("unknown component kind: ") + kind);
         }
@@ -1029,6 +1131,21 @@ int LuaProject::Impl::component_get(lua_State* lua) {
             lua_createtable(lua, 0, 2);
             lua_pushstring(lua, value->path.c_str()); lua_setfield(lua, -2, "path");
             lua_pushboolean(lua, value->enabled); lua_setfield(lua, -2, "enabled");
+        } else if (std::strcmp(kind, "physics") == 0) {
+            const auto value = world.physics(id);
+            if (!value) { lua_pushnil(lua); return 1; }
+            lua_createtable(lua, 0, 6);
+            const char* motion = value->motion == PhysicsMotion::Static ? "static" :
+                value->motion == PhysicsMotion::Dynamic ? "dynamic" : "kinematic";
+            lua_pushstring(lua, motion); lua_setfield(lua, -2, "motion");
+            lua_pushstring(lua, value->shape == ColliderShape::Box ? "box" : "sphere");
+            lua_setfield(lua, -2, "shape");
+            push_vec3(lua, value->half_extents); lua_setfield(lua, -2, "half_extents");
+            lua_pushnumber(lua, value->radius); lua_setfield(lua, -2, "radius");
+            const auto body = context(lua).physics->state(id);
+            push_vec3(lua, body ? body->velocity : value->velocity);
+            lua_setfield(lua, -2, "velocity");
+            lua_pushboolean(lua, value->trigger); lua_setfield(lua, -2, "trigger");
         } else {
             return luaL_error(lua, "unknown component kind: %s", kind);
         }
@@ -1042,7 +1159,8 @@ int LuaProject::Impl::component_remove(lua_State* lua) {
     if (lua_gettop(lua) != 2) return luaL_error(lua, "component_remove() expects ID and kind");
     const EntityId id = checked_id(lua, 1);
     const char* kind = luaL_checkstring(lua, 2);
-    World& world = context(lua).world;
+    Impl& state = context(lua);
+    World& world = state.world;
     bool removed = false;
     try {
         if (std::strcmp(kind, "transform") == 0) removed = world.remove_transform(id);
@@ -1050,6 +1168,10 @@ int LuaProject::Impl::component_remove(lua_State* lua) {
         else if (std::strcmp(kind, "light") == 0) removed = world.remove_light(id);
         else if (std::strcmp(kind, "mesh") == 0) removed = world.remove_mesh(id);
         else if (std::strcmp(kind, "script") == 0) removed = world.remove_script(id);
+        else if (std::strcmp(kind, "physics") == 0) {
+            removed = world.remove_physics(id);
+            state.physics->remove(id);
+        }
         else return luaL_error(lua, "unknown component kind: %s", kind);
     } catch (const std::invalid_argument& error) {
         return luaL_error(lua, "%s", error.what());
@@ -1090,7 +1212,10 @@ int LuaProject::Impl::prefab_spawn(lua_State* lua) {
         lua_pushinteger(lua, lua_Integer(id));
         return 1;
     } catch (const std::exception& error) {
-        if (id && state.world.exists(id)) state.world.destroy(id);
+        if (id && state.world.exists(id)) {
+            state.physics->remove(id);
+            state.world.destroy(id);
+        }
         lua_pushstring(lua, error.what());
     }
     return lua_error(lua);
@@ -1119,6 +1244,114 @@ int LuaProject::Impl::scene_reload(lua_State* lua) {
     return 0;
 }
 
+int LuaProject::Impl::physics_state(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "physics_state() expects an ID");
+    const auto body = context(lua).physics->state(checked_id(lua, 1));
+    if (!body) { lua_pushnil(lua); return 1; }
+    lua_createtable(lua, 0, 4);
+    push_vec3(lua, body->position); lua_setfield(lua, -2, "position");
+    push_vec3(lua, context(lua).world.transform(checked_id(lua, 1))->rotation);
+    lua_setfield(lua, -2, "rotation");
+    push_vec3(lua, body->velocity); lua_setfield(lua, -2, "velocity");
+    lua_pushboolean(lua, body->active); lua_setfield(lua, -2, "active");
+    return 1;
+}
+
+int LuaProject::Impl::physics_set_velocity(lua_State* lua) {
+    if (lua_gettop(lua) != 2) return luaL_error(lua, "physics_set_velocity() expects ID and vector");
+    try { context(lua).physics->set_velocity(checked_id(lua, 1), vector_arg(lua, 2, false)); }
+    catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::physics_move(lua_State* lua) {
+    if (lua_gettop(lua) != 2) return luaL_error(lua, "physics_move() expects ID and position");
+    try {
+        Impl& state = context(lua);
+        const EntityId id = checked_id(lua, 1);
+        const glm::vec3 position = vector_arg(lua, 2, false);
+        state.physics->move(id, position);
+        auto transform = state.world.transform(id).value();
+        transform.position = position;
+        state.world.set_transform(id, transform);
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::physics_apply_force(lua_State* lua) {
+    if (lua_gettop(lua) != 2) return luaL_error(lua, "physics_apply_force() expects ID and vector");
+    try { context(lua).physics->apply_force(checked_id(lua, 1), vector_arg(lua, 2, false)); }
+    catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::physics_apply_impulse(lua_State* lua) {
+    if (lua_gettop(lua) != 2) return luaL_error(lua, "physics_apply_impulse() expects ID and vector");
+    try { context(lua).physics->apply_impulse(checked_id(lua, 1), vector_arg(lua, 2, false)); }
+    catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::physics_raycast(lua_State* lua) {
+    if (lua_gettop(lua) != 3) return luaL_error(lua, "physics_raycast() expects origin, direction, distance");
+    try {
+        const glm::vec3 origin = vector_arg(lua, 1, false);
+        const glm::vec3 direction = vector_arg(lua, 2, false);
+        const float distance = float(luaL_checknumber(lua, 3));
+        const auto hit = context(lua).physics->raycast(origin, direction, distance);
+        if (!hit) { lua_pushnil(lua); return 1; }
+        lua_createtable(lua, 0, 3);
+        lua_pushinteger(lua, lua_Integer(hit->id)); lua_setfield(lua, -2, "id");
+        push_vec3(lua, hit->position); lua_setfield(lua, -2, "position");
+        lua_pushnumber(lua, hit->distance); lua_setfield(lua, -2, "distance");
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 1;
+}
+
+int LuaProject::Impl::physics_overlap_sphere(lua_State* lua) {
+    if (lua_gettop(lua) != 2) return luaL_error(lua, "physics_overlap_sphere() expects center and radius");
+    try {
+        const auto ids = context(lua).physics->overlap_sphere(
+            vector_arg(lua, 1, false), float(luaL_checknumber(lua, 2)));
+        lua_createtable(lua, int(ids.size()), 0);
+        for (size_t i = 0; i < ids.size(); ++i) {
+            lua_pushinteger(lua, lua_Integer(ids[i]));
+            lua_rawseti(lua, -2, lua_Integer(i + 1));
+        }
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 1;
+}
+
+int LuaProject::Impl::physics_contacts(lua_State* lua) {
+    if (lua_gettop(lua) != 0) return luaL_error(lua, "physics_contacts() expects no arguments");
+    const auto& events = context(lua).physics->contacts();
+    lua_createtable(lua, int(events.size()), 0);
+    for (size_t i = 0; i < events.size(); ++i) {
+        lua_createtable(lua, 0, 4);
+        lua_pushinteger(lua, lua_Integer(events[i].first)); lua_setfield(lua, -2, "first");
+        lua_pushinteger(lua, lua_Integer(events[i].second)); lua_setfield(lua, -2, "second");
+        lua_pushboolean(lua, events[i].trigger); lua_setfield(lua, -2, "trigger");
+        lua_pushboolean(lua, events[i].began); lua_setfield(lua, -2, "began");
+        lua_rawseti(lua, -2, lua_Integer(i + 1));
+    }
+    return 1;
+}
+
+void LuaProject::Impl::sync_physics() {
+    for (EntityId id : world.entities()) {
+        const auto component = world.physics(id);
+        if (!component || component->motion == PhysicsMotion::Static) continue;
+        const auto body = physics->state(id);
+        if (!body) continue;
+        auto transform = world.transform(id).value();
+        transform.position = body->position;
+        float y = 0, x = 0, z = 0;
+        glm::extractEulerAngleYXZ(glm::mat4_cast(body->rotation), y, x, z);
+        transform.rotation = {x, y, z};
+        world.set_transform(id, transform);
+    }
+}
+
 SceneFrame LuaProject::Impl::step(double dt) {
     if (!std::isfinite(dt) || dt < 0.0 || dt > 0.25) {
         throw std::invalid_argument("frame delta must be finite and between 0 and 0.25 seconds");
@@ -1135,6 +1368,8 @@ SceneFrame LuaProject::Impl::step(double dt) {
     sync_scripts();
     while (fixed_accumulator + 1e-12 >= fixed_dt && fixed_steps < 8 &&
            !wants_quit && !pending_scene) {
+        physics->step();
+        sync_physics();
         call(fixed_ref, "fixed_update", fixed_dt, true);
         sync_scripts();
         if (!pending_scene && !wants_quit)

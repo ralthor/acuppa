@@ -62,6 +62,15 @@ int main(int argc, char* argv[]) {
            environment.environment_intensity == 1.0f &&
            !no_environment.environment && no_environment.environment_intensity == 0.0f,
            "source-authored HDRI did not reach the render frame");
+    threepoint::LuaProject physics(argv[1], "physics");
+    const auto initial_physics = physics.step(0.0);
+    expect(initial_physics.cubes.size() == 2 &&
+           std::abs(initial_physics.cubes[1].position.y - 4.0f) < 0.001f,
+           "source physics scene did not create its visible rigid bodies");
+    for (int i = 0; i < 180; ++i) physics.step(1.0 / 60.0);
+    const auto settled_physics = physics.step(0.0);
+    expect(std::abs(settled_physics.cubes[1].position.y - 0.4f) < 0.05f,
+           "Lua-authored dynamic body did not visibly settle on the floor");
     project.set_viewport(640, 360);
     expect(project.width() == 640 && project.height() == 360,
            "resize did not update Lua's screen-ray viewport");

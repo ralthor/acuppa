@@ -85,6 +85,23 @@ int main() {
     world.set_script(first, {"scripts/main.lua", true});
     expect(world.script(first)->enabled, "script component did not persist");
 
+    threepoint::PhysicsComponent body;
+    body.motion = threepoint::PhysicsMotion::Dynamic;
+    world.set_physics(first, body);
+    expect(world.physics(first)->motion == threepoint::PhysicsMotion::Dynamic,
+           "physics component did not persist");
+    bool bad_body = false;
+    try { body.radius = 0; world.set_physics(first, body); }
+    catch (const std::invalid_argument&) { bad_body = true; }
+    expect(bad_body && world.physics(first)->radius == 0.5f,
+           "invalid physics component changed the stored body");
+    bad_body = false;
+    try { world.remove_transform(first); }
+    catch (const std::invalid_argument&) { bad_body = true; }
+    expect(bad_body, "physics body lost its required transform");
+    expect(world.remove_physics(first) && !world.physics(first),
+           "physics component removal failed");
+
     expect(world.remove_transform(first) && !world.transform(first), "transform remove failed");
     expect(world.remove_camera(first) && !world.camera(first), "camera remove failed");
     expect(world.remove_light(first) && !world.light(first), "light remove failed");

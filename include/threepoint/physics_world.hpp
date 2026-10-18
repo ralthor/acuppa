@@ -36,6 +36,13 @@ struct PhysicsContact {
     uint64_t first = 0;
     uint64_t second = 0;
     bool trigger = false;
+    bool began = true;
+};
+
+struct PhysicsRayHit {
+    uint64_t id = 0;
+    glm::vec3 position{0.0f};
+    float distance = 0.0f;
 };
 
 // Y is up; each step advances exactly 1/60 second. Contacts are new pairs from
@@ -52,6 +59,14 @@ public:
     void add(const PhysicsBodyDesc& body);
     bool remove(uint64_t id);
     std::optional<PhysicsBodyState> state(uint64_t id) const;
+    void set_velocity(uint64_t id, glm::vec3 velocity);
+    void move(uint64_t id, glm::vec3 position);
+    void set_pose(uint64_t id, glm::vec3 position, glm::quat rotation);
+    void apply_force(uint64_t id, glm::vec3 force);
+    void apply_impulse(uint64_t id, glm::vec3 impulse);
+    std::optional<PhysicsRayHit> raycast(glm::vec3 origin, glm::vec3 direction,
+                                         float distance) const;
+    std::vector<uint64_t> overlap_sphere(glm::vec3 center, float radius) const;
     void step();
     const std::vector<PhysicsContact>& contacts() const;
 
