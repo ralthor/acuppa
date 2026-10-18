@@ -1,4 +1,4 @@
-local tp = require("threepoint")
+local tp = require("acuppa")
 local help = false
 
 return {
@@ -12,7 +12,7 @@ return {
     local center = (w - 300) / 2
     assert(not pcall(tp.viewport_size, 1))
     tp.ui_rect(0, 0, w, h, 0.04, 0.07, 0.12, 1)
-    tp.ui_text(center - 20, h / 6, "THREEPOINT", 4)
+    tp.ui_text(center - 20, h / 6, "ACUPPA", 4)
     if tp.ui_button("start", center, h / 2 - 100, 300, 64, "START GAME") then
       tp.scene_switch("menu_play")
     end

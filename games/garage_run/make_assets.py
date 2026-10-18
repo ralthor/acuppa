@@ -23,7 +23,7 @@ def mesh(name, positions, normals, indices, color, metallic=0.0, roughness=0.7):
     (output / buffer_name).write_bytes(binary)
     offsets = [0, len(chunks[0]), len(chunks[0]) + len(chunks[1])]
     asset = {
-        "asset": {"version": "2.0", "generator": "ThreePoint Garage Run source"},
+        "asset": {"version": "2.0", "generator": "ACuppa Garage Run source"},
         "buffers": [{"uri": buffer_name, "byteLength": len(binary)}],
         "bufferViews": [{"buffer": 0, "byteOffset": offset, "byteLength": len(chunk)}
                         for offset, chunk in zip(offsets, chunks)],

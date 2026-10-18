@@ -1,4 +1,4 @@
-#include "threepoint/source_document.hpp"
+#include "acuppa/source_document.hpp"
 
 extern "C" {
 #include <lauxlib.h>
@@ -13,7 +13,7 @@ extern "C" {
 #include <sys/stat.h>
 #include <unistd.h>
 
-namespace threepoint {
+namespace acuppa {
 namespace fs = std::filesystem;
 namespace {
 
@@ -108,4 +108,4 @@ void SourceDocument::replace(const std::string& source) {
     original_ = source;
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

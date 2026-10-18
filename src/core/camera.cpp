@@ -1,4 +1,4 @@
-#include "threepoint/camera.hpp"
+#include "acuppa/camera.hpp"
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -6,7 +6,7 @@
 #include <cmath>
 #include <stdexcept>
 
-namespace threepoint {
+namespace acuppa {
 namespace {
 
 bool finite(const glm::vec3& value) {
@@ -30,4 +30,4 @@ glm::mat4 PerspectiveCamera::view_projection(float aspect_ratio) const {
     return projection * glm::lookAtRH(eye, target, up);
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

@@ -6,7 +6,7 @@ and project-local assets. No editor action is needed to play or change it.
 From the repository root, run:
 
 ```sh
-build/threepoint run games/garage_run
+build/acuppa run games/garage_run
 ```
 
 The 90×90 yard leaves room to practice turns and handbrake drifts; the marked
@@ -39,6 +39,6 @@ obstacles. The engine's SSAO feature remains available for other scenes.
 
 Automated rules, gameplay, asset, Vulkan capture, and interactive startup tests
 run with the engine suite. The standalone export passes device-free gameplay checks, a Vulkan capture, and
-interactive startup. From the repository root, run `build/threepoint build
+interactive startup. From the repository root, run `build/acuppa build
 games/garage_run build/garage_run_release`, then launch
-`build/garage_run_release/threepoint-game`. No editor or asset generator is needed.
+`build/garage_run_release/acuppa-game`. No editor or asset generator is needed.

@@ -6,7 +6,7 @@
 
 struct lua_State;
 
-namespace threepoint {
+namespace acuppa {
 
 struct EditorEntity {
     std::string name;
@@ -38,4 +38,4 @@ private:
     lua_State* lua_ = nullptr;
 };
 
-}  // namespace threepoint
+}  // namespace acuppa

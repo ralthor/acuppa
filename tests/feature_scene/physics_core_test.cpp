@@ -1,4 +1,4 @@
-#include "threepoint/physics_world.hpp"
+#include "acuppa/physics_world.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -15,7 +15,7 @@ template <typename F> void rejects(F&& run, const char* message) {
     throw std::runtime_error(message);
 }
 
-bool touched(const threepoint::PhysicsWorld& world, uint64_t a, uint64_t b, bool trigger) {
+bool touched(const acuppa::PhysicsWorld& world, uint64_t a, uint64_t b, bool trigger) {
     for (const auto& contact : world.contacts())
         if (((contact.first == a && contact.second == b) ||
              (contact.first == b && contact.second == a)) && contact.trigger == trigger)
@@ -25,7 +25,7 @@ bool touched(const threepoint::PhysicsWorld& world, uint64_t a, uint64_t b, bool
 }
 
 int main() {
-    using namespace threepoint;
+    using namespace acuppa;
     PhysicsWorld world;
     PhysicsBodyDesc floor;
     floor.id = 1;

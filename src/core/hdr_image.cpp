@@ -1,4 +1,4 @@
-#include "threepoint/hdr_image.hpp"
+#include "acuppa/hdr_image.hpp"
 
 #include <stb_image.h>
 
@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace threepoint {
+namespace acuppa {
 
 HdrImage load_hdr_image(const std::filesystem::path& file) {
     if (file.extension() != ".hdr")
@@ -45,4 +45,4 @@ HdrImage load_hdr_image(const std::filesystem::path& file) {
     return image;
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

@@ -1,4 +1,4 @@
-#include "threepoint/save_data.hpp"
+#include "acuppa/save_data.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-namespace threepoint {
+namespace acuppa {
 namespace {
 
 constexpr size_t max_bytes = 1024 * 1024;
@@ -253,4 +253,4 @@ std::optional<SaveValue> read_save(const std::filesystem::path& project_root,
     return result;
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

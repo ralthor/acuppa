@@ -1,4 +1,4 @@
-local tp = require("threepoint")
+local tp = require("acuppa")
 return {
   start = function()
     tp.set_exposure(tp.scene_name() == "hdr_dim" and 0.15 or 1.0)

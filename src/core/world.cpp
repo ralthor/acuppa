@@ -1,4 +1,4 @@
-#include "threepoint/world.hpp"
+#include "acuppa/world.hpp"
 
 #include <glm/geometric.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -8,7 +8,7 @@
 #include <limits>
 #include <stdexcept>
 
-namespace threepoint {
+namespace acuppa {
 namespace {
 
 bool finite(glm::vec3 vector) {
@@ -260,4 +260,4 @@ SceneFrame World::snapshot(const PerspectiveCamera& fallback_camera) const {
     return frame;
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

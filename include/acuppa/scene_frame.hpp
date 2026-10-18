@@ -1,8 +1,8 @@
 #pragma once
 
-#include "threepoint/camera.hpp"
-#include "threepoint/gltf_asset.hpp"
-#include "threepoint/hdr_image.hpp"
+#include "acuppa/camera.hpp"
+#include "acuppa/gltf_asset.hpp"
+#include "acuppa/hdr_image.hpp"
 
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace threepoint {
+namespace acuppa {
 
 struct CubeInstance {
     uint64_t id = 0;
@@ -65,4 +65,4 @@ struct SceneFrame {
     bool quit = false;
 };
 
-}  // namespace threepoint
+}  // namespace acuppa

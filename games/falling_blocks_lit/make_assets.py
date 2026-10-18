@@ -51,7 +51,7 @@ def mesh_file(name, vertices, vertex_normals, texcoords, triangles, color, rough
     offsets = (0, len(chunks[0]), len(chunks[0]) + len(chunks[1]),
                len(chunks[0]) + len(chunks[1]) + len(chunks[2]))
     asset = {
-        "asset": {"version": "2.0", "generator": "ThreePoint Falling Blocks source"},
+        "asset": {"version": "2.0", "generator": "ACuppa Falling Blocks source"},
         "buffers": [{"uri": buffer_name, "byteLength": len(buffer)}],
         "bufferViews": [{"buffer": 0, "byteOffset": offset, "byteLength": len(chunk)}
                         for offset, chunk in zip(offsets, chunks)],

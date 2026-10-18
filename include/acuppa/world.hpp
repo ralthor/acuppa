@@ -1,7 +1,7 @@
 #pragma once
 
-#include "threepoint/scene_frame.hpp"
-#include "threepoint/physics_world.hpp"
+#include "acuppa/scene_frame.hpp"
+#include "acuppa/physics_world.hpp"
 
 #include <cstdint>
 #include <map>
@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace threepoint {
+namespace acuppa {
 
 using EntityId = uint64_t;
 
@@ -104,4 +104,4 @@ private:
     EntityId next_id_ = 1;
 };
 
-}  // namespace threepoint
+}  // namespace acuppa

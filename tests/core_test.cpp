@@ -1,4 +1,4 @@
-#include "threepoint/project.hpp"
+#include "acuppa/project.hpp"
 
 #include <exception>
 #include <filesystem>
@@ -11,7 +11,7 @@ namespace {
 
 void expect_failure(const std::filesystem::path& path, const std::string& message) {
     try {
-        threepoint::require_project(path);
+        acuppa::require_project(path);
     } catch (const std::runtime_error& error) {
         if (std::string(error.what()).find(message) != std::string::npos) {
             return;
@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
     }
     try {
         const std::filesystem::path root(argv[1]);
-        const auto project = threepoint::require_project(root);
+        const auto project = acuppa::require_project(root);
         if (project.root != root || project.manifest != root / "game.lua") {
             throw std::runtime_error("project paths do not match source layout");
         }
@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
             std::ofstream manifest(fixture / "game.lua");
             manifest << "return {}\n";
         }
-        threepoint::require_project(fixture);
+        acuppa::require_project(fixture);
         std::filesystem::remove_all(fixture);
         std::cout << "Core project checks passed\n";
         return 0;

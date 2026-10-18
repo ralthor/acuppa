@@ -1,4 +1,4 @@
-#include "threepoint/ui_canvas.hpp"
+#include "acuppa/ui_canvas.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -7,7 +7,7 @@
 
 #include <stb_easy_font.h>
 
-namespace threepoint {
+namespace acuppa {
 namespace {
 
 struct Vertex { float x, y, z; uint8_t color[4]; };
@@ -97,4 +97,4 @@ std::vector<uint8_t> rasterize_ui(uint32_t width, uint32_t height,
     return pixels;
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

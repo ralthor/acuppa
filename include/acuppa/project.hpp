@@ -2,7 +2,7 @@
 
 #include <filesystem>
 
-namespace threepoint {
+namespace acuppa {
 
 struct ProjectPaths {
     std::filesystem::path root;
@@ -12,4 +12,4 @@ struct ProjectPaths {
 // Checks the entry point only. LuaProject validates scene and script paths.
 ProjectPaths require_project(const std::filesystem::path& root);
 
-}  // namespace threepoint
+}  // namespace acuppa

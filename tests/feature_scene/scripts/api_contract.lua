@@ -1,4 +1,4 @@
-local tp = require("threepoint")
+local tp = require("acuppa")
 
 -- Each public call must reject an invalid argument count. Normal uses live in
 -- the other feature scripts; quit runs in this scene's update callback.

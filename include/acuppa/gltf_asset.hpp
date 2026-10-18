@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace threepoint {
+namespace acuppa {
 
 struct GltfVertex {
     float position[3];
@@ -56,4 +56,4 @@ struct GltfAsset {
 GltfAsset load_gltf(const std::filesystem::path& project_root,
                     const std::string& relative_path);
 
-}  // namespace threepoint
+}  // namespace acuppa

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "threepoint/hdr_image.hpp"
+#include "acuppa/hdr_image.hpp"
 
 #include <vector>
 
-namespace threepoint {
+namespace acuppa {
 
 struct FilteredEnvironment {
     HdrImage diffuse;                 // Cosine-weighted irradiance, 64x32.
@@ -14,4 +14,4 @@ struct FilteredEnvironment {
 // Deterministic CPU prefilter. Call once per HDRI, not once per rendered frame.
 FilteredEnvironment filter_environment(const HdrImage& source);
 
-}  // namespace threepoint
+}  // namespace acuppa

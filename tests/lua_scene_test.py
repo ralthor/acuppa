@@ -50,25 +50,25 @@ with tempfile.TemporaryDirectory() as directory:
     invalid_project = temp / "invalid"
     shutil.copytree(fixture, invalid_project)
     script = invalid_project / "scripts/main.lua"
-    script.write_text('local tp = require("threepoint")\nreturn {start=function() '
+    script.write_text('local tp = require("acuppa")\nreturn {start=function() '
                       'tp.spawn({mesh="not:a:mesh"}) end, '
                       'fixed_update=function() end, update=function() end}\n')
     bad_mesh = run("run", invalid_project, "--frames", 1)
     assert bad_mesh.returncode != 0 and "mesh path must end" in bad_mesh.stderr, bad_mesh.stderr
 
-    script.write_text('local tp = require("threepoint")\nreturn {start=function() '
+    script.write_text('local tp = require("acuppa")\nreturn {start=function() '
                       'tp.spawn({mesh="builtin:cube", scale={0,1,1}}) end, '
                       'fixed_update=function() end, update=function() end}\n')
     bad_scale = run("run", invalid_project, "--frames", 1)
     assert bad_scale.returncode != 0 and "scale" in bad_scale.stderr, bad_scale.stderr
 
-    script.write_text('local tp = require("threepoint")\nreturn {start=function() '
+    script.write_text('local tp = require("acuppa")\nreturn {start=function() '
                       'tp.set_rotation(999, {0,0,0}) end, '
                       'fixed_update=function() end, update=function() end}\n')
     bad_id = run("run", invalid_project, "--frames", 1)
     assert bad_id.returncode != 0 and "unknown entity ID" in bad_id.stderr, bad_id.stderr
 
-    script.write_text('local tp = require("threepoint")\nreturn {start=function() '
+    script.write_text('local tp = require("acuppa")\nreturn {start=function() '
                       'tp.time(1) end, fixed_update=function() end, '
                       'update=function() end}\n')
     bad_time = run("run", invalid_project, "--frames", 1)
@@ -77,14 +77,14 @@ with tempfile.TemporaryDirectory() as directory:
 
     for expression, expected in (("tp.spawn()", "spawn() expects one table"),
                                  ("tp.quit(1)", "quit() expects no arguments")):
-        script.write_text('local tp = require("threepoint")\nreturn {start=function() '
+        script.write_text('local tp = require("acuppa")\nreturn {start=function() '
                           + expression + ' end, fixed_update=function() end, '
                           'update=function() end}\n')
         invalid_call = run("run", invalid_project, "--frames", 1)
         assert invalid_call.returncode != 0 and expected in invalid_call.stderr, \
             invalid_call.stderr
 
-    script.write_text('local tp = require("threepoint")\nreturn {start=function() end, '
+    script.write_text('local tp = require("acuppa")\nreturn {start=function() end, '
                       'fixed_update=function() end, update=function() tp.quit() end}\n')
     quit_result = run("run", invalid_project, "--frames", 1)
     assert quit_result.returncode == 0 and "Rendered 0 project frames" in quit_result.stdout, \

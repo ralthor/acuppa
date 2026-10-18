@@ -1,4 +1,4 @@
-local tp = require("threepoint")
+local tp = require("acuppa")
 local Board = require("scripts.board")
 local Font = require("scripts.font")
 local board, rendered, status, message, previous, hold_time

@@ -1,4 +1,4 @@
-#include "threepoint/environment_filter.hpp"
+#include "acuppa/environment_filter.hpp"
 
 #include <cmath>
 #include <filesystem>
@@ -11,8 +11,8 @@ void expect(bool condition, const char* message) {
 
 int main(int argc, char* argv[]) {
     if (argc != 2) throw std::runtime_error("HDRI fixture path required");
-    const auto source = threepoint::load_hdr_image(std::filesystem::path(argv[1]));
-    const auto filtered = threepoint::filter_environment(source);
+    const auto source = acuppa::load_hdr_image(std::filesystem::path(argv[1]));
+    const auto filtered = acuppa::filter_environment(source);
     expect(filtered.diffuse.width == 64 && filtered.diffuse.height == 32,
            "diffuse prefilter dimensions changed");
     expect(filtered.specular.size() == 7 && filtered.specular.front().width == 256 &&
@@ -35,13 +35,13 @@ int main(int argc, char* argv[]) {
     auto invalid = source;
     invalid.rgba[0] = std::numeric_limits<float>::quiet_NaN();
     bool rejected = false;
-    try { (void)threepoint::filter_environment(invalid); }
+    try { (void)acuppa::filter_environment(invalid); }
     catch (const std::invalid_argument&) { rejected = true; }
     expect(rejected, "nonfinite HDR radiance passed prefilter validation");
     invalid = source;
     invalid.rgba.pop_back();
     rejected = false;
-    try { (void)threepoint::filter_environment(invalid); }
+    try { (void)acuppa::filter_environment(invalid); }
     catch (const std::invalid_argument&) { rejected = true; }
     expect(rejected, "truncated HDR radiance passed prefilter validation");
 }

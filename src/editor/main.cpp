@@ -1,8 +1,8 @@
-#include "threepoint/project.hpp"
-#include "threepoint/scene_document.hpp"
-#include "threepoint/source_document.hpp"
-#include "threepoint/editor_viewport.hpp"
-#include "threepoint/preview.hpp"
+#include "acuppa/project.hpp"
+#include "acuppa/scene_document.hpp"
+#include "acuppa/source_document.hpp"
+#include "acuppa/editor_viewport.hpp"
+#include "acuppa/preview.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -17,9 +17,9 @@
 
 namespace {
 
-void print_tree(const std::vector<threepoint::EditorEntity>& entities) {
+void print_tree(const std::vector<acuppa::EditorEntity>& entities) {
     std::set<std::string> printed;
-    const auto visit = [&](const auto& self, const threepoint::EditorEntity& entity,
+    const auto visit = [&](const auto& self, const acuppa::EditorEntity& entity,
                            unsigned depth) -> void {
         if (!printed.insert(entity.name).second) return;
         std::cout << std::string(depth * 2, ' ') << entity.name;
@@ -45,14 +45,14 @@ void print_tree(const std::vector<threepoint::EditorEntity>& entities) {
 
 void usage() {
     std::cerr << "Usage:\n"
-              << "  threepoint-editor --check-project <directory>\n"
-              << "  threepoint-editor tree <project> <scene>\n"
-              << "  threepoint-editor inspect <project> <scene> <entity>\n"
-              << "  threepoint-editor add <project> <scene> <entity>\n"
-              << "  threepoint-editor set <project> <scene> <entity> <component> <field> <Lua value>\n";
-    std::cerr << "  threepoint-editor source <project> <relative.lua>\n"
-              << "  threepoint-editor replace <project> <relative.lua>  (read Lua from stdin)\n";
-    std::cerr << "  threepoint-editor viewport <project> <scene> [--select <entity>]"
+              << "  acuppa-editor --check-project <directory>\n"
+              << "  acuppa-editor tree <project> <scene>\n"
+              << "  acuppa-editor inspect <project> <scene> <entity>\n"
+              << "  acuppa-editor add <project> <scene> <entity>\n"
+              << "  acuppa-editor set <project> <scene> <entity> <component> <field> <Lua value>\n";
+    std::cerr << "  acuppa-editor source <project> <relative.lua>\n"
+              << "  acuppa-editor replace <project> <relative.lua>  (read Lua from stdin)\n";
+    std::cerr << "  acuppa-editor viewport <project> <scene> [--select <entity>]"
                  " [--frames <count> --capture <ppm-file>]\n";
 }
 
@@ -60,19 +60,19 @@ void usage() {
 
 int main(int argc, char* argv[]) {
     if (argc == 2 && std::string_view(argv[1]) == "--version") {
-        std::cout << "ThreePoint editor " << THREEPOINT_VERSION << " (source scene editor)\n";
+        std::cout << "ACuppa editor " << ACUPPA_VERSION << " (source scene editor)\n";
         return 0;
     }
     try {
         if (argc == 3 && std::string_view(argv[1]) == "--check-project") {
-            const auto project = threepoint::require_project(argv[2]);
+            const auto project = acuppa::require_project(argv[2]);
             std::cout << "Project files found: " << project.root.string() << '\n';
             return 0;
         }
         if (argc >= 4) {
             const std::string_view command = argv[1];
             if (argc == 4 && (command == "source" || command == "replace")) {
-                threepoint::SourceDocument document(argv[2], argv[3]);
+                acuppa::SourceDocument document(argv[2], argv[3]);
                 if (command == "source") {
                     std::cout.write(document.text().data(),
                                     static_cast<std::streamsize>(document.text().size()));
@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
                 return 0;
             }
             if (command == "viewport") {
-                threepoint::EditorViewport viewport(argv[2], argv[3]);
+                acuppa::EditorViewport viewport(argv[2], argv[3]);
                 uint32_t frames = 0;
                 std::filesystem::path capture;
                 std::string selected;
@@ -117,27 +117,27 @@ int main(int argc, char* argv[]) {
                 if (!capture.empty() && frames == 0)
                     throw std::invalid_argument("--capture requires --frames");
                 if (!selected.empty()) viewport.select(selected);
-                threepoint::PreviewOptions options;
-                options.scene = threepoint::PreviewOptions::Scene::Project;
+                acuppa::PreviewOptions options;
+                options.scene = acuppa::PreviewOptions::Scene::Project;
                 options.width = viewport.width();
                 options.height = viewport.height();
                 options.frame_limit = frames;
                 options.capture_frame = frames == 0 ? 1 : frames;
                 options.capture_path = capture;
                 options.on_frame = [&](double) { return viewport.frame(); };
-                options.on_input = [&](const threepoint::InputEvent& event) { viewport.input(event); };
+                options.on_input = [&](const acuppa::InputEvent& event) { viewport.input(event); };
                 options.on_pointer = [&](double x, double y) { viewport.pointer(x, y); };
                 options.on_resize = [&](uint32_t width, uint32_t height) {
                     viewport.resize(width, height);
                 };
-                const auto result = threepoint::run_preview(options);
+                const auto result = acuppa::run_preview(options);
                 std::cout << "Editor viewport rendered " << result.frames << " frames\n";
                 return result.frames == frames || frames == 0 ? 0 : 1;
             }
             if ((command == "tree" && argc == 4) ||
                 ((command == "inspect" || command == "add") && argc == 5) ||
                 (command == "set" && argc == 8)) {
-                threepoint::SceneDocument document(argv[2], argv[3]);
+                acuppa::SceneDocument document(argv[2], argv[3]);
                 if (command == "tree") {
                     std::cout << document.path().string() << '\n';
                     print_tree(document.tree());
@@ -157,7 +157,7 @@ int main(int argc, char* argv[]) {
             }
         }
     } catch (const std::exception& error) {
-        std::cerr << "ThreePoint editor: " << error.what() << '\n';
+        std::cerr << "ACuppa editor: " << error.what() << '\n';
         return 1;
     }
     usage();

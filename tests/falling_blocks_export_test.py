@@ -28,8 +28,8 @@ def invoke(*command, timeout=30):
 for source in games:
     bundle = work / source.name
     invoke(cli, "build", source, bundle)
-    player = bundle / "threepoint-game"
-    assert player.is_file() and not (bundle / "threepoint-editor").exists()
+    player = bundle / "acuppa-game"
+    assert player.is_file() and not (bundle / "acuppa-editor").exists()
     assert not (bundle / "game/README.md").exists()
     assert not (bundle / "game/make_assets.py").exists()
     invoke(player, "--check")

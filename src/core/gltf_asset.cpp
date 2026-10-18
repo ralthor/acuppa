@@ -1,4 +1,4 @@
-#include "threepoint/gltf_asset.hpp"
+#include "acuppa/gltf_asset.hpp"
 
 #include <cgltf.h>
 #include <stb_image.h>
@@ -15,7 +15,7 @@
 #include <utility>
 #include <vector>
 
-namespace threepoint {
+namespace acuppa {
 namespace fs = std::filesystem;
 namespace {
 
@@ -393,4 +393,4 @@ GltfAsset load_gltf(const fs::path& project_root, const std::string& relative_pa
     }
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

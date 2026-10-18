@@ -1,5 +1,5 @@
-#include "threepoint/lua_project.hpp"
-#include "threepoint/source_document.hpp"
+#include "acuppa/lua_project.hpp"
+#include "acuppa/source_document.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -22,7 +22,7 @@ int main(int argc, char* argv[]) {
 
     // A human edits the source, then the editor reads and saves the same bytes.
     std::ofstream(script, std::ios::app) << "-- hand edit\n";
-    const std::string replacement = R"(local tp = require("threepoint")
+    const std::string replacement = R"(local tp = require("acuppa")
 return {
   start = function()
     local actor = tp.entity_find("actor")
@@ -36,7 +36,7 @@ return {
 )";
     const auto permissions_before = fs::status(script).permissions();
     {
-        threepoint::SourceDocument document(work, "scripts/editor.lua");
+        acuppa::SourceDocument document(work, "scripts/editor.lua");
         expect(document.text().find("-- hand edit") != std::string::npos,
                "editor lost a manual script edit");
         bool rejected = false;
@@ -49,33 +49,33 @@ return {
     expect(fs::status(script).permissions() == permissions_before,
            "editor changed script permissions");
     {
-        threepoint::SourceDocument reopened(work, "scripts/editor.lua");
+        acuppa::SourceDocument reopened(work, "scripts/editor.lua");
         expect(reopened.text() == replacement, "script changed across save and reopen");
     }
     {
-        threepoint::LuaProject runtime(work, "editor");
+        acuppa::LuaProject runtime(work, "editor");
         const auto frame = runtime.step(0);
         expect(frame.cubes.size() == 1 && frame.cubes[0].position.x == 2 &&
                frame.cubes[0].parent_transform[3].x == 1,
                "editor script did not run from source after reopen");
     }
     {
-        threepoint::SourceDocument document(work, "scenes/editor.scene.lua");
+        acuppa::SourceDocument document(work, "scenes/editor.scene.lua");
         auto updated = document.text();
         const auto position = updated.find("{1, 0, 0}");
         expect(position != std::string::npos, "fixture anchor position missing");
         updated.replace(position, 9, "{4, 0, 0}");
         updated += "-- editor comment\n";
         document.replace(updated);
-        threepoint::SourceDocument reopened(work, "scenes/editor.scene.lua");
+        acuppa::SourceDocument reopened(work, "scenes/editor.scene.lua");
         expect(reopened.text() == updated, "scene source was reformatted or truncated");
-        threepoint::LuaProject runtime(work, "editor");
+        acuppa::LuaProject runtime(work, "editor");
         const auto frame = runtime.step(0);
         expect(frame.cubes[0].position.x == 2 && frame.cubes[0].parent_transform[3].x == 4,
                "raw scene edit did not affect runtime behavior");
     }
     {
-        threepoint::SourceDocument document(work, "scripts/editor.lua");
+        acuppa::SourceDocument document(work, "scripts/editor.lua");
         std::ofstream(script, std::ios::app) << "-- second hand edit\n";
         bool rejected = false;
         try { document.replace(replacement); }
@@ -85,20 +85,20 @@ return {
     {
         // Computed scenes can be inspected and changed as source, even though
         // the scene-tree editor cannot flatten them into declarative data.
-        threepoint::SourceDocument computed(work, "scenes/shadow.scene.lua");
+        acuppa::SourceDocument computed(work, "scenes/shadow.scene.lua");
         expect(!computed.text().empty(), "computed scene source unavailable");
     }
     bool rejected = false;
-    try { threepoint::SourceDocument outside(work, "../outside.lua"); }
+    try { acuppa::SourceDocument outside(work, "../outside.lua"); }
     catch (const std::invalid_argument&) { rejected = true; }
     expect(rejected, "project path traversal accepted");
     rejected = false;
-    try { threepoint::SourceDocument wrong_type(work, "assets/triangle.gltf"); }
+    try { acuppa::SourceDocument wrong_type(work, "assets/triangle.gltf"); }
     catch (const std::invalid_argument&) { rejected = true; }
     expect(rejected, "non-Lua source accepted");
     fs::create_symlink(script, work / "script-link.lua");
     rejected = false;
-    try { threepoint::SourceDocument linked(work, "script-link.lua"); }
+    try { acuppa::SourceDocument linked(work, "script-link.lua"); }
     catch (const std::invalid_argument&) { rejected = true; }
     expect(rejected, "symlink source accepted");
 }

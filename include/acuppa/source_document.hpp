@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <string>
 
-namespace threepoint {
+namespace acuppa {
 
 // Raw Lua source editing. Unlike SceneDocument, this preserves comments and
 // computed scene code, and can also open behavior scripts and game.lua.
@@ -21,4 +21,4 @@ private:
     std::string original_;
 };
 
-}  // namespace threepoint
+}  // namespace acuppa

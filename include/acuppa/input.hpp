@@ -1,6 +1,6 @@
 #pragma once
 
-#include "threepoint/camera.hpp"
+#include "acuppa/camera.hpp"
 
 #include <glm/vec3.hpp>
 
@@ -11,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-namespace threepoint {
+namespace acuppa {
 
 enum class InputDevice { Keyboard, MouseButton, GamepadButton, GamepadAxis };
 
@@ -52,4 +52,4 @@ private:
 WorldRay screen_ray(const PerspectiveCamera& camera, uint32_t width, uint32_t height,
                     double pixel_x, double pixel_y);
 
-}  // namespace threepoint
+}  // namespace acuppa

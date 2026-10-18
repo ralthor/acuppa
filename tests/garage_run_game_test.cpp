@@ -1,4 +1,4 @@
-#include "threepoint/lua_project.hpp"
+#include "acuppa/lua_project.hpp"
 
 #include <cmath>
 #include <filesystem>
@@ -14,19 +14,19 @@ void expect(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
 }
 
-float car_x(const threepoint::SceneFrame& frame) {
+float car_x(const acuppa::SceneFrame& frame) {
     for (const auto& item : frame.imported)
         if (item.id == 4) return item.transform[3].x;
     throw std::runtime_error("car model missing from frame");
 }
 
-float car_z(const threepoint::SceneFrame& frame) {
+float car_z(const acuppa::SceneFrame& frame) {
     for (const auto& item : frame.imported)
         if (item.id == 4) return item.transform[3].z;
     throw std::runtime_error("car model missing from frame");
 }
 
-bool has_text(const threepoint::SceneFrame& frame, const std::string& value) {
+bool has_text(const acuppa::SceneFrame& frame, const std::string& value) {
     for (const auto& item : frame.ui)
         if (item.text.find(value) != std::string::npos) return true;
     return false;
@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
     const fs::path work = argv[2];
     fs::remove_all(work);
     fs::copy(argv[1], work, fs::copy_options::recursive);
-    threepoint::LuaProject game(work, "course", threepoint::LuaProject::Mode::Game, false);
+    acuppa::LuaProject game(work, "course", acuppa::LuaProject::Mode::Game, false);
     auto frame = game.step(0);
     expect(frame.imported.size() >= 15 && frame.environment && frame.ssao_quality == 0 &&
            frame.lights.size() == 1 && frame.lights[0].shadows,
@@ -45,42 +45,42 @@ int main(int argc, char* argv[]) {
     expect(std::abs(car_x(frame)) < 0.01f && std::abs(car_z(frame) - 16) < 0.01f &&
            has_text(frame, "GATE 1"), "car did not start at the first checkpoint");
 
-    game.inject({threepoint::InputDevice::Keyboard, "d", 1});
+    game.inject({acuppa::InputDevice::Keyboard, "d", 1});
     for (int i = 0; i < 90; ++i) frame = game.step(1.0 / 60.0);
     expect(std::abs(car_x(frame)) < 0.08f && std::abs(car_z(frame) - 16) < 0.08f,
            "steering at rest moved or spun the car");
-    game.inject({threepoint::InputDevice::Keyboard, "d", 0});
+    game.inject({acuppa::InputDevice::Keyboard, "d", 0});
 
-    game.inject({threepoint::InputDevice::Keyboard, "w", 1});
+    game.inject({acuppa::InputDevice::Keyboard, "w", 1});
     for (int i = 0; i < 65; ++i) frame = game.step(1.0 / 60.0);
     if (car_z(frame) >= 14.0f)
         throw std::runtime_error("throttle did not drive the rigid-body car forward: z=" +
                                  std::to_string(car_z(frame)));
-    game.inject({threepoint::InputDevice::Keyboard, "d", 1});
+    game.inject({acuppa::InputDevice::Keyboard, "d", 1});
     for (int i = 0; i < 100; ++i) frame = game.step(1.0 / 60.0);
     if (car_x(frame) <= 0.25f)
         throw std::runtime_error("steering did not turn the 3D car right: x=" +
                                  std::to_string(car_x(frame)));
-    game.inject({threepoint::InputDevice::Keyboard, "w", 0});
-    game.inject({threepoint::InputDevice::Keyboard, "d", 0});
-    game.inject({threepoint::InputDevice::Keyboard, "r", 1});
+    game.inject({acuppa::InputDevice::Keyboard, "w", 0});
+    game.inject({acuppa::InputDevice::Keyboard, "d", 0});
+    game.inject({acuppa::InputDevice::Keyboard, "r", 1});
     frame = game.step(0);
     expect(std::abs(car_x(frame)) < 0.01f && std::abs(car_z(frame) - 16) < 0.01f,
            "restart did not rebuild the course from source");
-    game.inject({threepoint::InputDevice::Keyboard, "r", 0});
+    game.inject({acuppa::InputDevice::Keyboard, "r", 0});
 
-    threepoint::LuaProject grip(work, "course", threepoint::LuaProject::Mode::Game, false);
-    threepoint::LuaProject slide(work, "course", threepoint::LuaProject::Mode::Game, false);
-    grip.inject({threepoint::InputDevice::Keyboard, "w", 1});
-    slide.inject({threepoint::InputDevice::Keyboard, "w", 1});
+    acuppa::LuaProject grip(work, "course", acuppa::LuaProject::Mode::Game, false);
+    acuppa::LuaProject slide(work, "course", acuppa::LuaProject::Mode::Game, false);
+    grip.inject({acuppa::InputDevice::Keyboard, "w", 1});
+    slide.inject({acuppa::InputDevice::Keyboard, "w", 1});
     for (int i = 0; i < 80; ++i) {
         grip.step(1.0 / 60.0);
         slide.step(1.0 / 60.0);
     }
-    grip.inject({threepoint::InputDevice::Keyboard, "d", 1});
-    slide.inject({threepoint::InputDevice::Keyboard, "d", 1});
-    slide.inject({threepoint::InputDevice::Keyboard, "left_shift", 1});
-    threepoint::SceneFrame grip_frame, slide_frame;
+    grip.inject({acuppa::InputDevice::Keyboard, "d", 1});
+    slide.inject({acuppa::InputDevice::Keyboard, "d", 1});
+    slide.inject({acuppa::InputDevice::Keyboard, "left_shift", 1});
+    acuppa::SceneFrame grip_frame, slide_frame;
     for (int i = 0; i < 100; ++i) {
         grip_frame = grip.step(1.0 / 60.0);
         slide_frame = slide.step(1.0 / 60.0);
@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
                                  std::to_string(car_x(grip_frame)) + " slide=" +
                                  std::to_string(car_x(slide_frame)));
 
-    game.inject({threepoint::InputDevice::Keyboard, "w", 1});
+    game.inject({acuppa::InputDevice::Keyboard, "w", 1});
     bool reached_parking = false;
     for (int i = 0; i < 360; ++i) {
         frame = game.step(1.0 / 60.0);
@@ -101,18 +101,18 @@ int main(int argc, char* argv[]) {
     }
     expect(reached_parking && has_text(frame, "PARK"),
            "straight run did not cross the ordered physics checkpoints");
-    game.inject({threepoint::InputDevice::Keyboard, "w", 0});
-    game.inject({threepoint::InputDevice::Keyboard, "space", 1});
+    game.inject({acuppa::InputDevice::Keyboard, "w", 0});
+    game.inject({acuppa::InputDevice::Keyboard, "space", 1});
     for (int i = 0; i < 240 && !has_text(frame, "PARKED!"); ++i)
         frame = game.step(1.0 / 60.0);
     if (!has_text(frame, "PARKED!") || !fs::exists(work / "saves/best.tpsave"))
         throw std::runtime_error("low-speed parking did not finish and save: z=" +
                                  std::to_string(car_z(frame)) +
                                  " in_bay=" + std::to_string(has_text(frame, "BRAKE TO PARK")));
-    game.inject({threepoint::InputDevice::Keyboard, "space", 0});
-    threepoint::LuaProject reopened(work, "course", threepoint::LuaProject::Mode::Game, false);
+    game.inject({acuppa::InputDevice::Keyboard, "space", 0});
+    acuppa::LuaProject reopened(work, "course", acuppa::LuaProject::Mode::Game, false);
     expect(has_text(reopened.step(0), "BEST"), "best time did not restore in a fresh game");
-    reopened.inject({threepoint::InputDevice::Keyboard, "escape", 1});
+    reopened.inject({acuppa::InputDevice::Keyboard, "escape", 1});
     expect(reopened.step(0).quit, "Escape did not exit the game");
 
     const fs::path crash_work = work.parent_path() / "garage_run_crash_fixture";
@@ -127,9 +127,9 @@ int main(int argc, char* argv[]) {
                   "position = {0, 0.75, -35}");
     source.close();
     std::ofstream(crash_scene, std::ios::trunc) << scene;
-    threepoint::LuaProject crash(crash_work, "course", threepoint::LuaProject::Mode::Game, false);
+    acuppa::LuaProject crash(crash_work, "course", acuppa::LuaProject::Mode::Game, false);
     crash.step(0);
-    crash.inject({threepoint::InputDevice::Keyboard, "w", 1});
+    crash.inject({acuppa::InputDevice::Keyboard, "w", 1});
     bool hit_wall = false, shocked = false;
     for (int i = 0; i < 360; ++i) {
         const auto hit_frame = crash.step(1.0 / 60.0);

@@ -1,5 +1,5 @@
-#include "threepoint/editor_gizmo.hpp"
-#include "threepoint/input.hpp"
+#include "acuppa/editor_gizmo.hpp"
+#include "acuppa/input.hpp"
 
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/geometric.hpp>
@@ -11,7 +11,7 @@
 #include <limits>
 #include <stdexcept>
 
-namespace threepoint {
+namespace acuppa {
 namespace {
 
 glm::vec3 direction(GizmoAxis axis) {
@@ -150,4 +150,4 @@ glm::vec3 drag_gizmo_axis(const PerspectiveCamera& camera,
     return start_position + direction(axis) * units;
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

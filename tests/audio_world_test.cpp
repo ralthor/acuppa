@@ -1,4 +1,4 @@
-#include "threepoint/audio_world.hpp"
+#include "acuppa/audio_world.hpp"
 
 #include <cmath>
 #include <filesystem>
@@ -17,10 +17,10 @@ double energy(const std::vector<float>& samples) {
 
 int main(int argc, char* argv[]) {
     if (argc != 2) throw std::runtime_error("audio fixture path required");
-    threepoint::AudioWorld audio(false);
+    acuppa::AudioWorld audio(false);
     expect(!audio.output_available(), "offline audio test opened a device");
     audio.set_listener({0, 0, 0}, {0, 0, -1}, {0, 1, 0});
-    threepoint::SoundState settings;
+    acuppa::SoundState settings;
     settings.spatial = true;
     settings.looping = true;
     settings.position = {-2, 0, -3};
@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
            "playing sound state is unavailable");
     audio.set_pitch(id, 1.5f);
     expect(audio.state(id)->pitch == 1.5f, "sound pitch did not update");
-    threepoint::AudioWorld normal_pitch(false);
+    acuppa::AudioWorld normal_pitch(false);
     normal_pitch.set_listener({0, 0, 0}, {0, 0, -1}, {0, 1, 0});
     settings.pitch = 1.0f;
     normal_pitch.play(argv[1], settings);
@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
     catch (const std::invalid_argument&) { rejected = true; }
     expect(rejected, "unknown sound pitch target accepted");
     rejected = false;
-    try { audio.play(argv[1], threepoint::SoundState{.pitch = 0}); }
+    try { audio.play(argv[1], acuppa::SoundState{.pitch = 0}); }
     catch (const std::invalid_argument&) { rejected = true; }
     expect(rejected, "invalid initial sound pitch accepted");
     rejected = false;

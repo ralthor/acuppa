@@ -1,4 +1,4 @@
-#include "threepoint/environment_filter.hpp"
+#include "acuppa/environment_filter.hpp"
 
 #include <glm/geometric.hpp>
 #include <glm/vec3.hpp>
@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <stdexcept>
 
-namespace threepoint {
+namespace acuppa {
 namespace {
 
 constexpr float pi = 3.14159265358979323846f;
@@ -138,4 +138,4 @@ FilteredEnvironment filter_environment(const HdrImage& source) {
     return result;
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

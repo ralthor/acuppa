@@ -50,4 +50,4 @@ result = subprocess.run([str(cli), "build", str(garage), str(bundle)], cwd=work,
                         capture_output=True, text=True, timeout=30)
 assert result.returncode == 0, result.stderr
 (bundle / "game/assets/motor.wav").unlink()
-check_failure(bundle / "threepoint-game", "--check", expected="motor.wav")
+check_failure(bundle / "acuppa-game", "--check", expected="motor.wav")

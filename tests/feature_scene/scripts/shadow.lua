@@ -1,4 +1,4 @@
-local tp = require("threepoint")
+local tp = require("acuppa")
 return {
   start = function()
     tp.set_camera({eye = {tp.scene_name() == "shadow_shift" and 0.15 or 0, 0, 6},

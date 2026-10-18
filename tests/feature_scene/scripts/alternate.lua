@@ -1,4 +1,4 @@
-local tp = require("threepoint")
+local tp = require("acuppa")
 local ticks = 0
 return {
   start = function()
@@ -17,7 +17,7 @@ return {
     assert(not pcall(function() tp.prefab_spawn("probe", {mesh = {mesh = "missing"}}) end))
     assert(#tp.entities() == 2)
     assert(not pcall(function() tp.scene_switch("missing") end))
-    _G.threepoint_alternate_loads = (_G.threepoint_alternate_loads or 0) + 1
+    _G.acuppa_alternate_loads = (_G.acuppa_alternate_loads or 0) + 1
   end,
   fixed_update = function(dt)
     assert(dt > 0)
@@ -25,13 +25,13 @@ return {
   end,
   update = function(dt)
     assert(dt >= 0)
-    assert(_G.threepoint_actor_starts == _G.threepoint_alternate_loads)
-    assert(_G.threepoint_actor_fixed == (_G.threepoint_alternate_loads - 1) * 2 + ticks)
+    assert(_G.acuppa_actor_starts == _G.acuppa_alternate_loads)
+    assert(_G.acuppa_actor_fixed == (_G.acuppa_alternate_loads - 1) * 2 + ticks)
     assert(tp.component_get(tp.entity_find("actor"), "transform").position[1] == ticks)
     if ticks == 2 then
-      assert(_G.threepoint_actor_updates == _G.threepoint_alternate_loads)
-      assert(_G.threepoint_actor_draws == _G.threepoint_alternate_loads)
-      if _G.threepoint_alternate_loads == 1 then tp.scene_reload()
+      assert(_G.acuppa_actor_updates == _G.acuppa_alternate_loads)
+      assert(_G.acuppa_actor_draws == _G.acuppa_alternate_loads)
+      if _G.acuppa_alternate_loads == 1 then tp.scene_reload()
       else tp.scene_switch("main") end
     end
   end,

@@ -17,7 +17,7 @@ assert 'api_contract = "scenes/api_contract.scene.lua"' in (
     root / "tests/feature_scene/game.lua").read_text()
 assert 'tp.quit()' in invalid
 examples = {name for name in api if re.search(
-    r'\b(?:tp|threepoint)\.' + name + r'\s*\(', positive)} | {"quit"}
+    r'\b(?:tp|acuppa)\.' + name + r'\s*\(', positive)} | {"quit"}
 failures = {name for name in api if re.search(
     r'\b' + name + r'\s*=\s*function\s*\(\s*\)\s*tp\.' + name + r'\s*\(', invalid)}
 assert examples == api, f"Lua calls without a feature-scene example: {sorted(api - examples)}"

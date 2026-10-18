@@ -98,8 +98,8 @@ ZIG_GLOBAL_CACHE_DIR="$tools_dir/zig-cache" "$tools_dir/venv/bin/cmake" --fresh 
   -DLUA_LIBRARY="$sysroot_dir/usr/lib/x86_64-linux-gnu/liblua5.4.so" \
   -DLUA_MATH_LIBRARY=m \
   -Dglfw3_DIR="$sysroot_dir/usr/lib/x86_64-linux-gnu/cmake/glfw3" \
-  -DTHREEPOINT_GLSLANG_VALIDATOR="$sysroot_dir/usr/bin/glslangValidator" \
-  -DTHREEPOINT_VULKAN_LOADER="$sysroot_dir/usr/lib/x86_64-linux-gnu/libvulkan.so" \
+  -DACUPPA_GLSLANG_VALIDATOR="$sysroot_dir/usr/bin/glslangValidator" \
+  -DACUPPA_VULKAN_LOADER="$sysroot_dir/usr/lib/x86_64-linux-gnu/libvulkan.so" \
   -DFETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS="$tools_dir/vendor/vulkan-headers" \
   -DFETCHCONTENT_SOURCE_DIR_NVRHI="$tools_dir/vendor/nvrhi" \
   -DFETCHCONTENT_SOURCE_DIR_GLM="$tools_dir/vendor/glm" \
@@ -108,10 +108,10 @@ ZIG_GLOBAL_CACHE_DIR="$tools_dir/zig-cache" "$tools_dir/venv/bin/cmake" --fresh 
   -DFETCHCONTENT_SOURCE_DIR_MINIAUDIO="$tools_dir/vendor/miniaudio" \
   -DFETCHCONTENT_SOURCE_DIR_JOLT="$tools_dir/vendor/JoltPhysics" \
   -DFETCHCONTENT_SOURCE_DIR_LUA="$tools_dir/vendor/lua-5.4.8" \
-  -DTHREEPOINT_BUILD_2D_PROTOTYPE=ON \
-  -DTHREEPOINT_ENABLE_GPU_TESTS="$gpu_tests"
+  -DACUPPA_BUILD_2D_PROTOTYPE=ON \
+  -DACUPPA_ENABLE_GPU_TESTS="$gpu_tests"
 ZIG_GLOBAL_CACHE_DIR="$tools_dir/zig-cache" "$tools_dir/venv/bin/cmake" --build "$project_root/build"
-"$project_root/build/threepoint" --version
+"$project_root/build/acuppa" --version
 VK_LAYER_PATH="$sysroot_dir/usr/share/vulkan/explicit_layer.d" \
 LD_LIBRARY_PATH="$sysroot_dir/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}" \
 VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation \

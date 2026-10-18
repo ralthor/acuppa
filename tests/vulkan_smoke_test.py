@@ -33,8 +33,8 @@ with tempfile.TemporaryDirectory() as directory:
     assert match and int(match.group(1)) >= 1, result.stdout
     assert "Swapchain: 1056x604" in result.stdout, result.stdout
 
-    missing_driver = {**os.environ, "VK_ICD_FILENAMES": "/nonexistent/threepoint-icd.json",
-                      "VK_DRIVER_FILES": "/nonexistent/threepoint-icd.json"}
+    missing_driver = {**os.environ, "VK_ICD_FILENAMES": "/nonexistent/acuppa-icd.json",
+                      "VK_DRIVER_FILES": "/nonexistent/acuppa-icd.json"}
     result = run("--smoke-vulkan", environment=missing_driver)
     assert result.returncode != 0, result.stdout + result.stderr
     assert "Vulkan" in result.stderr, result.stderr

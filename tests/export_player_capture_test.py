@@ -18,7 +18,7 @@ bundle = work / "bundle"
 made = subprocess.run([str(cli), "build", str(source), str(bundle)],
                       capture_output=True, text=True, timeout=30)
 assert made.returncode == 0, made.stderr
-player = bundle / "threepoint-game"
+player = bundle / "acuppa-game"
 capture = work / "player.ppm"
 result = subprocess.run([str(player), "--frames", "2", "--capture", str(capture)],
                         cwd=work, capture_output=True, text=True, timeout=30)

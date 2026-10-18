@@ -1,4 +1,4 @@
-#include "threepoint/hdr_image.hpp"
+#include "acuppa/hdr_image.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -14,7 +14,7 @@ void expect(bool condition, const char* message) {
 int main(int argc, char* argv[]) {
     if (argc != 3) throw std::runtime_error("fixture root and work path required");
     const fs::path fixture = fs::path(argv[1]) / "assets/test_gradient.hdr";
-    const auto image = threepoint::load_hdr_image(fixture);
+    const auto image = acuppa::load_hdr_image(fixture);
     expect(image.width == 16 && image.height == 8 && image.rgba.size() == 16 * 8 * 4,
            "Radiance HDR image dimensions or channels were lost");
     const size_t bright = (2 * 16 + 7) * 4;
@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
     const fs::path work = argv[2];
     fs::create_directories(work);
     bool missing = false;
-    try { threepoint::load_hdr_image(work / "missing.hdr"); }
+    try { acuppa::load_hdr_image(work / "missing.hdr"); }
     catch (const std::runtime_error& error) {
         missing = std::string(error.what()).find("missing.hdr") != std::string::npos;
     }
@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
 
     std::ofstream(work / "invalid.hdr", std::ios::binary) << "not a Radiance image";
     bool invalid = false;
-    try { threepoint::load_hdr_image(work / "invalid.hdr"); }
+    try { acuppa::load_hdr_image(work / "invalid.hdr"); }
     catch (const std::runtime_error& error) {
         invalid = std::string(error.what()).find("invalid Radiance") != std::string::npos;
     }
@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
     bad_size.write(bytes.data(), std::streamsize(bytes.size()));
     bad_size.close();
     bool aspect = false;
-    try { threepoint::load_hdr_image(work / "bad_aspect.hdr"); }
+    try { acuppa::load_hdr_image(work / "bad_aspect.hdr"); }
     catch (const std::runtime_error& error) {
         aspect = std::string(error.what()).find("2:1") != std::string::npos;
     }

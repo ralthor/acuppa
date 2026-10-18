@@ -1,13 +1,13 @@
 #pragma once
 
-#include "threepoint/scene_frame.hpp"
+#include "acuppa/scene_frame.hpp"
 
 #include <glm/vec2.hpp>
 
 #include <cstdint>
 #include <optional>
 
-namespace threepoint {
+namespace acuppa {
 
 enum class GizmoAxis { X, Y, Z };
 
@@ -25,4 +25,4 @@ glm::vec3 drag_gizmo_axis(const PerspectiveCamera& camera,
                           glm::vec3 start_position, GizmoAxis axis,
                           glm::vec2 start_pointer, glm::vec2 pointer);
 
-}  // namespace threepoint
+}  // namespace acuppa

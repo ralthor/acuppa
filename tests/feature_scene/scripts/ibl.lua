@@ -1,4 +1,4 @@
-local tp = require("threepoint")
+local tp = require("acuppa")
 return {
   start = function()
     if tp.scene_name() == "ibl_missing" then

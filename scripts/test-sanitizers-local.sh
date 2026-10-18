@@ -19,10 +19,10 @@ export UBSAN_OPTIONS="${UBSAN_OPTIONS:-halt_on_error=1:print_stacktrace=1}"
   -DCMAKE_CXX_COMPILER="$tools_dir/venv/bin/python-zig" -DCMAKE_CXX_COMPILER_ARG1=c++ \
   -DCMAKE_CXX_FLAGS="-I$sysroot_dir/usr/include/x86_64-linux-gnu" \
   -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON \
-  -DTHREEPOINT_ENABLE_SANITIZERS=ON -DTHREEPOINT_ENABLE_GPU_TESTS=OFF \
+  -DACUPPA_ENABLE_SANITIZERS=ON -DACUPPA_ENABLE_GPU_TESTS=OFF \
   -Dglfw3_DIR="$sysroot_dir/usr/lib/x86_64-linux-gnu/cmake/glfw3" \
-  -DTHREEPOINT_GLSLANG_VALIDATOR="$sysroot_dir/usr/bin/glslangValidator" \
-  -DTHREEPOINT_VULKAN_LOADER="$sysroot_dir/usr/lib/x86_64-linux-gnu/libvulkan.so" \
+  -DACUPPA_GLSLANG_VALIDATOR="$sysroot_dir/usr/bin/glslangValidator" \
+  -DACUPPA_VULKAN_LOADER="$sysroot_dir/usr/lib/x86_64-linux-gnu/libvulkan.so" \
   -DFETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS="$tools_dir/vendor/vulkan-headers" \
   -DFETCHCONTENT_SOURCE_DIR_NVRHI="$tools_dir/vendor/nvrhi" \
   -DFETCHCONTENT_SOURCE_DIR_GLM="$tools_dir/vendor/glm" \

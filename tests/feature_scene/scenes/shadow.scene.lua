@@ -1,4 +1,4 @@
-local tp = require("threepoint")
+local tp = require("acuppa")
 local scene = tp.scene_name()
 local point = scene == "shadow_point" or scene == "shadow_point_off" or
               scene == "shadow_point_second"

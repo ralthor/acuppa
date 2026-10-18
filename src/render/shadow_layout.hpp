@@ -1,13 +1,13 @@
 #pragma once
 
-#include "threepoint/scene_frame.hpp"
+#include "acuppa/scene_frame.hpp"
 
 #include <array>
 #include <cstdint>
 #include <stdexcept>
 #include <vector>
 
-namespace threepoint {
+namespace acuppa {
 
 struct ShadowAtlasLayout {
     static constexpr uint32_t tile = 1024;
@@ -26,4 +26,4 @@ inline ShadowAtlasLayout plan_shadow_atlas(const std::vector<LightInstance>& lig
     return layout;
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

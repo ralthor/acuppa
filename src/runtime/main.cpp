@@ -1,6 +1,6 @@
-#include "threepoint/lua_project.hpp"
-#include "threepoint/project.hpp"
-#include "threepoint/preview.hpp"
+#include "acuppa/lua_project.hpp"
+#include "acuppa/project.hpp"
+#include "acuppa/preview.hpp"
 #include "export_game.hpp"
 
 #include <charconv>
@@ -15,40 +15,40 @@
 
 int main(int argc, char* argv[]) {
     if (argc == 2 && std::string_view(argv[1]) == "--version") {
-        std::cout << "ThreePoint runtime " << THREEPOINT_VERSION << " (Lua 3D runtime)\n";
+        std::cout << "ACuppa Engine " << ACUPPA_VERSION << " — Brew games, one idea at a time.\n";
         return 0;
     }
     const std::string_view command = argc > 1 ? argv[1] : "";
     if (command == "build" && argc == 4) {
         try {
             const std::filesystem::path root = argv[2];
-            const threepoint::LuaProject manifest(root, {},
-                threepoint::LuaProject::Mode::EditorPreview, false);
+            const acuppa::LuaProject manifest(root, {},
+                acuppa::LuaProject::Mode::EditorPreview, false);
             for (const auto& name : manifest.scene_names()) {
-                threepoint::LuaProject project(root, name,
-                    threepoint::LuaProject::Mode::Game, false);
+                acuppa::LuaProject project(root, name,
+                    acuppa::LuaProject::Mode::Game, false);
                 project.step(0);
                 project.step(1.0 / 60.0);
             }
             const auto self = std::filesystem::read_symlink("/proc/self/exe");
-            export_game(root, argv[3], self.parent_path() / "threepoint-player");
+            export_game(root, argv[3], self.parent_path() / "acuppa-player");
             std::cout << "Exported standalone game to " << argv[3] << '\n';
             return 0;
         } catch (const std::exception& error) {
-            std::cerr << "ThreePoint build: " << error.what() << '\n';
+            std::cerr << "ACuppa build: " << error.what() << '\n';
             return 1;
         }
     }
     if (command == "test" && argc == 3) {
         try {
             const std::filesystem::path root = argv[2];
-            const threepoint::LuaProject manifest(root, {},
-                threepoint::LuaProject::Mode::EditorPreview, false);
+            const acuppa::LuaProject manifest(root, {},
+                acuppa::LuaProject::Mode::EditorPreview, false);
             const auto scenes = manifest.scene_names();
             for (const auto& name : scenes) {
                 try {
-                    threepoint::LuaProject project(root, name,
-                        threepoint::LuaProject::Mode::Game, false);
+                    acuppa::LuaProject project(root, name,
+                        acuppa::LuaProject::Mode::Game, false);
                     auto frame = project.step(0);
                     for (int tick = 0; tick < 1 && !frame.quit; ++tick)
                         frame = project.step(1.0 / 60.0);
@@ -60,7 +60,7 @@ int main(int argc, char* argv[]) {
             std::cout << "Tested " << scenes.size() << " source scenes headlessly\n";
             return 0;
         } catch (const std::exception& error) {
-            std::cerr << "ThreePoint test: " << error.what() << '\n';
+            std::cerr << "ACuppa test: " << error.what() << '\n';
             return 1;
         }
     }
@@ -100,12 +100,12 @@ int main(int argc, char* argv[]) {
             if (!capture.empty() && frames == 0) {
                 throw std::invalid_argument("--capture requires --frames");
             }
-            threepoint::LuaProject project(argv[2], initial_scene);
+            acuppa::LuaProject project(argv[2], initial_scene);
             if (!held_key.empty()) {
-                project.inject({threepoint::InputDevice::Keyboard, held_key, 1.0f});
+                project.inject({acuppa::InputDevice::Keyboard, held_key, 1.0f});
             }
-            threepoint::PreviewOptions options;
-            options.scene = threepoint::PreviewOptions::Scene::Project;
+            acuppa::PreviewOptions options;
+            options.scene = acuppa::PreviewOptions::Scene::Project;
             options.width = project.width();
             options.height = project.height();
             options.frame_limit = frames;
@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
             options.capture_frame = frames == 0 ? 1 : frames;
             options.fixed_delta = frames == 0 ? 0.0 : 1.0 / 60.0;
             options.on_frame = [&project](double dt) { return project.step(dt); };
-            options.on_input = [&project](const threepoint::InputEvent& event) {
+            options.on_input = [&project](const acuppa::InputEvent& event) {
                 project.inject(event);
             };
             options.on_pointer = [&project](double x, double y) {
@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
             options.on_resize = [&project](uint32_t width, uint32_t height) {
                 project.set_viewport(width, height);
             };
-            const auto result = threepoint::run_preview(options);
+            const auto result = acuppa::run_preview(options);
             std::cout << "Rendered " << result.frames << " project frames\n";
             if (!capture.empty() && result.frames != frames) {
                 std::cerr << "Game stopped before the requested capture frame\n";
@@ -130,7 +130,7 @@ int main(int argc, char* argv[]) {
             }
             return 0;
         } catch (const std::exception& error) {
-            std::cerr << "ThreePoint: " << error.what() << '\n';
+            std::cerr << "ACuppa: " << error.what() << '\n';
             return 1;
         }
     }
@@ -142,8 +142,8 @@ int main(int argc, char* argv[]) {
         const bool cube = command == "--preview" || command == "--smoke-cube" ||
                           command == "--capture-cube";
         try {
-            threepoint::PreviewOptions options;
-            if (cube) options.scene = threepoint::PreviewOptions::Scene::Cube;
+            acuppa::PreviewOptions options;
+            if (cube) options.scene = acuppa::PreviewOptions::Scene::Cube;
             if (smoke) {
                 options.frame_limit = 6;
                 options.resize_after = 2;
@@ -160,7 +160,7 @@ int main(int argc, char* argv[]) {
                     }
                 }
             }
-            const auto result = threepoint::run_preview(options);
+            const auto result = acuppa::run_preview(options);
             std::cout << "Rendered " << result.frames << (cube ? " cube" : " clear")
                       << " frames; swapchain rebuilds: "
                       << result.swapchain_rebuilds << '\n';
@@ -170,20 +170,20 @@ int main(int argc, char* argv[]) {
             }
             return 0;
         } catch (const std::exception& error) {
-            std::cerr << "ThreePoint: " << error.what() << '\n';
+            std::cerr << "ACuppa: " << error.what() << '\n';
             return 1;
         }
     }
     if (argc == 3 && std::string_view(argv[1]) == "--check-project") {
         try {
-            const auto project = threepoint::require_project(argv[2]);
+            const auto project = acuppa::require_project(argv[2]);
             std::cout << "Project files found: " << project.root.string() << '\n';
             return 0;
         } catch (const std::exception& error) {
-            std::cerr << "ThreePoint: " << error.what() << '\n';
+            std::cerr << "ACuppa: " << error.what() << '\n';
             return 1;
         }
     }
-    std::cerr << "Usage: threepoint build <project> <output-directory> | threepoint test <project> | threepoint run <project> [--scene name] [--frames N] [--capture file.ppm] [--hold-key name] | --version | --check-project <directory> | --preview | --smoke-vulkan | --smoke-cube | --capture-clear <file.ppm> | --capture-cube <file.ppm> [angle-radians]\n";
+    std::cerr << "Usage: acuppa build <project> <output-directory> | acuppa test <project> | acuppa run <project> [--scene name] [--frames N] [--capture file.ppm] [--hold-key name] | --version | --check-project <directory> | --preview | --smoke-vulkan | --smoke-cube | --capture-clear <file.ppm> | --capture-cube <file.ppm> [angle-radians]\n";
     return 2;
 }

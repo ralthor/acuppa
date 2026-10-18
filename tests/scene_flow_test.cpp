@@ -1,4 +1,4 @@
-#include "threepoint/lua_project.hpp"
+#include "acuppa/lua_project.hpp"
 
 #include <cmath>
 #include <filesystem>
@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
       prefabs={probe="prefabs/probe.prefab.lua"}, input={}
     })");
     {
-        threepoint::LuaProject project(work);
+        acuppa::LuaProject project(work);
         auto frame = project.step(1.0 / 60.0);
         expect(frame.cubes.size() == 1 && frame.cubes[0].id == 2,
                "source scene did not create its cube");
@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
       entities={{name="same"},{name="same"}}, script="scripts/alternate.lua"
     })");
     bool duplicate_rejected = false;
-    try { threepoint::LuaProject project(work); }
+    try { acuppa::LuaProject project(work); }
     catch (const std::runtime_error& error) {
         duplicate_rejected = std::string(error.what()).find("duplicate scene entity name") !=
                              std::string::npos;
@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
       script="scripts/alternate.lua"
     })");
     bool parent_rejected = false;
-    try { threepoint::LuaProject project(work); }
+    try { acuppa::LuaProject project(work); }
     catch (const std::runtime_error& error) {
         parent_rejected = std::string(error.what()).find("unknown parent entity") !=
                           std::string::npos;
@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
       script="scripts/alternate.lua"
     })");
     bool typo_rejected = false;
-    try { threepoint::LuaProject project(work); }
+    try { acuppa::LuaProject project(work); }
     catch (const std::runtime_error& error) {
         typo_rejected = std::string(error.what()).find("unknown entity field") !=
                         std::string::npos;
@@ -88,7 +88,7 @@ int main(int argc, char* argv[]) {
       entities={[2]={name="child"}}, script="scripts/alternate.lua"
     })");
     bool sparse_rejected = false;
-    try { threepoint::LuaProject project(work); }
+    try { acuppa::LuaProject project(work); }
     catch (const std::runtime_error& error) {
         sparse_rejected = std::string(error.what()).find("dense array") !=
                           std::string::npos;

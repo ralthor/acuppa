@@ -21,7 +21,7 @@ try:
         stdout, stderr = process.communicate(timeout=5)
     else:
         raise AssertionError("interactive scene exited during startup:\n" + stdout + stderr)
-    assert "ThreePoint:" not in stderr and "Validation Error" not in stderr, stderr
+    assert "ACuppa:" not in stderr and "Validation Error" not in stderr, stderr
 finally:
     if process.poll() is None:
         process.kill()

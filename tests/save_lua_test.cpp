@@ -1,4 +1,4 @@
-#include "threepoint/lua_project.hpp"
+#include "acuppa/lua_project.hpp"
 
 #include <filesystem>
 #include <stdexcept>
@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     fs::remove_all(work);
     fs::copy(argv[1], work, fs::copy_options::recursive);
     for (int run = 0; run < 3; ++run) {
-        threepoint::LuaProject project(work, "save");
+        acuppa::LuaProject project(work, "save");
         const auto frame = project.step(0.0);
         expect(frame.cubes.size() == 1 && frame.cubes[0].position.x == float(run),
                "saved game state did not survive a fresh project instance");

@@ -64,7 +64,7 @@ with tempfile.TemporaryDirectory() as temporary:
         frame.unlink()
 
     script = project / "scripts/main.lua"
-    script.write_text("""local tp = require("threepoint")
+    script.write_text("""local tp = require("acuppa")
 local x, ticks, frames = 10, 0, 0
 return {
   start = function()
@@ -101,14 +101,14 @@ return {
     assert pixel(later_image, 10, 110) == (0, 255, 0)
     assert pixel(later_image, 130, 40) == (0, 0, 255)
 
-    script.write_text('local tp = require("threepoint")\nreturn {start = function() tp.draw.rect(0, 0, 5, 5, "#ffffff") end}\n')
+    script.write_text('local tp = require("acuppa")\nreturn {start = function() tp.draw.rect(0, 0, 5, 5, "#ffffff") end}\n')
     result = run("run", project)
     assert result.returncode != 0 and "scripts/main.lua:2:" in result.stderr
     assert "only run in draw()" in result.stderr
 
-    script.write_text('local tp = require("threepoint")\nreturn {draw = function() tp.draw.rect(0, 0, 5, 5, "red") end}\n')
+    script.write_text('local tp = require("acuppa")\nreturn {draw = function() tp.draw.rect(0, 0, 5, 5, "red") end}\n')
     result = run("run", project)
     assert result.returncode != 0 and "scripts/main.lua:2:" in result.stderr
     assert "#RRGGBB" in result.stderr
 
-print("ThreePoint graphics checks passed")
+print("ACuppa graphics checks passed")

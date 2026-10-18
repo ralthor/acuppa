@@ -1,4 +1,4 @@
-#include "threepoint/camera.hpp"
+#include "acuppa/camera.hpp"
 
 #include <glm/vec4.hpp>
 
@@ -16,7 +16,7 @@ void expect(bool condition, const char* message) {
 }  // namespace
 
 int main() {
-    threepoint::PerspectiveCamera camera;
+    acuppa::PerspectiveCamera camera;
     const glm::mat4 view_projection = camera.view_projection(16.0f / 9.0f);
     const glm::vec4 center = view_projection * glm::vec4(0, 0, 0, 1);
     expect(std::abs(center.x / center.w) < 0.0001f, "camera center X is off axis");
@@ -37,7 +37,7 @@ int main() {
     try { camera.view_projection(1.0f); }
     catch (const std::invalid_argument&) { rejected = true; }
     expect(rejected, "invalid near plane was accepted");
-    camera = threepoint::PerspectiveCamera{};
+    camera = acuppa::PerspectiveCamera{};
     camera.eye.x = std::numeric_limits<float>::quiet_NaN();
     rejected = false;
     try { camera.view_projection(1.0f); }

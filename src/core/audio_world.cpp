@@ -1,4 +1,4 @@
-#include "threepoint/audio_world.hpp"
+#include "acuppa/audio_world.hpp"
 
 #include <miniaudio.h>
 
@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace threepoint {
+namespace acuppa {
 namespace fs = std::filesystem;
 namespace {
 
@@ -179,4 +179,4 @@ std::vector<float> AudioWorld::render_offline(uint64_t frames) {
     return output;
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

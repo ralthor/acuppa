@@ -1,6 +1,6 @@
 #pragma once
 
-#include "threepoint/scene_frame.hpp"
+#include "acuppa/scene_frame.hpp"
 
 #include <nvrhi/nvrhi.h>
 
@@ -10,7 +10,7 @@
 #include <memory>
 #include <vector>
 
-namespace threepoint {
+namespace acuppa {
 
 class CubeDemo {
 public:
@@ -97,4 +97,4 @@ private:
     std::vector<nvrhi::FramebufferHandle> framebuffers_;
 };
 
-}  // namespace threepoint
+}  // namespace acuppa

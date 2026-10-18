@@ -1,4 +1,4 @@
-#include "threepoint/input.hpp"
+#include "acuppa/input.hpp"
 
 #include <glm/geometric.hpp>
 #include <glm/matrix.hpp>
@@ -8,7 +8,7 @@
 #include <cmath>
 #include <stdexcept>
 
-namespace threepoint {
+namespace acuppa {
 namespace {
 
 bool contains(std::string_view list, std::string_view control) {
@@ -126,4 +126,4 @@ WorldRay screen_ray(const PerspectiveCamera& camera, uint32_t width, uint32_t he
     return {camera.eye, glm::normalize(far_world - near_world)};
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

@@ -1,10 +1,10 @@
-#include "threepoint/project.hpp"
+#include "acuppa/project.hpp"
 
 #include <stdexcept>
 #include <string>
 #include <system_error>
 
-namespace threepoint {
+namespace acuppa {
 namespace {
 
 bool project_directory_exists(const std::filesystem::path& path) {
@@ -39,4 +39,4 @@ ProjectPaths require_project(const std::filesystem::path& root) {
     return paths;
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

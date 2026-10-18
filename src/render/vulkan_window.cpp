@@ -2,7 +2,7 @@
 #include <vulkan/vulkan.hpp>
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
-#include "threepoint/preview.hpp"
+#include "acuppa/preview.hpp"
 #include "cube_demo.hpp"
 
 #define GLFW_INCLUDE_NONE
@@ -21,7 +21,7 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #include <string>
 #include <vector>
 
-namespace threepoint {
+namespace acuppa {
 namespace {
 
 void check(VkResult result, const char* action) {
@@ -169,8 +169,8 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         window_ = glfwCreateWindow(int(options_.width), int(options_.height),
                                    options_.scene == PreviewOptions::Scene::Cube
-                                       ? "ThreePoint 3D cube" : options_.scene == PreviewOptions::Scene::Project
-                                           ? "ThreePoint game" : "ThreePoint Vulkan preview",
+                                       ? "ACuppa 3D cube" : options_.scene == PreviewOptions::Scene::Project
+                                           ? "ACuppa game" : "ACuppa Vulkan preview",
                                    nullptr, nullptr);
         if (!window_) {
             throw std::runtime_error("GLFW could not create the Vulkan window");
@@ -216,7 +216,7 @@ private:
         }
         instance_extensions_.assign(extensions, extensions + extension_count);
         VkApplicationInfo application{VK_STRUCTURE_TYPE_APPLICATION_INFO};
-        application.pApplicationName = "ThreePoint";
+        application.pApplicationName = "ACuppa";
         application.apiVersion = VK_API_VERSION_1_3;
         VkInstanceCreateInfo instance_info{VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
         instance_info.pApplicationInfo = &application;
@@ -643,4 +643,4 @@ PreviewResult run_preview(const PreviewOptions& options) {
     return VulkanWindow(options).run();
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

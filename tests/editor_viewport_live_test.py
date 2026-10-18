@@ -17,7 +17,7 @@ try:
         stdout, stderr = process.communicate(timeout=5)
     else:
         raise AssertionError("editor viewport exited during startup:\n" + stdout + stderr)
-    assert "ThreePoint editor:" not in stderr and "Validation Error" not in stderr, stderr
+    assert "ACuppa editor:" not in stderr and "Validation Error" not in stderr, stderr
 finally:
     if process.poll() is None:
         process.kill()

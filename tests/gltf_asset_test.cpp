@@ -1,4 +1,4 @@
-#include "threepoint/gltf_asset.hpp"
+#include "acuppa/gltf_asset.hpp"
 
 #include <cmath>
 #include <filesystem>
@@ -15,7 +15,7 @@ void expect(bool condition, const char* message) {
 int main(int argc, char* argv[]) {
     if (argc != 3) throw std::runtime_error("source root and temporary directory required");
     const fs::path root = argv[1];
-    const auto asset = threepoint::load_gltf(root, "assets/triangle.gltf");
+    const auto asset = acuppa::load_gltf(root, "assets/triangle.gltf");
     expect(asset.primitives.size() == 1, "glTF scene triangle was not imported");
     const auto& triangle = asset.primitives[0];
     expect(triangle.vertices.size() == 3 && triangle.indices.size() == 3,
@@ -27,13 +27,13 @@ int main(int argc, char* argv[]) {
            "glTF parent and child transforms were not composed");
     expect(triangle.vertices[0].color[0] > 0.9f,
            "glTF vertex color was not imported");
-    const auto external = threepoint::load_gltf(root, "assets/triangle_external.gltf");
-    const auto binary = threepoint::load_gltf(root, "assets/triangle.glb");
+    const auto external = acuppa::load_gltf(root, "assets/triangle_external.gltf");
+    const auto binary = acuppa::load_gltf(root, "assets/triangle.glb");
     expect(external.primitives.size() == 1 && binary.primitives.size() == 1 &&
            external.primitives[0].indices == triangle.indices &&
            binary.primitives[0].indices == triangle.indices,
            "external-buffer glTF or GLB geometry differs from embedded glTF");
-    const auto textured = threepoint::load_gltf(root, "assets/material_quad.gltf");
+    const auto textured = acuppa::load_gltf(root, "assets/material_quad.gltf");
     expect(textured.primitives.size() == 1 && textured.images.size() == 4,
            "textured glTF material or images were not imported");
     const auto& material = textured.primitives[0].material;
@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
     expect(textured.primitives[0].vertices[0].normal[2] == 1.0f &&
            textured.primitives[0].vertices[0].uv[1] == 1.0f,
            "glTF normals or UVs were not imported");
-    const auto spheres = threepoint::load_gltf(root, "assets/material_spheres.gltf");
+    const auto spheres = acuppa::load_gltf(root, "assets/material_spheres.gltf");
     expect(spheres.primitives.size() == 3 &&
            spheres.primitives[0].material.metallic < 0.1f &&
            spheres.primitives[1].material.metallic > 0.9f &&
@@ -58,14 +58,14 @@ int main(int argc, char* argv[]) {
            "reference sphere materials were not imported distinctly");
 
     bool missing_rejected = false;
-    try { threepoint::load_gltf(root, "assets/missing.gltf"); }
+    try { acuppa::load_gltf(root, "assets/missing.gltf"); }
     catch (const std::runtime_error& error) {
         missing_rejected = std::string(error.what()).find("assets/missing.gltf") !=
                            std::string::npos;
     }
     expect(missing_rejected, "missing asset error did not name the file");
     bool escape_rejected = false;
-    try { threepoint::load_gltf(root, "../outside.gltf"); }
+    try { acuppa::load_gltf(root, "../outside.gltf"); }
     catch (const std::runtime_error& error) {
         escape_rejected = std::string(error.what()).find("escapes project") !=
                           std::string::npos;
@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
                       "\"byteLength\": 1");
     std::ofstream(work / "assets/bad.gltf") << malformed;
     bool bounds_rejected = false;
-    try { threepoint::load_gltf(work, "assets/bad.gltf"); }
+    try { acuppa::load_gltf(work, "assets/bad.gltf"); }
     catch (const std::runtime_error& error) {
         bounds_rejected = std::string(error.what()).find("assets/bad.gltf") !=
                           std::string::npos;
@@ -98,7 +98,7 @@ int main(int argc, char* argv[]) {
     unsafe.replace(uri, std::string("triangle.bin").size(), "../outside.bin");
     std::ofstream(work / "assets/unsafe.gltf") << unsafe;
     bool buffer_escape_rejected = false;
-    try { threepoint::load_gltf(work, "assets/unsafe.gltf"); }
+    try { acuppa::load_gltf(work, "assets/unsafe.gltf"); }
     catch (const std::runtime_error& error) {
         buffer_escape_rejected = std::string(error.what()).find("escapes project") !=
                                  std::string::npos;
@@ -116,7 +116,7 @@ int main(int argc, char* argv[]) {
                           "data:image/png;base64,AAAA");
     std::ofstream(work / "assets/invalid_image.gltf") << invalid_image;
     bool image_rejected = false;
-    try { threepoint::load_gltf(work, "assets/invalid_image.gltf"); }
+    try { acuppa::load_gltf(work, "assets/invalid_image.gltf"); }
     catch (const std::runtime_error& error) {
         image_rejected = std::string(error.what()).find("image 0") != std::string::npos;
     }
@@ -132,7 +132,7 @@ int main(int argc, char* argv[]) {
                                 "\"source\": 0, \"sampler\": 0");
     std::ofstream(work / "assets/unsupported_sampler.gltf") << unsupported_sampler;
     bool sampler_rejected = false;
-    try { threepoint::load_gltf(work, "assets/unsupported_sampler.gltf"); }
+    try { acuppa::load_gltf(work, "assets/unsupported_sampler.gltf"); }
     catch (const std::runtime_error& error) {
         sampler_rejected = std::string(error.what()).find("sampler") != std::string::npos;
     }

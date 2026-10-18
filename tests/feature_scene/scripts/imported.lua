@@ -1,4 +1,4 @@
-local tp = require("threepoint")
+local tp = require("acuppa")
 return {
   start = function()
     local id = tp.entity_find("imported triangle")

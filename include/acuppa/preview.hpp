@@ -1,13 +1,13 @@
 #pragma once
 
-#include "threepoint/input.hpp"
-#include "threepoint/scene_frame.hpp"
+#include "acuppa/input.hpp"
+#include "acuppa/scene_frame.hpp"
 
 #include <cstdint>
 #include <filesystem>
 #include <functional>
 
-namespace threepoint {
+namespace acuppa {
 
 struct PreviewOptions {
     enum class Scene { Clear, Cube, Project };
@@ -33,4 +33,4 @@ struct PreviewResult {
 
 PreviewResult run_preview(const PreviewOptions& options);
 
-}  // namespace threepoint
+}  // namespace acuppa

@@ -1,6 +1,6 @@
 ---
-name: threepoint-feature-slice
-description: Implement one small, fully tested ThreePoint 3D engine milestone while preserving the source-only game workflow.
+name: acuppa-feature-slice
+description: Implement one small, fully tested ACuppa 3D engine milestone while preserving the source-only game workflow.
 ---
 
 # Feature slice

@@ -1,6 +1,6 @@
 #include "export_game.hpp"
 
-#include "threepoint/project.hpp"
+#include "acuppa/project.hpp"
 
 #include <algorithm>
 #include <array>
@@ -53,10 +53,10 @@ std::string game_id(const fs::path& root) {
 
 void export_game(const fs::path& project, const fs::path& destination,
                  const fs::path& player_binary) {
-    const fs::path root = fs::canonical(threepoint::require_project(project).root);
+    const fs::path root = fs::canonical(acuppa::require_project(project).root);
     if (destination.empty()) throw std::invalid_argument("build destination is empty");
     if (!fs::is_regular_file(player_binary))
-        throw std::runtime_error("threepoint-player was not built beside the CLI");
+        throw std::runtime_error("acuppa-player was not built beside the CLI");
     const fs::path output = fs::weakly_canonical(destination);
     if (is_within(output, root) || is_within(root, output))
         throw std::invalid_argument("build destination must be separate from the project");
@@ -89,9 +89,9 @@ void export_game(const fs::path& project, const fs::path& destination,
         }
         if (!fs::is_regular_file(staging / "game/game.lua"))
             throw std::runtime_error("game.lua was not copied into the bundle");
-        fs::copy_file(player_binary, staging / "threepoint-game");
+        fs::copy_file(player_binary, staging / "acuppa-game");
         std::ofstream(staging / "game.id") << game_id(root) << '\n';
-        fs::permissions(staging / "threepoint-game",
+        fs::permissions(staging / "acuppa-game",
                         fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
                         fs::perm_options::add);
         fs::rename(staging, output);

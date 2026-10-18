@@ -8,7 +8,7 @@
 #include <optional>
 #include <vector>
 
-namespace threepoint {
+namespace acuppa {
 
 struct SoundState {
     bool playing = false;
@@ -43,4 +43,4 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 
-}  // namespace threepoint
+}  // namespace acuppa

@@ -29,7 +29,7 @@ with tempfile.TemporaryDirectory() as directory:
         ('tp.entity_destroy(999)', "unknown entity ID"),
     ]
     for expression, expected in cases:
-        script.write_text('local tp=require("threepoint")\n'
+        script.write_text('local tp=require("acuppa")\n'
                           'return {start=function() local id=tp.entity_create() '
                           + expression + ' end, fixed_update=function() end, '
                           'update=function() end}\n')

@@ -1,4 +1,4 @@
-#include "threepoint/lua_project.hpp"
+#include "acuppa/lua_project.hpp"
 
 #include <cmath>
 #include <stdexcept>
@@ -9,7 +9,7 @@ void expect(bool condition, const char* message) {
 
 int main(int argc, char* argv[]) {
     if (argc != 2) throw std::runtime_error("feature scene path required");
-    threepoint::LuaProject project(argv[1]);
+    acuppa::LuaProject project(argv[1]);
     expect(project.width() == 1280 && project.height() == 720,
            "window settings were not read from game.lua");
     const auto startup = project.step(0.0);
@@ -24,11 +24,11 @@ int main(int argc, char* argv[]) {
     const auto last = project.step(0.0);
     expect(std::abs(last.cubes[0].rotation.y - 0.9f) < 0.001f,
            "the code-only scene did not animate deterministically");
-    project.inject({threepoint::InputDevice::Keyboard, "space", 1.0f});
-    project.inject({threepoint::InputDevice::Keyboard, "d", 1.0f});
-    project.inject({threepoint::InputDevice::MouseButton, "left", 1.0f});
-    project.inject({threepoint::InputDevice::GamepadButton, "b", 1.0f});
-    project.inject({threepoint::InputDevice::GamepadAxis, "left_x", 0.5f});
+    project.inject({acuppa::InputDevice::Keyboard, "space", 1.0f});
+    project.inject({acuppa::InputDevice::Keyboard, "d", 1.0f});
+    project.inject({acuppa::InputDevice::MouseButton, "left", 1.0f});
+    project.inject({acuppa::InputDevice::GamepadButton, "b", 1.0f});
+    project.inject({acuppa::InputDevice::GamepadAxis, "left_x", 0.5f});
     project.set_pointer(640.0, 360.0);
     const auto controlled = project.step(0.0);
     expect(std::abs(controlled.cubes[0].rotation.y - 1.8f) < 0.001f,
@@ -36,33 +36,33 @@ int main(int argc, char* argv[]) {
     expect(std::abs(controlled.camera.eye.x - 1.5f) < 0.001f &&
            std::abs(controlled.camera.eye.z - 6.5f) < 0.001f,
            "injected keyboard, mouse, and controller input did not move the camera");
-    project.inject({threepoint::InputDevice::Keyboard, "space", 0.0f});
-    project.inject({threepoint::InputDevice::GamepadButton, "a", 1.0f});
+    project.inject({acuppa::InputDevice::Keyboard, "space", 0.0f});
+    project.inject({acuppa::InputDevice::GamepadButton, "a", 1.0f});
     expect(std::abs(project.step(0.0).cubes[0].rotation.y - 1.8f) < 0.001f,
            "controller binding did not substitute for keyboard");
-    project.inject({threepoint::InputDevice::GamepadButton, "a", 0.0f});
+    project.inject({acuppa::InputDevice::GamepadButton, "a", 0.0f});
     expect(std::abs(project.step(0.0).cubes[0].rotation.y - 0.9f) < 0.001f,
            "released controls did not restore base rotation");
-    threepoint::LuaProject hdr(argv[1], "hdr");
-    threepoint::LuaProject hdr_dim(argv[1], "hdr_dim");
+    acuppa::LuaProject hdr(argv[1], "hdr");
+    acuppa::LuaProject hdr_dim(argv[1], "hdr_dim");
     expect(std::abs(hdr.step(0.0).exposure - 1.0f) < 0.001f &&
            std::abs(hdr_dim.step(0.0).exposure - 0.15f) < 0.001f,
            "source-authored scene exposure did not reach the render frame");
-    threepoint::LuaProject ssao(argv[1], "ssao"), ssao_off(argv[1], "ssao_off");
+    acuppa::LuaProject ssao(argv[1], "ssao"), ssao_off(argv[1], "ssao_off");
     const auto ao = ssao.step(0.0);
     expect(ao.ssao_quality == 3 && std::abs(ao.ssao_radius - 0.35f) < 0.001f &&
            std::abs(ao.ssao_strength - 2.0f) < 0.001f &&
            ssao_off.step(0.0).ssao_quality == 0 &&
            project.step(0.0).ssao_quality == 0,
            "Lua SSAO settings did not reach the frame or reset for a new scene");
-    threepoint::LuaProject ibl(argv[1], "ibl"), ibl_off(argv[1], "ibl_off");
+    acuppa::LuaProject ibl(argv[1], "ibl"), ibl_off(argv[1], "ibl_off");
     const auto environment = ibl.step(0.0);
     const auto no_environment = ibl_off.step(0.0);
     expect(environment.environment && environment.environment->width == 16 &&
            environment.environment_intensity == 1.0f &&
            !no_environment.environment && no_environment.environment_intensity == 0.0f,
            "source-authored HDRI did not reach the render frame");
-    threepoint::LuaProject physics(argv[1], "physics");
+    acuppa::LuaProject physics(argv[1], "physics");
     const auto initial_physics = physics.step(0.0);
     expect(initial_physics.cubes.size() == 2 &&
            std::abs(initial_physics.cubes[1].position.y - 4.0f) < 0.001f,
@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
     const auto settled_physics = physics.step(0.0);
     expect(std::abs(settled_physics.cubes[1].position.y - 0.4f) < 0.05f,
            "Lua-authored dynamic body did not visibly settle on the floor");
-    threepoint::LuaProject timers(argv[1], "timers");
+    acuppa::LuaProject timers(argv[1], "timers");
     for (int i = 0; i < 6; ++i) timers.step(1.0 / 60.0);
     project.set_viewport(640, 360);
     expect(project.width() == 640 && project.height() == 360,

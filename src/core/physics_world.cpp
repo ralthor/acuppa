@@ -19,7 +19,7 @@
 #include <Jolt/Physics/Vehicle/VehicleCollisionTester.h>
 #include <Jolt/Physics/Vehicle/WheeledVehicleController.h>
 
-#include "threepoint/physics_world.hpp"
+#include "acuppa/physics_world.hpp"
 
 #include <glm/geometric.hpp>
 
@@ -29,7 +29,7 @@
 #include <set>
 #include <stdexcept>
 
-namespace threepoint {
+namespace acuppa {
 namespace {
 
 struct JoltRuntime {
@@ -419,4 +419,4 @@ void PhysicsWorld::step() {
 
 const std::vector<PhysicsContact>& PhysicsWorld::contacts() const { return impl_->events; }
 
-}  // namespace threepoint
+}  // namespace acuppa

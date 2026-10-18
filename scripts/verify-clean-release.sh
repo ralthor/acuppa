@@ -13,7 +13,7 @@ rm -rf "$work"
 mkdir -p "$work/source"
 git -C "$root" archive HEAD | tar -x -C "$work/source"
 export ZIG_GLOBAL_CACHE_DIR="$tools/zig-cache"
-export THREEPOINT_VENDOR_DIR="$tools/vendor"
+export ACUPPA_VENDOR_DIR="$tools/vendor"
 export VK_LAYER_PATH="$sysroot/usr/share/vulkan/explicit_layer.d"
 export LD_LIBRARY_PATH="$sysroot/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
 export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
@@ -23,10 +23,10 @@ export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
   -DCMAKE_CXX_COMPILER="$tools/venv/bin/python-zig" -DCMAKE_CXX_COMPILER_ARG1=c++ \
   -DCMAKE_CXX_FLAGS="-I$sysroot/usr/include/x86_64-linux-gnu" \
   -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
-  -DTHREEPOINT_ENABLE_GPU_TESTS=ON \
+  -DACUPPA_ENABLE_GPU_TESTS=ON \
   -Dglfw3_DIR="$sysroot/usr/lib/x86_64-linux-gnu/cmake/glfw3" \
-  -DTHREEPOINT_GLSLANG_VALIDATOR="$sysroot/usr/bin/glslangValidator" \
-  -DTHREEPOINT_VULKAN_LOADER="$sysroot/usr/lib/x86_64-linux-gnu/libvulkan.so" \
+  -DACUPPA_GLSLANG_VALIDATOR="$sysroot/usr/bin/glslangValidator" \
+  -DACUPPA_VULKAN_LOADER="$sysroot/usr/lib/x86_64-linux-gnu/libvulkan.so" \
   -DFETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS="$tools/vendor/vulkan-headers" \
   -DFETCHCONTENT_SOURCE_DIR_NVRHI="$tools/vendor/nvrhi" \
   -DFETCHCONTENT_SOURCE_DIR_GLM="$tools/vendor/glm" \

@@ -1,15 +1,15 @@
 #include "cube_demo.hpp"
 #include "shadow_layout.hpp"
 
-#include "threepoint/camera.hpp"
-#include "threepoint/environment_filter.hpp"
+#include "acuppa/camera.hpp"
+#include "acuppa/environment_filter.hpp"
 #include "cube_vert_spv.hpp"
 #include "cube_frag_spv.hpp"
 #include "pbr_vert_spv.hpp"
 #include "pbr_frag_spv.hpp"
 #include "tonemap_vert_spv.hpp"
 #include "tonemap_frag_spv.hpp"
-#include "threepoint/ui_canvas.hpp"
+#include "acuppa/ui_canvas.hpp"
 #include "ssao_frag_spv.hpp"
 #include "shadow_cube_vert_spv.hpp"
 #include "shadow_cube_frag_spv.hpp"
@@ -31,7 +31,7 @@
 #include <string>
 #include <vector>
 
-namespace threepoint {
+namespace acuppa {
 namespace {
 
 struct Vertex {
@@ -844,4 +844,4 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
     commands->draw(nvrhi::DrawArguments().setVertexCount(3));
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

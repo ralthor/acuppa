@@ -1,6 +1,6 @@
 ---
-name: threepoint-release-check
-description: Verify a ThreePoint build and its code-only sample games before claiming a production-ready release.
+name: acuppa-release-check
+description: Verify a ACuppa build and its code-only sample games before claiming a production-ready release.
 ---
 
 # Release check

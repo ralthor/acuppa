@@ -1,4 +1,4 @@
-#include "threepoint/world.hpp"
+#include "acuppa/world.hpp"
 
 #include <cmath>
 #include <stdexcept>
@@ -10,13 +10,13 @@ void expect(bool condition, const char* message) {
 }
 
 int main() {
-    threepoint::World world;
+    acuppa::World world;
     const auto first = world.create("first");
     const auto second = world.create("second");
     expect(first != second && world.entities().size() == 2, "entity IDs are not unique");
     expect(world.name(first) == "first", "entity name was lost");
 
-    threepoint::TransformComponent transform;
+    acuppa::TransformComponent transform;
     transform.position = {1, 2, 3};
     world.set_transform(first, transform);
     expect(world.transform(first)->position.x == 1, "transform did not persist");
@@ -32,7 +32,7 @@ int main() {
     world.set_mesh(second, {"assets/triangle.gltf", true, false});
     expect(!world.snapshot({}).imported[0].casts_shadows,
            "glTF shadow-casting flag did not reach the render snapshot");
-    threepoint::TransformComponent parent_transform;
+    acuppa::TransformComponent parent_transform;
     parent_transform.position = {4, 0, 0};
     world.set_transform(second, parent_transform);
     transform.parent = second;
@@ -47,7 +47,7 @@ int main() {
     world.remove_transform(second);
     expect(!world.transform(first)->parent, "removing a parent did not detach child");
 
-    threepoint::CameraComponent camera;
+    acuppa::CameraComponent camera;
     camera.camera.eye = {0, 1, 5};
     camera.active = true;
     world.set_camera(first, camera);
@@ -58,8 +58,8 @@ int main() {
     expect(!world.camera(first)->active && world.active_camera() == second,
            "second active camera did not deactivate the first");
 
-    threepoint::LightComponent light;
-    light.type = threepoint::LightComponent::Type::Directional;
+    acuppa::LightComponent light;
+    light.type = acuppa::LightComponent::Type::Directional;
     light.intensity = 2;
     light.shadows = true;
     light.shadow_range = 7;
@@ -85,10 +85,10 @@ int main() {
     world.set_script(first, {"scripts/main.lua", true});
     expect(world.script(first)->enabled, "script component did not persist");
 
-    threepoint::PhysicsComponent body;
-    body.motion = threepoint::PhysicsMotion::Dynamic;
+    acuppa::PhysicsComponent body;
+    body.motion = acuppa::PhysicsMotion::Dynamic;
     world.set_physics(first, body);
-    expect(world.physics(first)->motion == threepoint::PhysicsMotion::Dynamic,
+    expect(world.physics(first)->motion == acuppa::PhysicsMotion::Dynamic,
            "physics component did not persist");
     bool bad_body = false;
     try { body.radius = 0; world.set_physics(first, body); }

@@ -1,4 +1,4 @@
-#include "threepoint/editor_viewport.hpp"
+#include "acuppa/editor_viewport.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/vec4.hpp>
@@ -9,7 +9,7 @@
 #include <sstream>
 #include <stdexcept>
 
-namespace threepoint {
+namespace acuppa {
 namespace {
 
 glm::vec3 axis_vector(GizmoAxis axis) {
@@ -215,4 +215,4 @@ SceneFrame EditorViewport::frame() {
     return shown;
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

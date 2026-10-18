@@ -210,7 +210,7 @@ static void set_lua_method(lua_State* lua, Runtime* state, const char* name,
   lua_setfield(lua, -2, name);
 }
 
-static int open_threepoint(lua_State* lua) {
+static int open_acuppa(lua_State* lua) {
   auto* state = static_cast<Runtime*>(lua_touserdata(lua, lua_upvalueindex(1)));
   lua_newtable(lua);
   lua_newtable(lua);
@@ -229,12 +229,12 @@ static int open_threepoint(lua_State* lua) {
   return 1;
 }
 
-static void register_threepoint(lua_State* lua, Runtime* state) {
+static void register_acuppa(lua_State* lua, Runtime* state) {
   lua_getglobal(lua, "package");
   lua_getfield(lua, -1, "preload");
   lua_pushlightuserdata(lua, state);
-  lua_pushcclosure(lua, open_threepoint, 1);
-  lua_setfield(lua, -2, "threepoint");
+  lua_pushcclosure(lua, open_acuppa, 1);
+  lua_setfield(lua, -2, "acuppa");
   lua_pop(lua, 2);
 }
 
@@ -275,24 +275,24 @@ static void init_project(const fs::path& path) {
   ui = {}
 }
 )");
-  write_file(path / "scripts/main.lua", R"(local tp = require("threepoint")
+  write_file(path / "scripts/main.lua", R"(local tp = require("acuppa")
 local x = 40
 
 return {
-  start = function() print("Hello from ThreePoint") end,
+  start = function() print("Hello from ACuppa") end,
   fixed_update = function(dt)
     x = (x + 120 * dt) % 800
   end,
   draw = function()
     tp.draw.rect(x, 260, 160, 70, "#55bbff")
-    tp.draw.text("ThreePoint", x + 34, 290, "#102030")
+    tp.draw.text("ACuppa", x + 34, 290, "#102030")
   end
 }
 )");
   write_file(path / "tests/smoke.test.lua", R"(local game = dofile("game.lua")
 assert(game.first_scene == "main")
 )");
-  std::cout << "Created ThreePoint project: " << path.string() << '\n';
+  std::cout << "Created ACuppa project: " << path.string() << '\n';
 }
 
 static std::string project_file(const std::string& name) {
@@ -433,7 +433,7 @@ static void run_project(const fs::path& path) {
     throw std::runtime_error("could not initialize Lua");
   }
   luaL_openlibs(lua.get());
-  register_threepoint(lua.get(), &state);
+  register_acuppa(lua.get(), &state);
 
   const int game = load_table(lua.get(), "game.lua");
   if (positive_int_field(lua.get(), game, "api", "game.lua") != 1) {
@@ -493,7 +493,7 @@ static void run_project(const fs::path& path) {
     throw std::runtime_error(std::string("could not enable blending: ") + SDL_GetError());
   }
 
-  std::cout << "ThreePoint: started '" << title << "' at scene '" << first_scene << "'\n";
+  std::cout << "ACuppa: started '" << title << "' at scene '" << first_scene << "'\n";
   call_callback(lua.get(), script_table, first.script, "start", false);
   constexpr double fixed_step = 1.0 / 60.0;
   constexpr Uint64 frame_ns = 16666667;
@@ -534,19 +534,19 @@ static void run_project(const fs::path& path) {
     const Uint64 elapsed = SDL_GetTicksNS() - frame_start;
     if (elapsed < frame_ns) SDL_DelayNS(frame_ns - elapsed);
   }
-  std::cout << "ThreePoint: stopped\n";
+  std::cout << "ACuppa: stopped\n";
 }
 
 int main(int argc, char* argv[]) {
   if (argc == 2 && std::string(argv[1]) == "--version") {
     const int sdl = SDL_GetVersion();
-    std::cout << "ThreePoint: SDL " << SDL_VERSIONNUM_MAJOR(sdl) << '.'
+    std::cout << "ACuppa: SDL " << SDL_VERSIONNUM_MAJOR(sdl) << '.'
               << SDL_VERSIONNUM_MINOR(sdl) << '.' << SDL_VERSIONNUM_MICRO(sdl)
               << ", " << LUA_VERSION << '\n';
     return 0;
   }
   if (argc != 3) {
-    std::cerr << "Usage: threepoint init <directory> | threepoint run <directory>\n";
+    std::cerr << "Usage: acuppa init <directory> | acuppa run <directory>\n";
     return 2;
   }
   try {
@@ -561,7 +561,7 @@ int main(int argc, char* argv[]) {
     }
     return 0;
   } catch (const std::exception& error) {
-    std::cerr << "threepoint: " << error.what() << '\n';
+    std::cerr << "acuppa: " << error.what() << '\n';
     return 1;
   }
 }

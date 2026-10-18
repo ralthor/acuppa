@@ -26,11 +26,11 @@ with tempfile.TemporaryDirectory() as temporary:
 
     script = project / "scripts/main.lua"
     original_script = script.read_text()
-    script.write_text('local tp = require("threepoint")\nreturn {start = function() print("Hello from ThreePoint"); tp.app.quit() end}\n')
+    script.write_text('local tp = require("acuppa")\nreturn {start = function() print("Hello from ACuppa"); tp.app.quit() end}\n')
     result = run("run", project)
     assert result.returncode == 0, result.stderr
     assert "started 'New Game'" in result.stdout and "stopped" in result.stdout
-    assert "Hello from ThreePoint" in result.stdout
+    assert "Hello from ACuppa" in result.stdout
 
     game = project / "game.lua"
     original = game.read_text()
@@ -51,7 +51,7 @@ with tempfile.TemporaryDirectory() as temporary:
     result = run("run", project)
     assert result.returncode != 0 and "scripts/main.lua:2:" in result.stderr, result.stderr
 
-    script.write_text("""local tp = require("threepoint")
+    script.write_text("""local tp = require("acuppa")
 local ticks = 0
 local updated, drawn = false, false
 return {
@@ -97,4 +97,4 @@ return {
     result = run("run", project)
     assert result.returncode != 0 and "scenes/main.scene.lua: file not found" in result.stderr
 
-print("ThreePoint CLI checks passed")
+print("ACuppa CLI checks passed")

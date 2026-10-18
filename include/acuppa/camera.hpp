@@ -3,7 +3,7 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
-namespace threepoint {
+namespace acuppa {
 
 struct PerspectiveCamera {
     glm::vec3 eye{0.0f, 0.0f, 4.5f};
@@ -17,4 +17,4 @@ struct PerspectiveCamera {
     glm::mat4 view_projection(float aspect_ratio) const;
 };
 
-}  // namespace threepoint
+}  // namespace acuppa

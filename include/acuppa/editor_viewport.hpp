@@ -1,8 +1,8 @@
 #pragma once
 
-#include "threepoint/editor_gizmo.hpp"
-#include "threepoint/lua_project.hpp"
-#include "threepoint/scene_document.hpp"
+#include "acuppa/editor_gizmo.hpp"
+#include "acuppa/lua_project.hpp"
+#include "acuppa/scene_document.hpp"
 
 #include <glm/mat4x4.hpp>
 
@@ -11,7 +11,7 @@
 #include <optional>
 #include <string>
 
-namespace threepoint {
+namespace acuppa {
 
 class EditorViewport {
 public:
@@ -53,4 +53,4 @@ private:
     glm::vec3 preview_local_{0};
 };
 
-}  // namespace threepoint
+}  // namespace acuppa

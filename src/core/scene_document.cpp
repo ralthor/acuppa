@@ -1,4 +1,4 @@
-#include "threepoint/scene_document.hpp"
+#include "acuppa/scene_document.hpp"
 
 extern "C" {
 #include <lauxlib.h>
@@ -21,7 +21,7 @@ extern "C" {
 #include <sys/stat.h>
 #include <unistd.h>
 
-namespace threepoint {
+namespace acuppa {
 namespace fs = std::filesystem;
 namespace {
 
@@ -332,4 +332,4 @@ void SceneDocument::save() {
     original_ = content;
 }
 
-}  // namespace threepoint
+}  // namespace acuppa

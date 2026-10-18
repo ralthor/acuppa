@@ -1,5 +1,5 @@
-#include "threepoint/lua_project.hpp"
-#include "threepoint/preview.hpp"
+#include "acuppa/lua_project.hpp"
+#include "acuppa/preview.hpp"
 
 #include <charconv>
 #include <cstdlib>
@@ -28,14 +28,14 @@ int main(int argc, char* argv[]) {
         else if (home && *home && std::filesystem::path(home).is_absolute())
             data_root = std::filesystem::path(home) / ".local/share";
         else throw std::runtime_error("HOME or absolute XDG_DATA_HOME is required for game saves");
-        const auto save_root = data_root / "threepoint" / game_id;
+        const auto save_root = data_root / "acuppa" / game_id;
         std::filesystem::create_directories(save_root);
         if (argc == 2 && std::string_view(argv[1]) == "--check") {
-            const threepoint::LuaProject manifest(root, {},
-                threepoint::LuaProject::Mode::EditorPreview, false, save_root);
+            const acuppa::LuaProject manifest(root, {},
+                acuppa::LuaProject::Mode::EditorPreview, false, save_root);
             for (const auto& name : manifest.scene_names()) {
-                threepoint::LuaProject scene(root, name,
-                    threepoint::LuaProject::Mode::Game, false, save_root);
+                acuppa::LuaProject scene(root, name,
+                    acuppa::LuaProject::Mode::Game, false, save_root);
                 scene.step(0);
                 scene.step(1.0 / 60.0);
             }
@@ -66,12 +66,12 @@ int main(int argc, char* argv[]) {
         }
         if (!capture.empty() && frames == 0)
             throw std::invalid_argument("--capture requires --frames");
-        threepoint::LuaProject project(root, {}, threepoint::LuaProject::Mode::Game,
+        acuppa::LuaProject project(root, {}, acuppa::LuaProject::Mode::Game,
                                        true, save_root);
         if (!held_key.empty())
-            project.inject({threepoint::InputDevice::Keyboard, held_key, 1.0f});
-        threepoint::PreviewOptions options;
-        options.scene = threepoint::PreviewOptions::Scene::Project;
+            project.inject({acuppa::InputDevice::Keyboard, held_key, 1.0f});
+        acuppa::PreviewOptions options;
+        options.scene = acuppa::PreviewOptions::Scene::Project;
         options.width = project.width();
         options.height = project.height();
         options.frame_limit = frames;
@@ -79,19 +79,19 @@ int main(int argc, char* argv[]) {
         options.capture_frame = frames == 0 ? 1 : frames;
         options.fixed_delta = frames == 0 ? 0.0 : 1.0 / 60.0;
         options.on_frame = [&project](double dt) { return project.step(dt); };
-        options.on_input = [&project](const threepoint::InputEvent& event) {
+        options.on_input = [&project](const acuppa::InputEvent& event) {
             project.inject(event);
         };
         options.on_pointer = [&project](double x, double y) { project.set_pointer(x, y); };
         options.on_resize = [&project](uint32_t width, uint32_t height) {
             project.set_viewport(width, height);
         };
-        const auto result = threepoint::run_preview(options);
+        const auto result = acuppa::run_preview(options);
         if (!capture.empty() && result.frames != frames)
             throw std::runtime_error("game stopped before the requested capture frame");
         return 0;
     } catch (const std::exception& error) {
-        std::cerr << "ThreePoint game: " << error.what() << '\n';
+        std::cerr << "ACuppa game: " << error.what() << '\n';
         return 1;
     }
 }

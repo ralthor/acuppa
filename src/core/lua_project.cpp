@@ -1,10 +1,10 @@
-#include "threepoint/lua_project.hpp"
+#include "acuppa/lua_project.hpp"
 
-#include "threepoint/project.hpp"
-#include "threepoint/audio_world.hpp"
-#include "threepoint/physics_world.hpp"
-#include "threepoint/save_data.hpp"
-#include "threepoint/world.hpp"
+#include "acuppa/project.hpp"
+#include "acuppa/audio_world.hpp"
+#include "acuppa/physics_world.hpp"
+#include "acuppa/save_data.hpp"
+#include "acuppa/world.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/euler_angles.hpp>
@@ -27,7 +27,7 @@ extern "C" {
 #include <system_error>
 #include <vector>
 
-namespace threepoint {
+namespace acuppa {
 namespace fs = std::filesystem;
 
 struct LuaProject::Impl {
@@ -778,7 +778,7 @@ void LuaProject::Impl::install_module() {
     lua_getfield(lua, -1, "preload");
     lua_pushlightuserdata(lua, this);
     lua_pushcclosure(lua, &open_module, 1);
-    lua_setfield(lua, -2, "threepoint");
+    lua_setfield(lua, -2, "acuppa");
     lua_pop(lua, 2);
     lua_pushlightuserdata(lua, this);
     lua_pushcclosure(lua, &component_set, 1);
@@ -2007,4 +2007,4 @@ void LuaProject::set_viewport(uint32_t width, uint32_t height) {
 }
 SceneFrame LuaProject::step(double dt) { return impl_->step(dt); }
 
-}  // namespace threepoint
+}  // namespace acuppa

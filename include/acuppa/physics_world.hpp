@@ -8,7 +8,7 @@
 #include <optional>
 #include <vector>
 
-namespace threepoint {
+namespace acuppa {
 
 enum class PhysicsMotion { Static, Dynamic, Kinematic };
 enum class ColliderShape { Box, Sphere };
@@ -102,4 +102,4 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 
-}  // namespace threepoint
+}  // namespace acuppa

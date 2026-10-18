@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-namespace threepoint {
+namespace acuppa {
 
 struct SaveKey {
     bool integer = false;
@@ -30,4 +30,4 @@ void write_save(const std::filesystem::path& project_root, const std::string& sl
 std::optional<SaveValue> read_save(const std::filesystem::path& project_root,
                                    const std::string& slot);
 
-}  // namespace threepoint
+}  // namespace acuppa

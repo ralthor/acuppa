@@ -1,4 +1,4 @@
-local tp = require("threepoint")
+local tp = require("acuppa")
 return {
   start = function() assert(tp.entity_find("cube")) end,
   fixed_update = function(dt) assert(dt == 1 / 60) end,

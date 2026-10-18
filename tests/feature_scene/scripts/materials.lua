@@ -1,4 +1,4 @@
-local tp = require("threepoint")
+local tp = require("acuppa")
 return {
   start = function()
     assert(tp.entity_find("sun") and tp.component_get(tp.entity_find("sun"), "light"))
