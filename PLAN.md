@@ -50,6 +50,8 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 
 **Phase 18 status (2026-10-18):** Source scenes and prefabs can declare a `physics` component after an unparented transform. Lua can add/read/remove it, set velocity or position, apply forces and impulses, inspect body state, raycast, overlap a sphere, and poll contact entry/exit events each fixed tick. Dynamic and kinematic body transforms update the render scene from Jolt; scene switches rebuild the physics world. The feature scene drives a falling cube through a trigger onto a solid floor, including invalid-call assertions. Core and Lua tests cover deterministic motion, queries, lifecycle, and contacts; Vulkan captures verify the cube visibly falls, and interactive startup verifies the source scene launches. A fuller game built on this API remains Phase 26.
 
+**Phase 19 progress (2026-10-18):** Deterministic named Lua timers now start, cancel, report remaining time, and emit one-shot/repeating events before `fixed_update`. The source-only timer fixture checks exact event ticks, cancellation, and invalid inputs. Text/buttons/focus and persistent save/load remain before Phase 19 is complete.
+
 **Falling Blocks Lit visual follow-up (2026-10-17):** The game's previous 1.15-unit SSAO radius caused blocky halos around stacked and ghost pieces. The game now uses restrained SSAO plus directional shadow maps for actual colored tiles. Meshes expose a `casts_shadows` switch to source scenes and Lua; the game turns it off for HUD, border, and ghost cubes. A dropped-piece Vulkan capture checks that tile shadows remain visible without dark title or ghost artifacts. The feature scene checks the new Lua setting and invalid input.
 
 | Phase | Deliverable | Check before commit |

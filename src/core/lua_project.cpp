@@ -22,6 +22,7 @@ extern "C" {
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <vector>
 
 namespace threepoint {
 namespace fs = std::filesystem;
@@ -82,6 +83,10 @@ struct LuaProject::Impl {
     static int physics_raycast(lua_State* lua);
     static int physics_overlap_sphere(lua_State* lua);
     static int physics_contacts(lua_State* lua);
+    static int timer_start(lua_State* lua);
+    static int timer_cancel(lua_State* lua);
+    static int timer_remaining(lua_State* lua);
+    static int timer_events(lua_State* lua);
     void sync_physics();
     static glm::vec3 vector_field(lua_State* lua, int table, const char* field,
                                   glm::vec3 fallback, bool positive);
@@ -113,6 +118,9 @@ struct LuaProject::Impl {
     std::map<std::string, std::shared_ptr<const HdrImage>> hdr_assets;
     std::string current_scene;
     std::optional<std::string> pending_scene;
+    struct Timer { double remaining; double interval; bool repeat; };
+    std::map<std::string, Timer> timers;
+    std::vector<std::string> expired_timers;
     SceneFrame frame;
     World world;
     std::unique_ptr<PhysicsWorld> physics = std::make_unique<PhysicsWorld>();
@@ -238,6 +246,19 @@ PhysicsBodyDesc physics_desc(EntityId id, const PhysicsComponent& component,
     desc.trigger = component.trigger;
     desc.velocity = velocity;
     return desc;
+}
+
+std::string timer_name(lua_State* lua, int index) {
+    if (lua_type(lua, index) != LUA_TSTRING)
+        throw std::invalid_argument("timer name must be a string");
+    std::string name = lua_tostring(lua, index);
+    if (name.empty() || name.size() > 64 ||
+        !std::all_of(name.begin(), name.end(), [](unsigned char c) {
+            return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                   (c >= '0' && c <= '9') || c == '_';
+        }))
+        throw std::invalid_argument("timer name must use 1-64 letters, digits, or underscores");
+    return name;
 }
 
 }  // namespace
@@ -509,6 +530,8 @@ void LuaProject::Impl::load_scene(const std::string& name) {
     frame.environment.reset();
     frame.environment_intensity = 0.0f;
     current_scene = name;
+    timers.clear();
+    expired_timers.clear();
     time_seconds = 0.0;
     fixed_accumulator = 0.0;
     load_table(project_file(found->second));
@@ -666,6 +689,10 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("physics_raycast", &physics_raycast);
     add_function("physics_overlap_sphere", &physics_overlap_sphere);
     add_function("physics_contacts", &physics_contacts);
+    add_function("timer_start", &timer_start);
+    add_function("timer_cancel", &timer_cancel);
+    add_function("timer_remaining", &timer_remaining);
+    add_function("timer_events", &timer_events);
     return 1;
 }
 
@@ -1337,6 +1364,59 @@ int LuaProject::Impl::physics_contacts(lua_State* lua) {
     return 1;
 }
 
+int LuaProject::Impl::timer_start(lua_State* lua) {
+    if (lua_gettop(lua) < 2 || lua_gettop(lua) > 3)
+        return luaL_error(lua, "timer_start() expects name, seconds, optional repeat");
+    try {
+        Impl& state = context(lua);
+        const std::string name = timer_name(lua, 1);
+        if (!lua_isnumber(lua, 2)) throw std::invalid_argument("timer duration must be a number");
+        const double seconds = lua_tonumber(lua, 2);
+        if (!std::isfinite(seconds) || seconds < 1.0 / 60.0 || seconds > 3600.0)
+            throw std::invalid_argument("timer duration must be from 1/60 to 3600 seconds");
+        bool loop = false;
+        if (lua_gettop(lua) == 3) {
+            if (!lua_isboolean(lua, 3)) throw std::invalid_argument("timer repeat must be boolean");
+            loop = lua_toboolean(lua, 3) != 0;
+        }
+        if (!state.timers.count(name) && state.timers.size() >= 128)
+            throw std::runtime_error("timer limit reached");
+        state.timers[name] = {seconds, seconds, loop};
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::timer_cancel(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "timer_cancel() expects a name");
+    try {
+        const auto name = timer_name(lua, 1);
+        lua_pushboolean(lua, context(lua).timers.erase(name) != 0);
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 1;
+}
+
+int LuaProject::Impl::timer_remaining(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "timer_remaining() expects a name");
+    try {
+        const auto name = timer_name(lua, 1);
+        const auto found = context(lua).timers.find(name);
+        if (found == context(lua).timers.end()) lua_pushnil(lua);
+        else lua_pushnumber(lua, found->second.remaining);
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 1;
+}
+
+int LuaProject::Impl::timer_events(lua_State* lua) {
+    if (lua_gettop(lua) != 0) return luaL_error(lua, "timer_events() expects no arguments");
+    const auto& events = context(lua).expired_timers;
+    lua_createtable(lua, int(events.size()), 0);
+    for (size_t i = 0; i < events.size(); ++i) {
+        lua_pushstring(lua, events[i].c_str());
+        lua_rawseti(lua, -2, lua_Integer(i + 1));
+    }
+    return 1;
+}
+
 void LuaProject::Impl::sync_physics() {
     for (EntityId id : world.entities()) {
         const auto component = world.physics(id);
@@ -1368,6 +1448,17 @@ SceneFrame LuaProject::Impl::step(double dt) {
     sync_scripts();
     while (fixed_accumulator + 1e-12 >= fixed_dt && fixed_steps < 8 &&
            !wants_quit && !pending_scene) {
+        expired_timers.clear();
+        for (auto it = timers.begin(); it != timers.end();) {
+            it->second.remaining -= fixed_dt;
+            if (it->second.remaining <= 1e-12) {
+                expired_timers.push_back(it->first);
+                if (it->second.repeat) {
+                    it->second.remaining += it->second.interval;
+                    ++it;
+                } else it = timers.erase(it);
+            } else ++it;
+        }
         physics->step();
         sync_physics();
         call(fixed_ref, "fixed_update", fixed_dt, true);

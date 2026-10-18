@@ -71,6 +71,8 @@ int main(int argc, char* argv[]) {
     const auto settled_physics = physics.step(0.0);
     expect(std::abs(settled_physics.cubes[1].position.y - 0.4f) < 0.05f,
            "Lua-authored dynamic body did not visibly settle on the floor");
+    threepoint::LuaProject timers(argv[1], "timers");
+    for (int i = 0; i < 6; ++i) timers.step(1.0 / 60.0);
     project.set_viewport(640, 360);
     expect(project.width() == 640 && project.height() == 360,
            "resize did not update Lua's screen-ray viewport");
