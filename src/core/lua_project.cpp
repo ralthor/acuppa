@@ -88,6 +88,9 @@ struct LuaProject::Impl {
     static int physics_raycast(lua_State* lua);
     static int physics_overlap_sphere(lua_State* lua);
     static int physics_contacts(lua_State* lua);
+    static int vehicle_attach(lua_State* lua);
+    static int vehicle_set_input(lua_State* lua);
+    static int vehicle_state(lua_State* lua);
     static int timer_start(lua_State* lua);
     static int timer_cancel(lua_State* lua);
     static int timer_remaining(lua_State* lua);
@@ -819,6 +822,9 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("physics_raycast", &physics_raycast);
     add_function("physics_overlap_sphere", &physics_overlap_sphere);
     add_function("physics_contacts", &physics_contacts);
+    add_function("vehicle_attach", &vehicle_attach);
+    add_function("vehicle_set_input", &vehicle_set_input);
+    add_function("vehicle_state", &vehicle_state);
     add_function("sound_play", &sound_play);
     add_function("sound_stop", &sound_stop);
     add_function("sound_set_volume", &sound_set_volume);
@@ -1521,6 +1527,58 @@ int LuaProject::Impl::physics_contacts(lua_State* lua) {
         lua_pushboolean(lua, events[i].began); lua_setfield(lua, -2, "began");
         lua_rawseti(lua, -2, lua_Integer(i + 1));
     }
+    return 1;
+}
+
+int LuaProject::Impl::vehicle_attach(lua_State* lua) {
+    if (lua_gettop(lua) < 1 || lua_gettop(lua) > 2 ||
+        (lua_gettop(lua) == 2 && !lua_istable(lua, 2)))
+        return luaL_error(lua, "vehicle_attach() expects a dynamic body ID and optional settings");
+    try {
+        VehicleConfig config;
+        if (lua_gettop(lua) == 2) {
+            config.half_track = optional_number(lua, 2, "half_track", config.half_track, "vehicle");
+            config.half_wheelbase = optional_number(lua, 2, "half_wheelbase", config.half_wheelbase, "vehicle");
+            config.wheel_radius = optional_number(lua, 2, "wheel_radius", config.wheel_radius, "vehicle");
+            config.engine_torque = optional_number(lua, 2, "engine_torque", config.engine_torque, "vehicle");
+            config.rear_grip = optional_number(lua, 2, "rear_grip", config.rear_grip, "vehicle");
+        }
+        context(lua).physics->add_vehicle(checked_id(lua, 1), config);
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::vehicle_set_input(lua_State* lua) {
+    if (lua_gettop(lua) != 2 || !lua_istable(lua, 2))
+        return luaL_error(lua, "vehicle_set_input() expects ID and controls table");
+    try {
+        const float throttle = optional_number(lua, 2, "throttle", 0, "vehicle input");
+        const float steer = optional_number(lua, 2, "steer", 0, "vehicle input");
+        const float brake = optional_number(lua, 2, "brake", 0, "vehicle input");
+        const float handbrake = optional_number(lua, 2, "handbrake", 0, "vehicle input");
+        context(lua).physics->set_vehicle_input(checked_id(lua, 1), throttle, steer,
+                                                 brake, handbrake);
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::vehicle_state(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "vehicle_state() expects ID");
+    const auto state = context(lua).physics->vehicle_state(checked_id(lua, 1));
+    if (!state) { lua_pushnil(lua); return 1; }
+    lua_createtable(lua, 0, 2);
+    lua_pushnumber(lua, state->engine_rpm); lua_setfield(lua, -2, "engine_rpm");
+    lua_createtable(lua, 4, 0);
+    for (int i = 0; i < 4; ++i) {
+        const auto& wheel = state->wheels[i];
+        lua_createtable(lua, 0, 4);
+        lua_pushboolean(lua, wheel.grounded); lua_setfield(lua, -2, "grounded");
+        lua_pushnumber(lua, wheel.steer); lua_setfield(lua, -2, "steer");
+        lua_pushnumber(lua, wheel.rotation); lua_setfield(lua, -2, "rotation");
+        lua_pushnumber(lua, wheel.lateral_slip); lua_setfield(lua, -2, "lateral_slip");
+        lua_rawseti(lua, -2, i + 1);
+    }
+    lua_setfield(lua, -2, "wheels");
     return 1;
 }
 

@@ -1,5 +1,6 @@
 #include "threepoint/physics_world.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -147,4 +148,55 @@ int main() {
     box.id = 6;
     box.half_extents.x = -1;
     rejects([&] { world.add(box); }, "negative box extent accepted");
+
+    PhysicsWorld vehicle_world;
+    floor.id = 20;
+    floor.half_extents = {30, 0.5f, 30};
+    vehicle_world.add(floor);
+    PhysicsBodyDesc chassis;
+    chassis.id = 21;
+    chassis.motion = PhysicsMotion::Dynamic;
+    chassis.half_extents = {0.65f, 0.2f, 1.05f};
+    chassis.position = {0, 0.75f, 0};
+    vehicle_world.add(chassis);
+    vehicle_world.add_vehicle(21);
+    rejects([&] { vehicle_world.add_vehicle(21); }, "duplicate vehicle accepted");
+    rejects([&] { vehicle_world.add_vehicle(20); }, "static body accepted as vehicle");
+    rejects([&] { vehicle_world.set_vehicle_input(21, 2, 0, 0, 0); },
+            "out-of-range throttle accepted");
+    for (int i = 0; i < 100; ++i) {
+        vehicle_world.set_vehicle_input(21, 0, 1, 0, 0);
+        vehicle_world.step();
+    }
+    const auto still = vehicle_world.state(21);
+    expect(std::abs(still->position.x) < 0.08f && std::abs(still->position.z) < 0.08f &&
+           std::abs(still->rotation.y) < 0.08f,
+           "front steering rotated or translated a stationary vehicle");
+    expect(vehicle_world.vehicle_state(21)->wheels[0].grounded &&
+           std::abs(vehicle_world.vehicle_state(21)->wheels[0].steer) > 0.1f,
+           "front wheel did not steer on the ground");
+    for (int i = 0; i < 180; ++i) {
+        vehicle_world.set_vehicle_input(21, 1, 0, 0, 0);
+        vehicle_world.step();
+    }
+    expect(vehicle_world.state(21)->position.z < -1.0f,
+           "rear driven wheels did not move the chassis forward");
+    expect(vehicle_world.vehicle_state(21)->engine_rpm > 0,
+           "vehicle engine did not advance");
+    const float straight_x = vehicle_world.state(21)->position.x;
+    float max_rear_slip = 0.0f;
+    for (int i = 0; i < 80; ++i) {
+        vehicle_world.set_vehicle_input(21, 0.8f, 0.6f, 0, 1);
+        vehicle_world.step();
+        const auto wheels = vehicle_world.vehicle_state(21);
+        max_rear_slip = std::max({max_rear_slip,
+                                  std::abs(wheels->wheels[2].lateral_slip),
+                                  std::abs(wheels->wheels[3].lateral_slip)});
+    }
+    expect(std::abs(vehicle_world.state(21)->position.x - straight_x) > 0.2f,
+           "front steering did not turn the moving chassis");
+    expect(max_rear_slip > 0.01f,
+           "rear wheels did not develop lateral slip under steering and handbrake");
+    expect(vehicle_world.remove(21) && !vehicle_world.vehicle_state(21),
+           "vehicle removal left an active constraint");
 }

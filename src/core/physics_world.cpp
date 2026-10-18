@@ -4,6 +4,7 @@
 #include <Jolt/Core/JobSystemSingleThreaded.h>
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include <Jolt/Physics/Body/BodyLock.h>
 #include <Jolt/Physics/Collision/ContactListener.h>
 #include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
 #include <Jolt/Physics/Collision/CollideShape.h>
@@ -13,6 +14,9 @@
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/PhysicsSystem.h>
+#include <Jolt/Physics/Vehicle/VehicleConstraint.h>
+#include <Jolt/Physics/Vehicle/VehicleCollisionTester.h>
+#include <Jolt/Physics/Vehicle/WheeledVehicleController.h>
 
 #include "threepoint/physics_world.hpp"
 
@@ -84,6 +88,7 @@ struct PhysicsWorld::Impl : JPH::ContactListener {
     JPH::TempAllocatorImpl allocator{10 * 1024 * 1024};
     JPH::JobSystemSingleThreaded jobs{JPH::cMaxPhysicsJobs};
     std::map<uint64_t, JPH::BodyID> bodies;
+    std::map<uint64_t, JPH::Ref<JPH::VehicleConstraint>> vehicles;
     std::map<uint32_t, uint64_t> entity_ids;
     std::map<std::pair<uint64_t, uint64_t>, bool> active_contacts;
     std::vector<PhysicsContact> events;
@@ -96,6 +101,11 @@ struct PhysicsWorld::Impl : JPH::ContactListener {
 
     ~Impl() override {
         system.SetContactListener(nullptr);
+        for (const auto& [id, vehicle] : vehicles) {
+            system.RemoveStepListener(vehicle);
+            system.RemoveConstraint(vehicle);
+        }
+        vehicles.clear();
         auto& iface = system.GetBodyInterface();
         for (const auto& [id, body] : bodies) {
             iface.RemoveBody(body);
@@ -183,6 +193,11 @@ void PhysicsWorld::add(const PhysicsBodyDesc& desc) {
 bool PhysicsWorld::remove(uint64_t id) {
     auto it = impl_->bodies.find(id);
     if (it == impl_->bodies.end()) return false;
+    if (const auto vehicle = impl_->vehicles.find(id); vehicle != impl_->vehicles.end()) {
+        impl_->system.RemoveStepListener(vehicle->second);
+        impl_->system.RemoveConstraint(vehicle->second);
+        impl_->vehicles.erase(vehicle);
+    }
     auto& iface = impl_->system.GetBodyInterface();
     iface.RemoveBody(it->second);
     impl_->entity_ids.erase(it->second.GetIndexAndSequenceNumber());
@@ -245,6 +260,91 @@ void PhysicsWorld::apply_impulse(uint64_t id, glm::vec3 impulse) {
         throw std::invalid_argument("impulse requires a dynamic physics body");
     impl_->system.GetBodyInterface().AddImpulse(it->second,
         JPH::Vec3(impulse.x, impulse.y, impulse.z));
+}
+
+void PhysicsWorld::add_vehicle(uint64_t id, const VehicleConfig& config) {
+    const auto body = impl_->bodies.find(id);
+    if (body == impl_->bodies.end() || impl_->vehicles.count(id))
+        throw std::invalid_argument("vehicle needs a unique existing body");
+    if (impl_->system.GetBodyInterface().GetMotionType(body->second) != JPH::EMotionType::Dynamic)
+        throw std::invalid_argument("vehicle body must be dynamic");
+    if (!std::isfinite(config.half_track) || config.half_track <= 0.0f ||
+        !std::isfinite(config.half_wheelbase) || config.half_wheelbase <= 0.0f ||
+        !std::isfinite(config.wheel_radius) || config.wheel_radius <= 0.0f ||
+        !std::isfinite(config.engine_torque) || config.engine_torque <= 0.0f ||
+        !std::isfinite(config.rear_grip) || config.rear_grip <= 0.0f ||
+        config.rear_grip > 2.0f)
+        throw std::invalid_argument("invalid vehicle dimensions, torque, or rear grip");
+    JPH::BodyLockWrite lock(impl_->system.GetBodyLockInterface(), body->second);
+    if (!lock.Succeeded()) throw std::runtime_error("vehicle body lock failed");
+    JPH::VehicleConstraintSettings settings;
+    settings.mForward = JPH::Vec3(0, 0, -1);
+    settings.mMaxPitchRollAngle = JPH::DegreesToRadians(65.0f);
+    for (int i = 0; i < 4; ++i) {
+        auto* wheel = new JPH::WheelSettingsWV;
+        wheel->mPosition = JPH::Vec3(i % 2 == 0 ? -config.half_track : config.half_track,
+                                    -0.1f, i < 2 ? -config.half_wheelbase : config.half_wheelbase);
+        wheel->mWheelForward = settings.mForward;
+        wheel->mRadius = config.wheel_radius;
+        wheel->mWidth = 0.16f;
+        wheel->mSuspensionMinLength = 0.18f;
+        wheel->mSuspensionMaxLength = 0.45f;
+        wheel->mSuspensionSpring.mFrequency = 2.5f;
+        wheel->mSuspensionSpring.mDamping = 0.75f;
+        wheel->mMaxSteerAngle = i < 2 ? 0.55f : 0.0f;
+        wheel->mMaxHandBrakeTorque = i < 2 ? 0.0f : 4000.0f;
+        settings.mWheels.push_back(wheel);
+    }
+    auto* controller_settings = new JPH::WheeledVehicleControllerSettings;
+    controller_settings->mEngine.mMaxTorque = config.engine_torque;
+    controller_settings->mDifferentials.resize(1);
+    controller_settings->mDifferentials[0].mLeftWheel = 2;
+    controller_settings->mDifferentials[0].mRightWheel = 3;
+    settings.mController = controller_settings;
+    JPH::Ref<JPH::VehicleConstraint> vehicle = new JPH::VehicleConstraint(lock.GetBody(), settings);
+    vehicle->SetVehicleCollisionTester(new JPH::VehicleCollisionTesterRay(kMoving));
+    auto* controller = static_cast<JPH::WheeledVehicleController*>(vehicle->GetController());
+    controller->SetTireMaxImpulseCallback(
+        [config, controller](JPH::uint wheel, float& longitudinal, float& lateral,
+                             float suspension, float longitudinal_friction, float lateral_friction,
+                             float, float, float) {
+            longitudinal = 10.0f * longitudinal_friction * suspension;
+            const float rear = wheel >= 2 ? config.rear_grip : 1.0f;
+            const float handbrake = wheel >= 2 ? 1.0f - 0.7f * controller->GetHandBrakeInput() : 1.0f;
+            lateral = rear * handbrake * lateral_friction * suspension;
+        });
+    impl_->system.AddConstraint(vehicle);
+    impl_->system.AddStepListener(vehicle);
+    impl_->vehicles.emplace(id, vehicle);
+}
+
+void PhysicsWorld::set_vehicle_input(uint64_t id, float throttle, float steer,
+                                      float brake, float handbrake) {
+    if (!std::isfinite(throttle) || throttle < -1 || throttle > 1 ||
+        !std::isfinite(steer) || steer < -1 || steer > 1 ||
+        !std::isfinite(brake) || brake < 0 || brake > 1 ||
+        !std::isfinite(handbrake) || handbrake < 0 || handbrake > 1)
+        throw std::invalid_argument("vehicle input must be finite and within its control range");
+    const auto found = impl_->vehicles.find(id);
+    if (found == impl_->vehicles.end()) throw std::invalid_argument("unknown vehicle ID");
+    static_cast<JPH::WheeledVehicleController*>(found->second->GetController())
+        ->SetDriverInput(throttle, steer, brake, handbrake);
+    if (throttle || steer || brake || handbrake)
+        impl_->system.GetBodyInterface().ActivateBody(impl_->bodies.at(id));
+}
+
+std::optional<VehicleState> PhysicsWorld::vehicle_state(uint64_t id) const {
+    const auto found = impl_->vehicles.find(id);
+    if (found == impl_->vehicles.end()) return std::nullopt;
+    VehicleState result;
+    result.engine_rpm = static_cast<const JPH::WheeledVehicleController*>(
+        found->second->GetController())->GetEngine().GetCurrentRPM();
+    for (int i = 0; i < 4; ++i) {
+        const auto* wheel = static_cast<const JPH::WheelWV*>(found->second->GetWheel(i));
+        result.wheels[i] = {wheel->HasContact(), wheel->GetSteerAngle(),
+                            wheel->GetRotationAngle(), wheel->mLateralSlip};
+    }
+    return result;
 }
 
 std::optional<PhysicsRayHit> PhysicsWorld::raycast(glm::vec3 origin, glm::vec3 direction,
