@@ -137,6 +137,10 @@ if(BUILD_TESTING)
   add_test(NAME scene_document_roundtrip COMMAND threepoint_scene_document_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene"
            "${PROJECT_BINARY_DIR}/scene_document_fixture")
+  add_test(NAME editor_source_commands COMMAND "${Python3_EXECUTABLE}"
+           "${PROJECT_SOURCE_DIR}/tests/editor_cli_test.py" $<TARGET_FILE:threepoint_editor>
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene"
+           "${PROJECT_BINARY_DIR}/editor_cli_fixture")
   add_executable(threepoint_ui_menu_test tests/ui_menu_test.cpp)
   target_link_libraries(threepoint_ui_menu_test PRIVATE threepoint_core)
   add_test(NAME source_ui_menu_and_save COMMAND threepoint_ui_menu_test
