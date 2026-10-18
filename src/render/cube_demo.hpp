@@ -59,6 +59,7 @@ private:
     nvrhi::SamplerHandle depth_sampler_;
     nvrhi::TextureHandle white_texture_;
     nvrhi::TextureHandle environment_texture_;
+    nvrhi::TextureHandle environment_diffuse_texture_;
     nvrhi::TextureHandle shadow_atlas_;
     nvrhi::FramebufferHandle shadow_framebuffer_;
     nvrhi::GraphicsPipelineHandle shadow_cube_pipeline_;

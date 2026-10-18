@@ -80,6 +80,8 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 
 **Phase 27 HDRI prefilter core substep complete (2026-10-18):** The core now deterministically converts validated Radiance images into a 64×32 cosine-weighted diffuse map and seven GGX specular roughness levels, 256×128 down to 4×2. A device-free test checks the pyramid, finite output, highlight blurring, and invalid data. The renderer still uses per-pixel sampling until the next substep connects these maps; Linux release checks remain.
 
+**Phase 27 HDRI renderer substep complete (2026-10-18):** The Vulkan PBR path now uploads the prefiltered diffuse and GGX mip maps once per environment change and uses a two-texture lookup with an analytic BRDF fit per pixel. The HDRI capture checks light direction, visible brightness, and a softer rough-metal reflection; Garage Run, PBR, and live HDRI checks pass under Vulkan validation. Linux release packaging and clean-checkout validation remain.
+
 **Falling Blocks Lit visual follow-up (2026-10-17):** The game's previous 1.15-unit SSAO radius caused blocky halos around stacked and ghost pieces. The game now uses restrained SSAO plus directional shadow maps for actual colored tiles. Meshes expose a `casts_shadows` switch to source scenes and Lua; the game turns it off for HUD, border, and ghost cubes. A dropped-piece Vulkan capture checks that tile shadows remain visible without dark title or ghost artifacts. The feature scene checks the new Lua setting and invalid input.
 
 | Phase | Deliverable | Check before commit |

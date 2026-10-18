@@ -39,6 +39,12 @@ with tempfile.TemporaryDirectory() as directory:
         "upper and lower HDRI radiance did not differ on the metal sphere"
     assert lit(640, 400)[0] > lit(640, 310)[0] + 20, \
         "warm lower HDRI radiance did not reach the metal sphere"
+    sharp_peak = max(sum(lit(x, y)) for x in range(590, 690, 2)
+                     for y in range(310, 410, 2))
+    rough_peak = max(sum(lit(x, y)) for x in range(860, 960, 2)
+                     for y in range(310, 410, 2))
+    assert sharp_peak > rough_peak + 50, \
+        "GGX roughness did not soften the HDRI reflection"
 
     missing = subprocess.run(
         [str(binary), "run", str(project), "--scene", "ibl_missing", "--frames", "1"],

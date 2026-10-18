@@ -1,6 +1,7 @@
 #include "cube_demo.hpp"
 
 #include "threepoint/camera.hpp"
+#include "threepoint/environment_filter.hpp"
 #include "cube_vert_spv.hpp"
 #include "cube_frag_spv.hpp"
 #include "pbr_vert_spv.hpp"
@@ -216,7 +217,8 @@ CubeDemo::CubeDemo(nvrhi::IDevice* device) : device_(device) {
         nvrhi::BindingLayoutDesc().setVisibility(nvrhi::ShaderType::Pixel)
             .setBindingOffsets(nvrhi::VulkanBindingOffsets().setSamplerOffset(0))
             .addItem(nvrhi::BindingLayoutItem::Texture_SRV(0))
-            .addItem(nvrhi::BindingLayoutItem::Sampler(1)));
+            .addItem(nvrhi::BindingLayoutItem::Sampler(1))
+            .addItem(nvrhi::BindingLayoutItem::Texture_SRV(2)));
     environment_sampler_ = device_->createSampler(nvrhi::SamplerDesc()
         .setAddressU(nvrhi::SamplerAddressMode::Wrap)
         .setAddressV(nvrhi::SamplerAddressMode::Clamp));
@@ -331,7 +333,8 @@ CubeDemo::CubeDemo(nvrhi::IDevice* device) : device_(device) {
     environment_binding_set_ = device_->createBindingSet(
         nvrhi::BindingSetDesc()
             .addItem(nvrhi::BindingSetItem::Texture_SRV(0, white_texture_))
-            .addItem(nvrhi::BindingSetItem::Sampler(1, environment_sampler_)),
+            .addItem(nvrhi::BindingSetItem::Sampler(1, environment_sampler_))
+            .addItem(nvrhi::BindingSetItem::Texture_SRV(2, white_texture_)),
         environment_binding_layout_);
     require(environment_binding_set_, "create fallback environment binding set");
     shadow_binding_set_ = device_->createBindingSet(
@@ -390,23 +393,41 @@ void CubeDemo::prepare(const SceneFrame& scene) {
     if (scene.environment != environment_source_) {
         environment_source_ = scene.environment;
         environment_texture_ = nullptr;
+        environment_diffuse_texture_ = nullptr;
         if (scene.environment) {
+            const FilteredEnvironment filtered = filter_environment(*scene.environment);
             nvrhi::TextureDesc desc;
-            desc.width = scene.environment->width;
-            desc.height = scene.environment->height;
+            desc.width = filtered.specular.front().width;
+            desc.height = filtered.specular.front().height;
+            desc.mipLevels = uint32_t(filtered.specular.size());
             desc.format = nvrhi::Format::RGBA32_FLOAT;
             desc.isShaderResource = true;
-            desc.debugName = "project HDRI";
+            desc.debugName = "prefiltered HDRI specular";
             environment_texture_ = device_->createTexture(desc);
             require(environment_texture_, "create environment texture");
+            desc.width = filtered.diffuse.width;
+            desc.height = filtered.diffuse.height;
+            desc.mipLevels = 1;
+            desc.debugName = "prefiltered HDRI diffuse";
+            environment_diffuse_texture_ = device_->createTexture(desc);
+            require(environment_diffuse_texture_, "create environment diffuse texture");
             auto upload = device_->createCommandList();
             require(upload, "create environment upload command list");
             upload->open();
             upload->beginTrackingTextureState(environment_texture_, nvrhi::AllSubresources,
                                               nvrhi::ResourceStates::Common);
-            upload->writeTexture(environment_texture_, 0, 0,
-                                 scene.environment->rgba.data(), size_t(desc.width) * 4 * sizeof(float));
+            for (size_t level = 0; level < filtered.specular.size(); ++level) {
+                const HdrImage& image = filtered.specular[level];
+                upload->writeTexture(environment_texture_, 0, uint32_t(level),
+                                     image.rgba.data(), size_t(image.width) * 4 * sizeof(float));
+            }
             upload->setPermanentTextureState(environment_texture_,
+                                              nvrhi::ResourceStates::ShaderResource);
+            upload->beginTrackingTextureState(environment_diffuse_texture_, nvrhi::AllSubresources,
+                                              nvrhi::ResourceStates::Common);
+            upload->writeTexture(environment_diffuse_texture_, 0, 0, filtered.diffuse.rgba.data(),
+                                 size_t(filtered.diffuse.width) * 4 * sizeof(float));
+            upload->setPermanentTextureState(environment_diffuse_texture_,
                                               nvrhi::ResourceStates::ShaderResource);
             upload->close();
             device_->executeCommandList(upload);
@@ -416,7 +437,9 @@ void CubeDemo::prepare(const SceneFrame& scene) {
             nvrhi::BindingSetDesc()
                 .addItem(nvrhi::BindingSetItem::Texture_SRV(
                     0, environment_texture_ ? environment_texture_ : white_texture_))
-                .addItem(nvrhi::BindingSetItem::Sampler(1, environment_sampler_)),
+                .addItem(nvrhi::BindingSetItem::Sampler(1, environment_sampler_))
+                .addItem(nvrhi::BindingSetItem::Texture_SRV(
+                    2, environment_diffuse_texture_ ? environment_diffuse_texture_ : white_texture_)),
             environment_binding_layout_);
         require(environment_binding_set_, "create environment binding set");
     }

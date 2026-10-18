@@ -27,6 +27,7 @@ layout(std140, set = 0, binding = 7) uniform Material {
 } material;
 layout(set = 1, binding = 0) uniform texture2D environment_texture;
 layout(set = 1, binding = 1) uniform sampler environment_sampler;
+layout(set = 1, binding = 2) uniform texture2D environment_diffuse_texture;
 layout(set = 2, binding = 0) uniform texture2D shadow_texture;
 layout(set = 2, binding = 1) uniform sampler shadow_sampler;
 layout(std140, set = 2, binding = 2) uniform Shadows {
@@ -53,57 +54,28 @@ vec3 fresnel_schlick(float cosine, vec3 f0) {
     return f0 + (1.0 - f0) * pow(1.0 - cosine, 5.0);
 }
 
-vec2 sample_pair(int index, int count) {
-    return vec2(float(index) / float(count),
-                float(bitfieldReverse(uint(index))) * 2.3283064365386963e-10);
-}
-
-vec3 environment_radiance(vec3 direction) {
-    vec2 coordinates = vec2(atan(direction.z, direction.x) / (2.0 * pi) + 0.5,
-                            acos(clamp(direction.y, -1.0, 1.0)) / pi);
-    return texture(sampler2D(environment_texture, environment_sampler), coordinates).rgb;
+vec2 environment_uv(vec3 direction) {
+    return vec2(atan(direction.z, direction.x) / (2.0 * pi) + 0.5,
+                acos(clamp(direction.y, -1.0, 1.0)) / pi);
 }
 
 vec3 image_based_light(vec3 normal, vec3 view, vec3 albedo,
                        float metallic, float roughness, vec3 f0) {
-    vec3 tangent = normalize(cross(abs(normal.y) < 0.99 ? vec3(0, 1, 0)
-                                                        : vec3(1, 0, 0), normal));
-    vec3 bitangent = cross(normal, tangent);
-    const int sample_count = 64;
-    vec3 diffuse_light = vec3(0.0);
-    vec3 specular_light = vec3(0.0);
-    float ndotv = max(dot(normal, view), 0.001);
-    float a = roughness * roughness;
-    for (int i = 0; i < sample_count; ++i) {
-        vec2 xi = sample_pair(i, sample_count);
-        float phi = 2.0 * pi * xi.x;
-        float cosine = sqrt(1.0 - xi.y);
-        float sine = sqrt(xi.y);
-        vec3 diffuse_direction = normalize(tangent * cos(phi) * sine +
-                                           bitangent * sin(phi) * sine +
-                                           normal * cosine);
-        diffuse_light += environment_radiance(diffuse_direction);
-
-        cosine = sqrt((1.0 - xi.y) / (1.0 + (a * a - 1.0) * xi.y));
-        sine = sqrt(max(0.0, 1.0 - cosine * cosine));
-        vec3 halfway = normalize(tangent * cos(phi) * sine +
-                                  bitangent * sin(phi) * sine + normal * cosine);
-        vec3 incoming = reflect(-view, halfway);
-        float ndotl = max(dot(normal, incoming), 0.0);
-        if (ndotl > 0.0) {
-            float ndoth = max(dot(normal, halfway), 0.001);
-            float vdoth = max(dot(view, halfway), 0.001);
-            vec3 fresnel = fresnel_schlick(vdoth, f0);
-            float geometry = geometry_schlick(ndotv, roughness) *
-                             geometry_schlick(ndotl, roughness);
-            specular_light += environment_radiance(incoming) * fresnel *
-                              geometry * vdoth / (ndotv * ndoth);
-        }
-    }
-    vec3 surface_fresnel = fresnel_schlick(ndotv, f0);
-    vec3 diffuse = diffuse_light * albedo * (1.0 - metallic) *
-                   (vec3(1.0) - surface_fresnel);
-    return (diffuse + specular_light) / float(sample_count);
+    float ndotv = max(dot(normal, view), 0.0);
+    vec3 fresnel = fresnel_schlick(ndotv, f0);
+    vec3 diffuse = texture(sampler2D(environment_diffuse_texture, environment_sampler),
+                           environment_uv(normal)).rgb * albedo * (1.0 - metallic) *
+                   (vec3(1.0) - fresnel);
+    vec3 reflected = reflect(-view, normal);
+    vec3 radiance = textureLod(sampler2D(environment_texture, environment_sampler),
+                               environment_uv(reflected), roughness * 6.0).rgb;
+    // Analytic split-sum BRDF fit for GGX, evaluated per pixel without a LUT.
+    vec4 coefficients = roughness * vec4(-1.0, -0.0275, -0.572, 0.022) +
+                        vec4(1.0, 0.0425, 1.04, -0.04);
+    float factor = min(coefficients.x * coefficients.x, exp2(-9.28 * ndotv)) *
+                   coefficients.x + coefficients.y;
+    vec2 brdf = vec2(-1.04, 1.04) * factor + coefficients.zw;
+    return diffuse + radiance * (f0 * brdf.x + brdf.y);
 }
 
 float shadow_visibility(int light_index, vec3 position, vec3 normal, vec3 light_direction) {
