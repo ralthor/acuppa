@@ -104,7 +104,8 @@ add_custom_command(OUTPUT "${shader_header}"
   VERBATIM)
 list(APPEND THREEPOINT_SHADER_HEADERS "${shader_header}")
 
-add_library(threepoint_core STATIC src/core/project.cpp src/core/camera.cpp src/core/input.cpp
+add_library(threepoint_core STATIC src/core/project.cpp src/core/scene_document.cpp
+            src/core/camera.cpp src/core/input.cpp
             src/core/ui_canvas.cpp
             src/core/world.cpp src/core/physics_world.cpp src/core/save_data.cpp
             src/core/gltf_asset.cpp src/core/cgltf_impl.c src/core/stb_image_impl.c
@@ -131,6 +132,11 @@ target_link_libraries(threepoint_editor PRIVATE threepoint_core)
 include(CTest)
 option(THREEPOINT_ENABLE_GPU_TESTS "Run live Vulkan display checks" OFF)
 if(BUILD_TESTING)
+  add_executable(threepoint_scene_document_test tests/scene_document_test.cpp)
+  target_link_libraries(threepoint_scene_document_test PRIVATE threepoint_core)
+  add_test(NAME scene_document_roundtrip COMMAND threepoint_scene_document_test
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene"
+           "${PROJECT_BINARY_DIR}/scene_document_fixture")
   add_executable(threepoint_ui_menu_test tests/ui_menu_test.cpp)
   target_link_libraries(threepoint_ui_menu_test PRIVATE threepoint_core)
   add_test(NAME source_ui_menu_and_save COMMAND threepoint_ui_menu_test

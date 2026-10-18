@@ -19,7 +19,8 @@ return {
             ssao_low = "scenes/ssao.scene.lua", ssao_shift = "scenes/ssao.scene.lua",
             physics = "scenes/physics.scene.lua", timers = "scenes/timers.scene.lua",
             save = "scenes/save.scene.lua", menu = "scenes/menu.scene.lua",
-            menu_play = "scenes/menu_play.scene.lua"},
+            menu_play = "scenes/menu_play.scene.lua",
+            editor = "scenes/editor.scene.lua"},
   prefabs = {probe = "prefabs/probe.prefab.lua"},
   input = {
     turn = {keyboard = "space", gamepad_button = "a"},
