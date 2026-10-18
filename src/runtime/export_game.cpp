@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
+#include <fstream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -27,6 +29,24 @@ bool ship(const fs::path& file) {
     const auto extension = file.extension().string();
     return std::find_if(extensions.begin(), extensions.end(),
                         [&](const char* value) { return extension == value; }) != extensions.end();
+}
+
+std::string game_id(const fs::path& root) {
+    const std::string name = root.filename().string();
+    uint32_t hash = 2166136261u;
+    std::string safe;
+    for (unsigned char c : name) {
+        hash = (hash ^ c) * 16777619u;
+        if (safe.size() < 48)
+            safe.push_back((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                           (c >= '0' && c <= '9') || c == '-' || c == '_' ? char(c) : '_');
+    }
+    if (safe.empty()) safe = "game";
+    static constexpr char digits[] = "0123456789abcdef";
+    safe.push_back('-');
+    for (int shift = 28; shift >= 0; shift -= 4)
+        safe.push_back(digits[(hash >> shift) & 15]);
+    return safe;
 }
 
 }  // namespace
@@ -70,6 +90,7 @@ void export_game(const fs::path& project, const fs::path& destination,
         if (!fs::is_regular_file(staging / "game/game.lua"))
             throw std::runtime_error("game.lua was not copied into the bundle");
         fs::copy_file(player_binary, staging / "threepoint-game");
+        std::ofstream(staging / "game.id") << game_id(root) << '\n';
         fs::permissions(staging / "threepoint-game",
                         fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
                         fs::perm_options::add);

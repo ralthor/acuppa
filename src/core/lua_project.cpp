@@ -33,7 +33,7 @@ namespace fs = std::filesystem;
 struct LuaProject::Impl {
     struct ScriptRefs;
     explicit Impl(const fs::path& directory, const std::string& initial_scene,
-                  Mode selected_mode, bool audio_output);
+                  Mode selected_mode, bool audio_output, const fs::path& save_directory);
     ~Impl() { if (lua) lua_close(lua); }
 
     SceneFrame step(double dt);
@@ -117,6 +117,7 @@ struct LuaProject::Impl {
     static glm::vec3 vector_arg(lua_State* lua, int index, bool positive);
 
     fs::path root;
+    fs::path save_root;
     Mode mode = Mode::Game;
     bool audio_output = true;
     lua_State* lua = nullptr;
@@ -385,10 +386,12 @@ void push_saved(lua_State* lua, const SaveValue& value) {
 }  // namespace
 
 LuaProject::Impl::Impl(const fs::path& directory, const std::string& initial_scene,
-                       Mode selected_mode, bool use_audio_output)
+                       Mode selected_mode, bool use_audio_output,
+                       const fs::path& save_directory)
     : mode(selected_mode), audio_output(use_audio_output) {
     const auto paths = require_project(directory);
     root = fs::canonical(paths.root);
+    save_root = save_directory.empty() ? root : save_directory;
     lua = luaL_newstate();
     if (!lua) throw std::runtime_error("could not create Lua state");
     std::unique_ptr<lua_State, decltype(&lua_close)> guard(lua, lua_close);
@@ -1865,7 +1868,7 @@ int LuaProject::Impl::save(lua_State* lua) {
         size_t entries = 0;
         std::set<const void*> active;
         const SaveValue value = from_lua(lua, 2, 0, entries, active);
-        write_save(context(lua).root, lua_tostring(lua, 1), value);
+        write_save(context(lua).save_root, lua_tostring(lua, 1), value);
     } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
     return 0;
 }
@@ -1874,7 +1877,7 @@ int LuaProject::Impl::load(lua_State* lua) {
     if (lua_gettop(lua) != 1) return luaL_error(lua, "load() expects a slot");
     if (lua_type(lua, 1) != LUA_TSTRING) return luaL_error(lua, "save slot must be a string");
     try {
-        const auto value = read_save(context(lua).root, lua_tostring(lua, 1));
+        const auto value = read_save(context(lua).save_root, lua_tostring(lua, 1));
         if (value) push_saved(lua, *value);
         else lua_pushnil(lua);
     } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
@@ -1982,8 +1985,8 @@ SceneFrame LuaProject::Impl::step(double dt) {
 }
 
 LuaProject::LuaProject(const fs::path& root, std::string initial_scene, Mode mode,
-                       bool audio_output)
-    : impl_(std::make_unique<Impl>(root, initial_scene, mode, audio_output)) {}
+                       bool audio_output, fs::path save_root)
+    : impl_(std::make_unique<Impl>(root, initial_scene, mode, audio_output, save_root)) {}
 LuaProject::~LuaProject() = default;
 uint32_t LuaProject::width() const { return impl_->width; }
 uint32_t LuaProject::height() const { return impl_->height; }

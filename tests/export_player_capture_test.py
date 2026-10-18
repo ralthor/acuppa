@@ -1,6 +1,7 @@
 """A relocated standalone player renders without editor or source checkout paths."""
 
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import sys
@@ -12,6 +13,7 @@ source = Path(sys.argv[2]).resolve()
 work = Path(sys.argv[3]).resolve()
 shutil.rmtree(work, ignore_errors=True)
 work.mkdir(parents=True)
+os.environ["XDG_DATA_HOME"] = str(work / "user_data")
 bundle = work / "bundle"
 made = subprocess.run([str(cli), "build", str(source), str(bundle)],
                       capture_output=True, text=True, timeout=30)

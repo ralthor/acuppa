@@ -1,6 +1,7 @@
 """Whole projects and bundles reject damaged assets with named errors."""
 
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import sys
@@ -12,6 +13,7 @@ garage = Path(sys.argv[3]).resolve()
 work = Path(sys.argv[4]).resolve()
 shutil.rmtree(work, ignore_errors=True)
 work.mkdir(parents=True)
+os.environ["XDG_DATA_HOME"] = str(work / "user_data")
 
 
 def check_failure(binary, *args, expected):

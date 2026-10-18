@@ -2,7 +2,9 @@
 #include "threepoint/preview.hpp"
 
 #include <charconv>
+#include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -12,12 +14,28 @@ int main(int argc, char* argv[]) {
     try {
         const auto self = std::filesystem::read_symlink("/proc/self/exe");
         const auto root = self.parent_path() / "game";
+        std::ifstream identity(self.parent_path() / "game.id");
+        std::string game_id;
+        std::getline(identity, game_id);
+        if (game_id.empty() || game_id.size() > 64 ||
+            game_id.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") !=
+                std::string::npos)
+            throw std::runtime_error("bundle game.id is missing or invalid");
+        const char* xdg = std::getenv("XDG_DATA_HOME");
+        const char* home = std::getenv("HOME");
+        std::filesystem::path data_root;
+        if (xdg && *xdg && std::filesystem::path(xdg).is_absolute()) data_root = xdg;
+        else if (home && *home && std::filesystem::path(home).is_absolute())
+            data_root = std::filesystem::path(home) / ".local/share";
+        else throw std::runtime_error("HOME or absolute XDG_DATA_HOME is required for game saves");
+        const auto save_root = data_root / "threepoint" / game_id;
+        std::filesystem::create_directories(save_root);
         if (argc == 2 && std::string_view(argv[1]) == "--check") {
             const threepoint::LuaProject manifest(root, {},
-                threepoint::LuaProject::Mode::EditorPreview, false);
+                threepoint::LuaProject::Mode::EditorPreview, false, save_root);
             for (const auto& name : manifest.scene_names()) {
                 threepoint::LuaProject scene(root, name,
-                    threepoint::LuaProject::Mode::Game, false);
+                    threepoint::LuaProject::Mode::Game, false, save_root);
                 scene.step(0);
                 scene.step(1.0 / 60.0);
             }
@@ -48,7 +66,8 @@ int main(int argc, char* argv[]) {
         }
         if (!capture.empty() && frames == 0)
             throw std::invalid_argument("--capture requires --frames");
-        threepoint::LuaProject project(root);
+        threepoint::LuaProject project(root, {}, threepoint::LuaProject::Mode::Game,
+                                       true, save_root);
         if (!held_key.empty())
             project.inject({threepoint::InputDevice::Keyboard, held_key, 1.0f});
         threepoint::PreviewOptions options;

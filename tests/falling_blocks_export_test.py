@@ -1,6 +1,7 @@
 """Both authored falling-block games run from relocatable standalone bundles."""
 
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import sys
@@ -13,6 +14,7 @@ work = Path(sys.argv[4]).resolve()
 graphical = len(sys.argv) == 6 and sys.argv[5] == "--graphical"
 shutil.rmtree(work, ignore_errors=True)
 work.mkdir(parents=True)
+os.environ["XDG_DATA_HOME"] = str(work / "user_data")
 
 
 def invoke(*command, timeout=30):
