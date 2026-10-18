@@ -9,3 +9,10 @@ After building and testing the repository, run `bash scripts/package-linux-relea
 Run `bash scripts/verify-clean-release.sh` to build only committed source in an isolated directory and run the complete unit, integration, Vulkan capture, live-startup, and archive suite. It uses the locally bootstrapped pinned toolchain and dependencies. The separate sanitizer gate is `bash scripts/test-sanitizers-local.sh`.
 
 This release target is Linux only. Hosted Ubuntu 24+ CI and speaker playback on user hardware remain separate validation gates until they are run on those machines.
+
+## Local validation record — 2026-10-18
+
+- Normal local build: 77/77 automated tests passed, including Vulkan captures and interactive startup on an NVIDIA GeForce GTX 1660.
+- Debug ASan/UBSan build: 40/40 device-free tests passed.
+- Clean committed-source build: 75/75 tests passed, including all three packaged games, archive hashes, reproducibility, and re-export from the packaged engine.
+- Hosted Ubuntu 24+ CI has not run because this repository has no Git remote. Speaker playback quality has not been checked on the user's output hardware. Treat these as open release qualification checks before public distribution.
