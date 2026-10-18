@@ -105,6 +105,7 @@ add_custom_command(OUTPUT "${shader_header}"
 list(APPEND THREEPOINT_SHADER_HEADERS "${shader_header}")
 
 add_library(threepoint_core STATIC src/core/project.cpp src/core/scene_document.cpp
+            src/core/editor_gizmo.cpp
             src/core/camera.cpp src/core/input.cpp
             src/core/ui_canvas.cpp
             src/core/world.cpp src/core/physics_world.cpp src/core/save_data.cpp
@@ -132,6 +133,9 @@ target_link_libraries(threepoint_editor PRIVATE threepoint_core)
 include(CTest)
 option(THREEPOINT_ENABLE_GPU_TESTS "Run live Vulkan display checks" OFF)
 if(BUILD_TESTING)
+  add_executable(threepoint_editor_gizmo_test tests/editor_gizmo_test.cpp)
+  target_link_libraries(threepoint_editor_gizmo_test PRIVATE threepoint_core)
+  add_test(NAME editor_gizmo_math COMMAND threepoint_editor_gizmo_test)
   add_executable(threepoint_scene_document_test tests/scene_document_test.cpp)
   target_link_libraries(threepoint_scene_document_test PRIVATE threepoint_core)
   add_test(NAME scene_document_roundtrip COMMAND threepoint_scene_document_test
