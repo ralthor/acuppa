@@ -16,5 +16,5 @@ This release target is Linux only. Hosted Ubuntu 24+ CI and speaker playback on 
 
 - Normal local ACuppa build: 78/78 automated tests passed, including the engine name check, Vulkan captures, interactive startup, and standalone archives on an NVIDIA GeForce GTX 1660.
 - Debug ASan/UBSan build: 40/40 device-free tests passed.
-- The prior clean committed-source build passed 75/75 tests, including all three packaged games, archive hashes, reproducibility, and re-export from the packaged engine. That run predates the engine rename.
+- Clean committed-source ACuppa build: 76/76 tests passed, including all three packaged games, archive hashes, reproducibility, and re-export from the packaged engine.
 - Hosted Ubuntu 24+ CI has not run because this repository has no Git remote. Speaker playback quality has not been checked on the user's output hardware. Treat these as open release qualification checks before public distribution.
