@@ -3,6 +3,7 @@
 #include <cmath>
 #include <filesystem>
 #include <stdexcept>
+#include <string>
 
 void expect(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
@@ -83,7 +84,9 @@ int main(int argc, char* argv[]) {
     expect(rejected, "missing sound file accepted");
     rejected = false;
     try { audio.play(std::filesystem::path(argv[1]).parent_path() / "test_gradient.hdr", settings); }
-    catch (const std::runtime_error&) { rejected = true; }
+    catch (const std::runtime_error& error) {
+        rejected = std::string(error.what()).find("test_gradient.hdr") != std::string::npos;
+    }
     expect(rejected, "non-audio asset was decoded as a sound");
     rejected = false;
     try { audio.set_listener({0, 0, 0}, {0, 0, -1}, {0, 0, -1}); }

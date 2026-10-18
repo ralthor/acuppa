@@ -311,6 +311,11 @@ if(BUILD_TESTING)
            "${PROJECT_SOURCE_DIR}/tests/export_game_test.py" $<TARGET_FILE:threepoint>
            "${PROJECT_SOURCE_DIR}/tests/project_test_fixture"
            "${PROJECT_BINARY_DIR}/export_files_fixture")
+  add_test(NAME project_asset_failure_matrix COMMAND "${Python3_EXECUTABLE}"
+           "${PROJECT_SOURCE_DIR}/tests/asset_failure_matrix.py" $<TARGET_FILE:threepoint>
+           "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit"
+           "${PROJECT_SOURCE_DIR}/games/garage_run"
+           "${PROJECT_BINARY_DIR}/asset_failure_fixture")
   add_test(NAME editor_project_check COMMAND threepoint_editor --check-project
            "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   if(THREEPOINT_ENABLE_GPU_TESTS)

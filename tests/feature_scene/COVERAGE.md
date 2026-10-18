@@ -4,6 +4,7 @@ This is the source-only project used for integration checks. It runs in the 3D r
 
 | Capability | Phase | Scene/script case | Automated check | Status |
 | --- | --- | --- | --- | --- |
+| Broken and missing shipped assets | 27 | Feature-scene importer/HDRI/audio fixtures plus both code-only sample projects cover bad glTF data, HDRI data, and WAV data | `gltf_geometry_and_errors`, `hdr_image_validation`, `audio_decode_spatial_and_errors`, and `project_asset_failure_matrix` check named errors in source and export | Local covered; hosted CI pending |
 | Debug sanitizer gate | 27 | The existing feature project drives physics, vehicles, audio, saves, rendering data, and Lua under a separate ASan/UBSan build | `scripts/test-sanitizers-local.sh` runs all 37 device-free tests; Release runs all 73 including Vulkan checks | Local covered; hosted CI pending |
 | Public Lua API registration audit | 27 | `scenes/api_contract.scene.lua` and `scripts/api_contract.lua` exercise quit and invalid arguments for every registered function; other feature scripts provide normal examples | `lua_api_contract_scene` executes all error cases; `lua_api_coverage_audit` compares all 54 registrations against examples and invalid calls | Local covered; audit stays active as APIs grow |
 | Project source layout | 1 | `game.lua`, `scenes/main.scene.lua`, `scripts/main.lua` | `core_project_check`, CLI checks | Covered |

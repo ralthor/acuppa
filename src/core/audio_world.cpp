@@ -27,8 +27,8 @@ void require_pitch(float pitch) {
         throw std::invalid_argument("sound pitch must be from 0.25 to 4");
 }
 
-std::runtime_error audio_error(const char* action, ma_result result) {
-    return std::runtime_error(std::string(action) + ": " + ma_result_description(result));
+std::runtime_error audio_error(const std::string& action, ma_result result) {
+    return std::runtime_error(action + ": " + ma_result_description(result));
 }
 
 }  // namespace
@@ -96,7 +96,7 @@ uint64_t AudioWorld::play(const fs::path& file, SoundState settings) {
     const auto path = file.string();
     const ma_result loaded = ma_sound_init_from_file(&impl_->engine, path.c_str(),
         MA_SOUND_FLAG_STREAM, nullptr, nullptr, &entry->sound);
-    if (loaded != MA_SUCCESS) throw audio_error("cannot load sound", loaded);
+    if (loaded != MA_SUCCESS) throw audio_error("cannot load sound '" + path + "'", loaded);
     ma_sound_set_spatialization_enabled(&entry->sound, settings.spatial ? MA_TRUE : MA_FALSE);
     ma_sound_set_position(&entry->sound, settings.position.x, settings.position.y,
                           settings.position.z);
@@ -106,7 +106,7 @@ uint64_t AudioWorld::play(const fs::path& file, SoundState settings) {
     const ma_result started = ma_sound_start(&entry->sound);
     if (started != MA_SUCCESS) {
         ma_sound_uninit(&entry->sound);
-        throw audio_error("cannot start sound", started);
+        throw audio_error("cannot start sound '" + path + "'", started);
     }
     entry->state = settings;
     const uint64_t id = impl_->next_id++;
