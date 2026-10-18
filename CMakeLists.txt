@@ -1,6 +1,15 @@
 cmake_minimum_required(VERSION 3.25)
 project(ThreePoint VERSION 0.1.0 LANGUAGES C CXX)
 
+option(THREEPOINT_ENABLE_SANITIZERS "Instrument ThreePoint and its tests with ASan and UBSan" OFF)
+if(THREEPOINT_ENABLE_SANITIZERS)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" OR NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    message(FATAL_ERROR "ThreePoint sanitizers require a Linux Clang or GCC compiler")
+  endif()
+  add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+  add_link_options(-fsanitize=address,undefined)
+endif()
+
 include(FetchContent)
 set(VULKAN_HEADERS_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
 set(VULKAN_HEADERS_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)

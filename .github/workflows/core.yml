@@ -18,3 +18,18 @@ jobs:
         run: cmake --build build --config Release --parallel
       - name: Test
         run: VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation xvfb-run -a ctest --test-dir build -C Release --output-on-failure
+  sanitizers:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libglfw3-dev libvulkan-dev glslang-tools
+      - name: Configure debug sanitizer build
+        run: cmake -S . -B build-sanitize -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DTHREEPOINT_ENABLE_SANITIZERS=ON -DTHREEPOINT_ENABLE_GPU_TESTS=OFF
+      - name: Build
+        run: cmake --build build-sanitize --parallel
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build-sanitize --output-on-failure

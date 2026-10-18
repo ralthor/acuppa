@@ -1,6 +1,7 @@
 #include <Jolt/Jolt.h>
 #include <Jolt/RegisterTypes.h>
 #include <Jolt/Core/Factory.h>
+#include <Jolt/Core/IssueReporting.h>
 #include <Jolt/Core/JobSystemSingleThreaded.h>
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
@@ -23,6 +24,7 @@
 #include <glm/geometric.hpp>
 
 #include <cmath>
+#include <cstdio>
 #include <map>
 #include <set>
 #include <stdexcept>
@@ -33,6 +35,14 @@ namespace {
 struct JoltRuntime {
     JoltRuntime() {
         JPH::RegisterDefaultAllocator();
+#ifdef JPH_ENABLE_ASSERTS
+        JPH::AssertFailed = [](const char* expression, const char* message,
+                               const char* file, JPH::uint line) -> bool {
+            std::fprintf(stderr, "Jolt assertion at %s:%u: %s%s%s\n", file, line,
+                         expression, message ? ": " : "", message ? message : "");
+            return true;
+        };
+#endif
         JPH::Factory::sInstance = new JPH::Factory();
         JPH::RegisterTypes();
     }
@@ -295,8 +305,8 @@ void PhysicsWorld::add_vehicle(uint64_t id, const VehicleConfig& config) {
         wheel->mRadius = config.wheel_radius;
         wheel->mWidth = 0.16f;
         wheel->mSuspensionMinLength = 0.15f;
-        wheel->mSuspensionMaxLength = 0.8f;
-        wheel->mSuspensionPreloadLength = -0.4f;
+        wheel->mSuspensionMaxLength = 0.4f;
+        wheel->mSuspensionPreloadLength = 0.0f;
         wheel->mSuspensionSpring.mFrequency = 1.5f;
         wheel->mSuspensionSpring.mDamping = 0.9f;
         wheel->mMaxSteerAngle = i < 2 ? 0.55f : 0.0f;
