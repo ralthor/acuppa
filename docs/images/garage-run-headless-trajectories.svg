@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="890"
+  viewBox="0 0 1200 890" role="img" aria-labelledby="title desc">
+<title id="title">Garage Run headless car trajectories</title>
+<desc id="desc">Top-down car positions under simultaneous and released keyboard controls.
+No game window or graphical renderer was used.</desc>
+<rect width="1200" height="890" fill="#f6f8fb"/>
+<text x="36" y="43" font-family="sans-serif" font-size="26" font-weight="700"
+ fill="#203044">Garage Run · headless trajectory test</text>
+<text x="36" y="69" font-family="sans-serif" font-size="15" fill="#526274">
+Top-down X/Z position, sampled every 0.1 s · north (−Z) is up · circles mark release points
+</text>
+<rect x="32" y="93" width="552" height="370" rx="10" fill="white" stroke="#d4dce7"/>
+<text x="50" y="122" font-family="sans-serif" font-size="18" font-weight="700" fill="#203044">Forward, 1.5 s</text>
+<line x1="50" y1="145" x2="68" y2="145" stroke="#4678c8" stroke-width="3"/>
+<text x="74" y="150" font-family="sans-serif" font-size="12" fill="#394b60">W</text>
+<line x1="95" y1="145" x2="113" y2="145" stroke="#d58a36" stroke-width="3"/>
+<text x="119" y="150" font-family="sans-serif" font-size="12" fill="#394b60">W + A</text>
+<line x1="168" y1="145" x2="186" y2="145" stroke="#1f9b8d" stroke-width="3"/>
+<text x="192" y="150" font-family="sans-serif" font-size="12" fill="#394b60">W + D</text>
+<rect x="86" y="169" width="470" height="253" fill="#fbfcfe" stroke="#b8c4d1"/>
+<path d="M86.0 169V422 M86 169.0H556" stroke="#e2e8f0" stroke-width="1"/>
+<text x="86.0" y="439" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">-3.4</text>
+<text x="78" y="173.0" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">8.8</text>
+<path d="M203.5 169V422 M86 232.2H556" stroke="#e2e8f0" stroke-width="1"/>
+<text x="203.5" y="439" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">-1.7</text>
+<text x="78" y="236.2" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">10.9</text>
+<path d="M321.0 169V422 M86 295.5H556" stroke="#e2e8f0" stroke-width="1"/>
+<text x="321.0" y="439" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">0.0</text>
+<text x="78" y="299.5" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">12.9</text>
+<path d="M438.5 169V422 M86 358.8H556" stroke="#e2e8f0" stroke-width="1"/>
+<text x="438.5" y="439" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">1.8</text>
+<text x="78" y="362.8" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">15.0</text>
+<path d="M556.0 169V422 M86 422.0H556" stroke="#e2e8f0" stroke-width="1"/>
+<text x="556.0" y="439" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">3.5</text>
+<text x="78" y="426.0" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">17.0</text>
+<text x="321.0" y="451" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#526274">X (m)</text>
+<text x="47" y="295.5" transform="rotate(-90 47 295.5)" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#526274">Z (m)</text>
+<polyline points="318.0,391.0 318.0,390.9 318.0,390.1 318.0,387.3 318.0,382.1 318.1,374.2 318.1,364.3 318.2,352.8 318.2,339.7 318.3,324.8 318.3,308.3 318.4,290.1 318.5,270.1 318.5,248.5 318.6,225.1 318.7,200.0" fill="none" stroke="#4678c8" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="318.7" cy="200.0" r="3.5" fill="#4678c8"/>
+<polyline points="318.0,391.0 318.0,390.9 317.7,390.4 317.0,389.0 315.7,386.4 313.5,382.2 310.1,376.2 305.0,368.4 297.8,358.6 288.0,347.1 275.0,334.5 258.6,320.9 238.4,306.5 214.4,291.2 186.3,274.9 154.2,257.7" fill="none" stroke="#d58a36" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="154.2" cy="257.7" r="3.5" fill="#d58a36"/>
+<polyline points="318.0,391.0 318.0,390.9 318.3,390.3 319.1,388.7 320.6,385.8 323.0,381.3 326.7,375.2 332.1,367.2 339.7,357.3 350.0,345.9 363.6,333.3 380.6,319.8 401.5,305.3 426.2,290.1 454.9,273.8 487.8,256.7" fill="none" stroke="#1f9b8d" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="487.8" cy="256.7" r="3.5" fill="#1f9b8d"/>
+<circle cx="318.0" cy="391.0" r="4" fill="#172334"/>
+<rect x="616" y="93" width="552" height="370" rx="10" fill="white" stroke="#d4dce7"/>
+<text x="634" y="122" font-family="sans-serif" font-size="18" font-weight="700" fill="#203044">Reverse, 2 s</text>
+<line x1="634" y1="145" x2="652" y2="145" stroke="#4678c8" stroke-width="3"/>
+<text x="658" y="150" font-family="sans-serif" font-size="12" fill="#394b60">S</text>
+<line x1="679" y1="145" x2="697" y2="145" stroke="#d58a36" stroke-width="3"/>
+<text x="703" y="150" font-family="sans-serif" font-size="12" fill="#394b60">S + A</text>
+<line x1="752" y1="145" x2="770" y2="145" stroke="#1f9b8d" stroke-width="3"/>
+<text x="776" y="150" font-family="sans-serif" font-size="12" fill="#394b60">S + D</text>
+<rect x="670" y="169" width="470" height="253" fill="#fbfcfe" stroke="#b8c4d1"/>
+<path d="M670.0 169V422 M670 169.0H1140" stroke="#e2e8f0" stroke-width="1"/>
+<text x="670.0" y="439" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">-3.9</text>
+<text x="662" y="173.0" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">14.9</text>
+<path d="M787.5 169V422 M670 232.2H1140" stroke="#e2e8f0" stroke-width="1"/>
+<text x="787.5" y="439" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">-1.9</text>
+<text x="662" y="236.2" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">17.7</text>
+<path d="M905.0 169V422 M670 295.5H1140" stroke="#e2e8f0" stroke-width="1"/>
+<text x="905.0" y="439" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">0.2</text>
+<text x="662" y="299.5" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">20.5</text>
+<path d="M1022.5 169V422 M670 358.8H1140" stroke="#e2e8f0" stroke-width="1"/>
+<text x="1022.5" y="439" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">2.2</text>
+<text x="662" y="362.8" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">23.4</text>
+<path d="M1140.0 169V422 M670 422.0H1140" stroke="#e2e8f0" stroke-width="1"/>
+<text x="1140.0" y="439" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">4.3</text>
+<text x="662" y="426.0" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">26.2</text>
+<text x="905.0" y="451" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#526274">X (m)</text>
+<text x="631" y="295.5" transform="rotate(-90 631 295.5)" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#526274">Z (m)</text>
+<polyline points="894.6,193.5 894.6,193.5 894.6,194.1 894.6,195.5 894.6,197.9 894.6,201.3 894.6,205.9 894.6,211.5 894.6,218.2 894.6,226.0 894.6,234.9 894.6,245.2 894.6,256.8 894.6,269.8 894.7,284.1 894.8,299.7 894.8,316.6 894.6,334.8 894.4,354.4 894.0,375.3 893.6,397.5" fill="none" stroke="#4678c8" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="893.6" cy="397.5" r="3.5" fill="#4678c8"/>
+<polyline points="894.6,193.5 894.7,193.5 894.9,193.9 895.5,194.9 896.4,196.3 897.5,198.7 898.8,202.1 900.0,206.5 900.5,212.0 900.0,218.5 897.8,226.0 893.5,234.4 887.0,243.3 877.6,252.5 865.7,261.8 850.2,271.4 831.3,281.2 810.2,290.2 785.9,299.1 758.3,307.6 727.2,315.8" fill="none" stroke="#d58a36" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="727.2" cy="315.8" r="3.5" fill="#d58a36"/>
+<polyline points="894.6,193.5 894.6,193.5 894.3,194.0 893.6,195.0 892.6,196.8 891.4,199.4 890.0,202.8 888.9,207.1 888.5,212.4 888.9,218.6 890.9,225.9 894.7,234.0 900.9,242.7 909.8,251.9 921.6,261.3 937.7,271.4 958.5,281.8 983.6,292.3 1012.6,302.9 1045.7,313.4 1082.8,323.9" fill="none" stroke="#1f9b8d" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="1082.8" cy="323.9" r="3.5" fill="#1f9b8d"/>
+<circle cx="894.6" cy="193.5" r="4" fill="#172334"/>
+<rect x="32" y="484" width="552" height="370" rx="10" fill="white" stroke="#d4dce7"/>
+<text x="50" y="513" font-family="sans-serif" font-size="18" font-weight="700" fill="#203044">Release after 2 s reverse</text>
+<line x1="50" y1="536" x2="68" y2="536" stroke="#4678c8" stroke-width="3"/>
+<text x="74" y="541" font-family="sans-serif" font-size="12" fill="#394b60">S → A</text>
+<line x1="123" y1="536" x2="141" y2="536" stroke="#d58a36" stroke-width="3"/>
+<text x="147" y="541" font-family="sans-serif" font-size="12" fill="#394b60">S + A → A</text>
+<line x1="224" y1="536" x2="242" y2="536" stroke="#1f9b8d" stroke-width="3"/>
+<text x="248" y="541" font-family="sans-serif" font-size="12" fill="#394b60">S + A → S</text>
+<rect x="86" y="560" width="470" height="253" fill="#fbfcfe" stroke="#b8c4d1"/>
+<path d="M86.0 560V813 M86 560.0H556" stroke="#e2e8f0" stroke-width="1"/>
+<text x="86.0" y="830" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">-13.1</text>
+<text x="78" y="564.0" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">13.7</text>
+<path d="M203.5 560V813 M86 623.2H556" stroke="#e2e8f0" stroke-width="1"/>
+<text x="203.5" y="830" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">-9.5</text>
+<text x="78" y="627.2" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">19.7</text>
+<path d="M321.0 560V813 M86 686.5H556" stroke="#e2e8f0" stroke-width="1"/>
+<text x="321.0" y="830" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">-5.8</text>
+<text x="78" y="690.5" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">25.6</text>
+<path d="M438.5 560V813 M86 749.8H556" stroke="#e2e8f0" stroke-width="1"/>
+<text x="438.5" y="830" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">-2.1</text>
+<text x="78" y="753.8" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">31.6</text>
+<path d="M556.0 560V813 M86 813.0H556" stroke="#e2e8f0" stroke-width="1"/>
+<text x="556.0" y="830" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">1.5</text>
+<text x="78" y="817.0" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">37.6</text>
+<text x="321.0" y="842" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#526274">X (m)</text>
+<text x="47" y="686.5" transform="rotate(-90 47 686.5)" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#526274">Z (m)</text>
+<polyline points="507.2,584.5 507.2,584.5 507.2,584.8 507.2,585.4 507.2,586.6 507.2,588.2 507.2,590.3 507.2,593.0 507.2,596.1 507.2,599.8 507.2,604.0 507.2,608.9 507.2,614.3 507.2,620.5 507.3,627.2 507.3,634.5 507.3,642.5 507.2,651.1 507.1,660.3 506.9,670.2 506.6,680.7 507.1,691.6 507.5,702.9 506.3,714.4 503.0,725.8 497.4,736.9 489.6,747.8 479.8,758.3 468.5,768.6 456.0,778.7 442.9,788.5" fill="none" stroke="#4678c8" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="507.1" cy="691.6" r="5" fill="white" stroke="#4678c8" stroke-width="2"/>
+<circle cx="442.9" cy="788.5" r="3.5" fill="#4678c8"/>
+<polyline points="507.2,584.5 507.2,584.5 507.4,584.7 507.7,585.1 508.2,585.8 508.8,586.9 509.6,588.5 510.2,590.6 510.5,593.2 510.2,596.3 509.0,599.8 506.6,603.8 502.9,608.0 497.7,612.3 491.0,616.7 482.3,621.2 471.7,625.8 459.9,630.1 446.3,634.2 430.8,638.3 413.4,642.2 394.2,645.9 373.4,649.5 351.1,652.8 327.5,655.8 302.9,658.3 278.0,660.3 252.7,661.9 226.2,663.1 199.1,663.7 171.6,663.8" fill="none" stroke="#d58a36" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="394.2" cy="645.9" r="5" fill="white" stroke="#d58a36" stroke-width="2"/>
+<circle cx="171.6" cy="663.8" r="3.5" fill="#d58a36"/>
+<polyline points="507.2,584.5 507.2,584.5 507.4,584.7 507.7,585.1 508.2,585.8 508.8,586.9 509.6,588.5 510.2,590.6 510.5,593.2 510.2,596.3 509.0,599.8 506.6,603.8 502.9,608.0 497.7,612.3 491.0,616.7 482.3,621.2 471.7,625.8 459.9,630.1 446.3,634.2 430.8,638.3 413.4,642.2 394.0,645.8 372.7,649.3 349.5,652.8 324.4,656.5 297.3,660.2 268.3,663.9 237.1,667.6 204.0,671.2 168.7,674.8 131.5,678.3" fill="none" stroke="#1f9b8d" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="394.0" cy="645.8" r="5" fill="white" stroke="#1f9b8d" stroke-width="2"/>
+<circle cx="131.5" cy="678.3" r="3.5" fill="#1f9b8d"/>
+<circle cx="507.2" cy="584.5" r="4" fill="#172334"/>
+<rect x="616" y="484" width="552" height="370" rx="10" fill="white" stroke="#d4dce7"/>
+<text x="634" y="513" font-family="sans-serif" font-size="18" font-weight="700" fill="#203044">Opposing keys and release</text>
+<line x1="634" y1="536" x2="652" y2="536" stroke="#8256ad" stroke-width="3"/>
+<text x="658" y="541" font-family="sans-serif" font-size="12" fill="#394b60">W + S</text>
+<line x1="707" y1="536" x2="725" y2="536" stroke="#4678c8" stroke-width="3"/>
+<text x="731" y="541" font-family="sans-serif" font-size="12" fill="#394b60">W + S → W</text>
+<line x1="808" y1="536" x2="826" y2="536" stroke="#d58a36" stroke-width="3"/>
+<text x="832" y="541" font-family="sans-serif" font-size="12" fill="#394b60">W + S → S</text>
+<line x1="909" y1="536" x2="927" y2="536" stroke="#1f9b8d" stroke-width="3"/>
+<text x="933" y="541" font-family="sans-serif" font-size="12" fill="#394b60">S + A + D</text>
+<line x1="1010" y1="536" x2="1028" y2="536" stroke="#d25673" stroke-width="3"/>
+<text x="1034" y="541" font-family="sans-serif" font-size="12" fill="#394b60">S + A + D → S + A</text>
+<rect x="670" y="560" width="470" height="253" fill="#fbfcfe" stroke="#b8c4d1"/>
+<path d="M670.0 560V813 M670 560.0H1140" stroke="#e2e8f0" stroke-width="1"/>
+<text x="670.0" y="830" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">-2.3</text>
+<text x="662" y="564.0" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">11.6</text>
+<path d="M787.5 560V813 M670 623.2H1140" stroke="#e2e8f0" stroke-width="1"/>
+<text x="787.5" y="830" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">-1.5</text>
+<text x="662" y="627.2" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">15.4</text>
+<path d="M905.0 560V813 M670 686.5H1140" stroke="#e2e8f0" stroke-width="1"/>
+<text x="905.0" y="830" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">-0.6</text>
+<text x="662" y="690.5" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">19.1</text>
+<path d="M1022.5 560V813 M670 749.8H1140" stroke="#e2e8f0" stroke-width="1"/>
+<text x="1022.5" y="830" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">0.2</text>
+<text x="662" y="753.8" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">22.8</text>
+<path d="M1140.0 560V813 M670 813.0H1140" stroke="#e2e8f0" stroke-width="1"/>
+<text x="1140.0" y="830" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#65788a">1.1</text>
+<text x="662" y="817.0" text-anchor="end" font-family="sans-serif" font-size="11" fill="#65788a">26.5</text>
+<text x="905.0" y="842" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#526274">X (m)</text>
+<text x="631" y="686.5" transform="rotate(-90 631 686.5)" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#526274">Z (m)</text>
+<polyline points="992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3" fill="none" stroke="#8256ad" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="992.0" cy="634.3" r="3.5" fill="#8256ad"/>
+<polyline points="992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.2 992.0,633.5 992.0,631.4 992.0,627.8 992.0,622.9 992.0,617.0 992.0,610.2 992.0,602.6 992.0,594.0 992.0,584.5" fill="none" stroke="#4678c8" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="992.0" cy="634.2" r="5" fill="white" stroke="#4678c8" stroke-width="2"/>
+<circle cx="992.0" cy="584.5" r="3.5" fill="#4678c8"/>
+<polyline points="992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.3 992.0,634.9 992.0,636.3 992.0,638.4 992.0,641.2 992.0,644.8 992.0,649.3 992.0,654.5 992.0,660.6 992.0,667.6" fill="none" stroke="#d58a36" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="992.0" cy="634.3" r="5" fill="white" stroke="#d58a36" stroke-width="2"/>
+<circle cx="992.0" cy="667.6" r="3.5" fill="#d58a36"/>
+<polyline points="992.0,634.3 992.0,634.3 992.0,634.7 992.0,635.8 992.0,637.6 992.0,640.2 992.0,643.6 992.0,647.8 992.0,652.9 992.0,658.8 992.0,665.6 992.0,673.4 992.0,682.2 992.0,692.0 992.2,702.7 992.4,714.6 992.4,727.4 992.0,741.1 991.3,755.9 990.4,771.7 989.4,788.5" fill="none" stroke="#1f9b8d" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="989.4" cy="788.5" r="3.5" fill="#1f9b8d"/>
+<polyline points="992.0,634.3 992.0,634.3 992.0,634.7 992.0,635.8 992.0,637.6 992.0,640.2 992.0,643.6 992.0,647.8 992.0,652.9 992.0,658.8 992.0,665.6 995.3,673.1 999.6,681.5 1000.5,690.7 995.6,700.5 983.5,710.7 963.8,721.4 936.7,732.4 902.1,743.7 859.8,755.4 809.5,767.2" fill="none" stroke="#d25673" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="995.3" cy="673.1" r="5" fill="white" stroke="#d25673" stroke-width="2"/>
+<circle cx="809.5" cy="767.2" r="3.5" fill="#d25673"/>
+<circle cx="992.0" cy="634.3" r="4" fill="#172334"/>
+</svg>

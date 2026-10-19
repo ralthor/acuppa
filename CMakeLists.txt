@@ -286,6 +286,11 @@ if(BUILD_TESTING)
   add_test(NAME garage_run_gameplay COMMAND acuppa_garage_run_game_test
            "${PROJECT_SOURCE_DIR}/games/garage_run"
            "${PROJECT_BINARY_DIR}/garage_run_game_fixture")
+  add_executable(acuppa_garage_run_trajectory_test tests/garage_run_trajectory_test.cpp)
+  target_link_libraries(acuppa_garage_run_trajectory_test PRIVATE acuppa_core)
+  add_test(NAME garage_run_headless_trajectory COMMAND acuppa_garage_run_trajectory_test
+           "${PROJECT_SOURCE_DIR}/games/garage_run"
+           "${PROJECT_BINARY_DIR}/garage_run_trajectory_fixture")
   add_test(NAME garage_run_assets COMMAND "${Python3_EXECUTABLE}"
            "${PROJECT_SOURCE_DIR}/tests/garage_run_assets_test.py"
            "${PROJECT_SOURCE_DIR}/games/garage_run"

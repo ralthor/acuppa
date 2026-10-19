@@ -98,7 +98,10 @@ return {
       end
     end
 
+    local speed = math.sqrt(state.velocity[1]^2 + state.velocity[3]^2)
     local steer = clamp(tp.action("right") - tp.action("left") + tp.action("steer"), -1, 1)
+    -- Keep full steering in the parking bay, but limit the wheel angle as speed rises.
+    steer = steer * clamp(1 - speed / 8, 0.2, 1)
     local throttle = clamp(tp.action("throttle") - tp.action("reverse"), -1, 1)
     local brake = tp.action("brake") > 0 and 1 or 0
     local handbrake = tp.action("drift") > 0 and 1 or 0
@@ -107,7 +110,7 @@ return {
     for i, wheel in ipairs(vehicle.wheels) do
       tp.component_set(wheels[i], "transform", {rotation = {wheel.rotation, wheel.steer, 0}})
     end
-    local speed = math.sqrt(state.velocity[1]^2 + state.velocity[2]^2 + state.velocity[3]^2)
+    speed = math.sqrt(state.velocity[1]^2 + state.velocity[2]^2 + state.velocity[3]^2)
     if drive:park(speed) then
       finish_message = 3
       cue("assets/checkpoint.wav", state.position, 1.0)

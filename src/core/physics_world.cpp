@@ -329,7 +329,8 @@ void PhysicsWorld::add_vehicle(uint64_t id, const VehicleConfig& config) {
             longitudinal = 10.0f * longitudinal_friction * suspension;
             const float rear = wheel >= 2 ? config.rear_grip : 1.0f;
             const float handbrake = wheel >= 2 ? 1.0f - 0.7f * controller->GetHandBrakeInput() : 1.0f;
-            lateral = rear * handbrake * lateral_friction * suspension;
+            // Ordinary turns need lateral traction; the handbrake still breaks rear grip.
+            lateral = 2.5f * rear * handbrake * lateral_friction * suspension;
         });
     impl_->system.AddConstraint(vehicle);
     impl_->system.AddStepListener(vehicle);
