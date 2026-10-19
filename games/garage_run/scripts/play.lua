@@ -48,7 +48,7 @@ return {
     end
     tp.vehicle_attach(car, {half_track = 0.55, half_wheelbase = 0.72,
                             wheel_radius = 0.28, engine_torque = 350,
-                            rear_grip = 0.75})
+                            rear_grip = 0.75, center_of_mass_y = -0.35})
     drive = Drive.new()
     impact = Impact.new()
     local saved = tp.load("best")

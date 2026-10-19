@@ -13,6 +13,7 @@
 #include <Jolt/Physics/Collision/NarrowPhaseQuery.h>
 #include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <Jolt/Physics/Collision/Shape/OffsetCenterOfMassShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/Physics/Vehicle/VehicleConstraint.h>
@@ -290,8 +291,17 @@ void PhysicsWorld::add_vehicle(uint64_t id, const VehicleConfig& config) {
         !std::isfinite(config.wheel_radius) || config.wheel_radius <= 0.0f ||
         !std::isfinite(config.engine_torque) || config.engine_torque <= 0.0f ||
         !std::isfinite(config.rear_grip) || config.rear_grip <= 0.0f ||
-        config.rear_grip > 2.0f)
-        throw std::invalid_argument("invalid vehicle dimensions, torque, or rear grip");
+        config.rear_grip > 2.0f || !std::isfinite(config.center_of_mass_y) ||
+        config.center_of_mass_y < -1.0f || config.center_of_mass_y > 0.0f)
+        throw std::invalid_argument("invalid vehicle dimensions, torque, grip, or center of mass");
+    if (config.center_of_mass_y != 0.0f) {
+        auto& iface = impl_->system.GetBodyInterface();
+        const JPH::RefConst<JPH::Shape> shape = iface.GetShape(body->second);
+        iface.SetShape(body->second,
+                       new JPH::OffsetCenterOfMassShape(shape.GetPtr(),
+                                                          JPH::Vec3(0, config.center_of_mass_y, 0)),
+                       true, JPH::EActivation::Activate);
+    }
     JPH::BodyLockWrite lock(impl_->system.GetBodyLockInterface(), body->second);
     if (!lock.Succeeded()) throw std::runtime_error("vehicle body lock failed");
     JPH::VehicleConstraintSettings settings;

@@ -54,6 +54,8 @@ struct VehicleConfig {
     float wheel_radius = 0.28f;
     float engine_torque = 800.0f;
     float rear_grip = 0.75f;
+    // Negative local Y lowers the rigid body's center of mass without moving its shape.
+    float center_of_mass_y = 0.0f;
 };
 
 struct VehicleWheelState {

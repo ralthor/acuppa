@@ -1549,6 +1549,8 @@ int LuaProject::Impl::vehicle_attach(lua_State* lua) {
             config.wheel_radius = optional_number(lua, 2, "wheel_radius", config.wheel_radius, "vehicle");
             config.engine_torque = optional_number(lua, 2, "engine_torque", config.engine_torque, "vehicle");
             config.rear_grip = optional_number(lua, 2, "rear_grip", config.rear_grip, "vehicle");
+            config.center_of_mass_y = optional_number(lua, 2, "center_of_mass_y",
+                                                       config.center_of_mass_y, "vehicle");
         }
         context(lua).physics->add_vehicle(checked_id(lua, 1), config);
     } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }

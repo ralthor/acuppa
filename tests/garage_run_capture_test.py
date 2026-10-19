@@ -33,6 +33,7 @@ assert red > 100, "the red PBR car is not visible in the Vulkan capture"
 
 # The right obstacle's oblique face is a single flat mesh face. SSAO produced
 # camera-moving bands here; the game leaves it off until that effect is fixed.
-for y, left, right in [(460, 960, 1000), (480, 970, 1000)]:
+# Sample well inside the face. Its screen edge shifts as the car ride changes.
+for y, left, right in [(450, 978, 1002), (460, 978, 1002), (480, 978, 1002)]:
     face = [driven[(y * 1280 + x) * 3] for x in range(left, right)]
     assert max(face) - min(face) <= 4, "SSAO striped the flat obstacle face"

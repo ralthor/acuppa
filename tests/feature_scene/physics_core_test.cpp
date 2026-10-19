@@ -167,6 +167,13 @@ int main() {
     chassis.half_extents = {0.65f, 0.2f, 1.05f};
     chassis.position = {0, 0.75f, 0};
     vehicle_world.add(chassis);
+    VehicleConfig invalid_center;
+    invalid_center.center_of_mass_y = 0.1f;
+    rejects([&] { vehicle_world.add_vehicle(21, invalid_center); },
+            "raised vehicle center of mass accepted");
+    invalid_center.center_of_mass_y = -1.1f;
+    rejects([&] { vehicle_world.add_vehicle(21, invalid_center); },
+            "out-of-range vehicle center of mass accepted");
     vehicle_world.add_vehicle(21);
     rejects([&] { vehicle_world.add_vehicle(21); }, "duplicate vehicle accepted");
     rejects([&] { vehicle_world.add_vehicle(20); }, "static body accepted as vehicle");
@@ -207,4 +214,23 @@ int main() {
            "rear wheels did not develop lateral slip under steering and handbrake");
     expect(vehicle_world.remove(21) && !vehicle_world.vehicle_state(21),
            "vehicle removal left an active constraint");
+
+    PhysicsWorld lowered_world;
+    lowered_world.add(floor);
+    chassis.id = 22;
+    lowered_world.add(chassis);
+    VehicleConfig lowered_center;
+    lowered_center.center_of_mass_y = -0.2f;
+    lowered_world.add_vehicle(22, lowered_center);
+    expect(std::abs(lowered_world.state(22)->position.y - 0.75f) < 0.001f,
+           "lowering vehicle center of mass moved the chassis shape");
+    bool lowered_wheel_grounded = false;
+    for (int i = 0; i < 180; ++i) {
+        lowered_world.set_vehicle_input(22, 1, 0.3f, 0, 0);
+        lowered_world.step();
+        lowered_wheel_grounded |= lowered_world.vehicle_state(22)->wheels[0].grounded;
+    }
+    expect(lowered_wheel_grounded &&
+           std::abs(lowered_world.state(22)->position.x) > 0.2f,
+           "lower center of mass broke wheel contact or steering");
 }

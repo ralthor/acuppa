@@ -28,7 +28,10 @@ The car uses a Jolt four-wheel vehicle constraint: the rear wheels receive
 drive torque, the front wheels steer, and the handbrake reduces rear tire grip.
 Steering at rest turns the wheels without rotating the chassis. Steering angle
 decreases as speed rises, and ordinary tire grip keeps left/right turns stable;
-the handbrake still allows a drift. Walls and
+the handbrake still allows a drift. The chassis center of mass is lowered by
+0.35 m in the vehicle settings so long gas-and-steer turns do not roll the car
+onto its side. The chassis shape, wheel positions, and visible ride height stay
+in place. Walls and
 obstacles are solid bodies, while gates and the parking bay are triggers. The
 course uses PBR glTF meshes, an HDRI, a shadowed light, spatial engine,
 skid, and impact sounds, and Lua UI. A wall hit moves the chase camera according
@@ -44,8 +47,9 @@ obstacles. The engine's SSAO feature remains available for other scenes.
 The trajectory test runs the real Lua game and Jolt vehicle at 60 Hz without a
 window or speaker output. It presses W/S and A/D together, releases one key at
 a time, and records the car's ground position in
-`build/garage_run_trajectory_fixture/trajectory.csv`. The plot shows the
-measured paths; open circles mark input changes.
+`build/garage_run_trajectory_fixture/trajectory.csv`. It also measures the
+chassis's upright direction over four-second gas-and-steer turns. The plot
+shows the measured ground paths; open circles mark input changes.
 
 ![Top-down Garage Run trajectories for forward, reverse, and key-release sequences](../../docs/images/garage-run-headless-trajectories.svg)
 

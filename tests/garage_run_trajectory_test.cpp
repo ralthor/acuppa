@@ -1,5 +1,6 @@
 #include "acuppa/lua_project.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <filesystem>
@@ -28,6 +29,7 @@ struct Pose {
     float x;
     float z;
     float heading;
+    float upright;
 };
 
 void expect(bool condition, const char* message) {
@@ -38,7 +40,8 @@ Pose car_pose(const acuppa::SceneFrame& frame) {
     for (const auto& item : frame.imported) {
         if (item.id != 4) continue;
         const auto& m = item.transform;
-        return {m[3].x, m[3].z, std::atan2(m[2].x, -m[2].z)};
+        const float up_length = std::hypot(m[1].x, m[1].y, m[1].z);
+        return {m[3].x, m[3].z, std::atan2(m[2].x, -m[2].z), m[1].y / up_length};
     }
     throw std::runtime_error("Garage Run car model missing from frame");
 }
@@ -72,12 +75,14 @@ int main(int argc, char* argv[]) {
     fs::copy(argv[1], project, fs::copy_options::recursive);
     std::ofstream csv(output / "trajectory.csv");
     if (!csv) throw std::runtime_error("cannot write trajectory.csv");
-    csv << "scenario,time,keys,x,z,heading,speed\n";
+    csv << "scenario,time,keys,x,z,heading,speed,upright\n";
 
     const std::vector<std::pair<std::string, std::vector<Stage>>> scenarios = {
         {"forward", {{90, {true, false, false, false}}}},
         {"forward_left", {{90, {true, false, true, false}}}},
         {"forward_right", {{90, {true, false, false, true}}}},
+        {"sustained_forward_left", {{240, {true, false, true, false}}}},
+        {"sustained_forward_right", {{240, {true, false, false, true}}}},
         {"reverse", {{120, {false, true, false, false}}}},
         {"reverse_left", {{120, {false, true, true, false}}}},
         {"reverse_right", {{120, {false, true, false, true}}}},
@@ -103,13 +108,15 @@ int main(int argc, char* argv[]) {
     };
     std::map<std::string, Pose> ends;
     std::map<std::string, Pose> first_stage;
+    std::map<std::string, float> least_upright_by_scenario;
     for (const auto& [name, stages] : scenarios) {
         acuppa::LuaProject game(project, "course", acuppa::LuaProject::Mode::Game, false);
         Pose previous = car_pose(game.step(0));
         Keys held;
         int tick = 0;
         csv << name << ",0,none," << previous.x << ',' << previous.z << ','
-            << previous.heading << ",0\n";
+            << previous.heading << ",0," << previous.upright << '\n';
+        float least_upright = previous.upright;
         for (size_t stage_index = 0; stage_index < stages.size(); ++stage_index) {
             const Stage& stage = stages[stage_index];
             set_keys(game, held, stage.keys);
@@ -119,21 +126,24 @@ int main(int argc, char* argv[]) {
                 const float distance = std::hypot(pose.x - previous.x,
                                                    pose.z - previous.z);
                 expect(std::isfinite(pose.x) && std::isfinite(pose.z) &&
-                       std::isfinite(pose.heading) && distance < 0.5f,
+                       std::isfinite(pose.heading) && std::isfinite(pose.upright) &&
+                       distance < 0.5f,
                        "car trajectory jumped or became nonfinite");
+                least_upright = std::min(least_upright, pose.upright);
                 ++tick;
                 if (tick % 6 == 0 || i + 1 == stage.ticks) {
                     csv << name << ',' << tick / 60.0 << ',' << key_name(held) << ','
                         << pose.x << ',' << pose.z << ',' << pose.heading << ','
-                        << distance * 60.0f << '\n';
+                        << distance * 60.0f << ',' << pose.upright << '\n';
                 }
                 previous = pose;
             }
             if (stage_index == 0) first_stage[name] = previous;
         }
         ends[name] = previous;
+        least_upright_by_scenario[name] = least_upright;
         std::cout << name << ": x=" << previous.x << " z=" << previous.z
-                  << " heading=" << previous.heading << '\n';
+                  << " heading=" << previous.heading << " least upright=" << least_upright << '\n';
     }
 
     const Pose forward = ends.at("forward");
@@ -146,6 +156,9 @@ int main(int argc, char* argv[]) {
            std::abs(forward_left.x + forward_right.x) < 0.6f &&
            std::abs(forward_left.z - forward_right.z) < 0.6f,
            "forward left/right steering was not approximately symmetric");
+    expect(least_upright_by_scenario.at("sustained_forward_left") > 0.9f &&
+           least_upright_by_scenario.at("sustained_forward_right") > 0.9f,
+           "sustained gas and steering tipped the car onto its side");
     const Pose reverse = ends.at("reverse");
     const Pose reverse_left = ends.at("reverse_left");
     const Pose reverse_right = ends.at("reverse_right");
