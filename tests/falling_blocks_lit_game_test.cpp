@@ -1,6 +1,8 @@
+#include "acuppa/audio_world.hpp"
 #include "acuppa/lua_project.hpp"
 
 #include <cmath>
+#include <filesystem>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -28,6 +30,16 @@ float active_x(const acuppa::SceneFrame& frame) {
 
 int main(int argc, char* argv[]) {
     if (argc != 2) throw std::runtime_error("lit game path required");
+    acuppa::AudioWorld audio(false);
+    for (const char* name : {"clear.wav", "burst.wav"}) {
+        const auto path = std::filesystem::path(argv[1]) / "assets" / name;
+        const auto id = audio.play(path, {});
+        double energy = 0;
+        for (const float sample : audio.render_offline(4800))
+            energy += double(sample) * sample;
+        expect(energy > 0.01, "line-clear cue did not decode into audible samples");
+        audio.stop(id);
+    }
     acuppa::LuaProject game(argv[1]);
     auto frame = game.step(0);
     expect(frame.environment && frame.lights.size() == 1 && frame.lights[0].shadows &&

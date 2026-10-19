@@ -8,8 +8,10 @@ The main scene uses a short-range directional shadow map for the colored tiles a
 
 Pieces come from deterministic, shuffled seven-piece bags. They fall with fixed-step gravity, lock, clear complete rows, and stop at top-out. The window shows the next and held pieces, a ghost landing outline, score, lines, level, pause, and game over. Every ten cleared lines raises the level and fall speed. Hard drops score two points per row and soft drops score one; line clears score 100, 300, 500, or 800 times the current level. Wall kicks try nearby positions when a rotation is blocked. Restart begins the same reproducible sequence.
 
-`make_assets.py` uses only Python's standard library to generate the checked-in `assets/` files. To regenerate them, run `python3 games/falling_blocks_lit/make_assets.py` from the repository root. The game itself only needs ACuppa; Python is not required to play. To test the copied game after building, run `ctest --test-dir build -R falling_blocks_lit --output-on-failure`.
+Cleared rows flash briefly with a small camera shake and a sound. Two-line clears last longer and shake more; three- and four-line clears add outward sparks and a bass burst. The effect plays after both gravity locks and hard drops, and restart removes any remaining visual effect.
 
-The HDRI lights the PBR tiles and panel; it is not drawn as a sky. Sound and animation remain future game work.
+`make_assets.py` uses only Python's standard library to generate the checked-in glTF, HDRI, and WAV assets. To regenerate them, run `python3 games/falling_blocks_lit/make_assets.py` from the repository root. The game itself only needs ACuppa; Python is not required to play. To test the copied game after building, run `ctest --test-dir build -R falling_blocks_lit --output-on-failure`.
+
+The HDRI lights the PBR tiles and panel; it is not drawn as a sky. Physical speaker quality has not been measured.
 
 To export a standalone Linux game from the repository root, run `build/acuppa build games/falling_blocks_lit build/falling_blocks_lit_release`, then launch `build/falling_blocks_lit_release/acuppa-game`. The bundle contains the source gameplay files and an executable player; no editor, Python generator, or CMake is needed to play it. `build/falling_blocks_lit_release/acuppa-game --check` validates the bundle without opening a window.

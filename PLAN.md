@@ -98,6 +98,8 @@ Phase 1 creates `tests/feature_scene/` and its coverage manifest. Every implemen
 
 **Falling Blocks Lit visual follow-up (2026-10-17):** The game's previous 1.15-unit SSAO radius caused blocky halos around stacked and ghost pieces. The game now uses restrained SSAO plus directional shadow maps for actual colored tiles. Meshes expose a `casts_shadows` switch to source scenes and Lua; the game turns it off for HUD, border, and ghost cubes. A dropped-piece Vulkan capture checks that tile shadows remain visible without dark title or ghost artifacts. The feature scene checks the new Lua setting and invalid input.
 
+**Falling Blocks Lit line-clear feedback (2026-10-19):** The newer game's board reports the original positions of cleared rows so its Lua scene can flash those rows. Flash duration, camera shake, clear-cue volume, and spark count increase from one to four lines; three and four lines layer a bass burst. The WAV files are generated with the other checked-in game assets. Board-row, tier, and gameplay tests cover one through four lines, hard-drop and gravity-lock paths, invalid tiers, cleanup, restart, and no-clear behavior. Offline audio decoding, real Vulkan effect capture, source check, standalone export checks, and interactive launch pass locally; the full 83-test local suite passes. Physical speaker quality remains unverified.
+
 | Phase | Deliverable | Check before commit |
 | --- | --- | --- |
 | 0 | Restore this 3D brief, this roadmap, `AGENTS.md`, and project-local development skills. | Requirements for every item in README map to a phase; no 2D plan is presented as the goal. |

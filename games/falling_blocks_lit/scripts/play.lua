@@ -1,8 +1,10 @@
 local tp = require("acuppa")
 local Board = require("scripts.board")
 local Font = require("scripts.font")
+local Feedback = require("scripts.clear_feedback")
 local board, rendered, status, message, previous, hold_time
 local gravity, score, lines, level, paused
+local effect
 
 local function block(x, y, z, sx, sy, sz)
   return tp.spawn({mesh = "builtin:cube", position = {x, y, z},
@@ -86,7 +88,65 @@ local function draw_board()
   draw_message()
 end
 
+local function end_effect()
+  if not effect then return end
+  clear(effect.ids)
+  effect = nil
+  tp.set_camera({eye = {0, 0, 24}, target = {0, 0, 0}})
+end
+
+local function start_effect(rows)
+  if #rows == 0 then return end
+  end_effect()
+  local profile = Feedback.profile(#rows)
+  effect = {ids = {}, bars = {}, sparks = {}, elapsed = 0, profile = profile}
+  for _, row in ipairs(rows) do
+    local y = row - 9.5
+    local bar = block(0, y, 0.65, 5.05, 0.23, 0.05)
+    effect.ids[#effect.ids + 1] = bar
+    effect.bars[#effect.bars + 1] = bar
+    for i = 1, profile.sparks do
+      local side = i % 2 == 0 and 1 or -1
+      local lane = math.floor((i - 1) / 2)
+      local x = side * (4.2 - lane * 0.25)
+      local spark = block(x, y, 0.72, 0.09, 0.09, 0.06)
+      effect.ids[#effect.ids + 1] = spark
+      effect.sparks[#effect.sparks + 1] = {id = spark, x = x, y = y,
+                                          speed = side * (4 + lane),
+                                          rise = (lane - 1) * 3}
+    end
+  end
+  tp.sound_play("assets/clear.wav", {volume = profile.volume, pitch = profile.pitch})
+  if #rows >= 3 then
+    tp.sound_play("assets/burst.wav", {volume = #rows == 4 and 0.85 or 0.60})
+  end
+end
+
+local function update_effect(dt)
+  if not effect then return end
+  effect.elapsed = math.min(effect.profile.duration, effect.elapsed + dt)
+  local progress = effect.elapsed / effect.profile.duration
+  local fade = 1 - progress
+  for _, id in ipairs(effect.bars) do
+    tp.component_set(id, "transform", {scale = {5.05 * fade + 0.01,
+                                                 0.23 * fade + 0.01, 0.05}})
+  end
+  for _, spark in ipairs(effect.sparks) do
+    tp.component_set(spark.id, "transform", {
+      position = {spark.x + spark.speed * effect.elapsed,
+                  spark.y + spark.rise * effect.elapsed, 0.72},
+      scale = {0.09 * fade + 0.01, 0.09 * fade + 0.01, 0.06},
+    })
+  end
+  local shake = effect.profile.shake * fade * fade
+  tp.set_camera({eye = {shake * math.sin(effect.elapsed * 61),
+                         shake * math.sin(effect.elapsed * 83), 24},
+                 target = {0, 0, 0}})
+  if progress >= 1 then end_effect() end
+end
+
 local function start_game()
+  end_effect()
   board = Board.new(16) -- fixed seed makes game runs and regression captures reproducible
   board:spawn()
   gravity, score, lines, level, paused = 0, 0, 0, 1, false
@@ -95,10 +155,11 @@ local function start_game()
   draw_board()
 end
 
-local function award(cleared, drop_distance)
+local function award(cleared, drop_distance, cleared_rows)
   score = score + 2 * drop_distance + Board.line_score(cleared, level)
   lines = lines + cleared
   level = Board.level_for_lines(lines)
+  if cleared > 0 then start_effect(cleared_rows) end
   board:spawn()
   draw_status()
 end
@@ -159,18 +220,19 @@ return {
     gravity = gravity + dt
     if gravity >= interval then
       gravity = gravity - interval
-      local moved, cleared = board:fall()
+      local moved, cleared, cleared_rows = board:fall()
       if moved and tp.action("soft_drop") > 0 then
         score = score + 1
         draw_status()
       elseif not moved then
-        award(cleared, 0)
+        award(cleared, 0, cleared_rows)
       end
       draw_board()
     end
   end,
   update = function(dt)
     if pressed("restart") then start_game(); return end
+    update_effect(dt)
     if pressed("pause") then
       paused = not paused
       draw_message()
@@ -186,8 +248,8 @@ return {
     end
     local drop = pressed("hard_drop")
     if drop and not board.game_over then
-      local distance, cleared = board:hard_drop()
-      award(cleared, distance)
+      local distance, cleared, cleared_rows = board:hard_drop()
+      award(cleared, distance, cleared_rows)
       gravity = 0
       changed = true
     end

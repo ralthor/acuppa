@@ -5,6 +5,7 @@ import math
 from pathlib import Path
 import struct
 import sys
+import wave
 
 
 output = Path(sys.argv[1]) if len(sys.argv) == 2 else Path(__file__).parent / "assets"
@@ -117,3 +118,36 @@ with (output / "studio.hdr").open("wb") as file:
         file.write(bytes((2, 2, width >> 8, width & 255)))
         for channel in range(4):
             file.write(bytes((width, *(pixel[channel] for pixel in row))))
+
+
+def sound(name, seconds, sample):
+    rate = 24000
+    frames = bytearray()
+    for index in range(int(seconds * rate)):
+        value = max(-1, min(1, sample(index / rate)))
+        frames.extend(struct.pack("<h", int(value * 26000)))
+    with wave.open(str(output / f"{name}.wav"), "wb") as file:
+        file.setnchannels(1)
+        file.setsampwidth(2)
+        file.setframerate(rate)
+        file.writeframes(frames)
+
+
+sound("clear", 0.24, lambda t: math.exp(-13 * t) *
+      (0.55 * math.sin(2 * math.pi * (620 * t + 900 * t * t)) +
+       0.22 * math.sin(2 * math.pi * 1240 * t)))
+
+noise_state = 17
+smoothed_noise = 0.0
+
+
+def burst(t):
+    global noise_state, smoothed_noise
+    noise_state = (noise_state * 1103515245 + 12345) % (1 << 31)
+    noise = noise_state / (1 << 30) - 1
+    smoothed_noise = 0.78 * smoothed_noise + 0.22 * noise
+    return math.exp(-9 * t) * (0.65 * math.sin(2 * math.pi * (95 * t - 50 * t * t)) +
+                                0.65 * smoothed_noise)
+
+
+sound("burst", 0.38, burst)

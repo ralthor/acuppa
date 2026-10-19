@@ -130,13 +130,14 @@ function Board:hold()
 end
 
 function Board:clear_lines()
-  local cleared, y = 0, 1
+  local cleared, y, rows = 0, 1, {}
   while y <= Board.height do
     local full = true
     for x = 1, Board.width do
       if not self.rows[y][x] then full = false; break end
     end
     if full then
+      rows[#rows + 1] = y - 1 + cleared
       table.remove(self.rows, y)
       self.rows[Board.height] = empty_row()
       cleared = cleared + 1
@@ -144,7 +145,7 @@ function Board:clear_lines()
       y = y + 1
     end
   end
-  return cleared
+  return cleared, rows
 end
 
 function Board:lock()
@@ -161,14 +162,16 @@ end
 function Board:fall()
   if not self.active or self.game_over then return false, 0 end
   if self:move(0, -1) then return true, 0 end
-  return false, self:lock()
+  local cleared, rows = self:lock()
+  return false, cleared, rows
 end
 
 function Board:hard_drop()
   assert(self.active and not self.game_over, "no active piece to drop")
   local distance = 0
   while self:move(0, -1) do distance = distance + 1 end
-  return distance, self:lock()
+  local cleared, rows = self:lock()
+  return distance, cleared, rows
 end
 
 function Board.line_score(cleared, level)

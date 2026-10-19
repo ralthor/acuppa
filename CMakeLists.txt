@@ -271,6 +271,15 @@ if(BUILD_TESTING)
   add_test(NAME falling_blocks_rules COMMAND acuppa_falling_blocks_rules_test
            "${PROJECT_SOURCE_DIR}/games/falling_blocks/scripts/board.lua"
            "${PROJECT_SOURCE_DIR}/tests/falling_blocks_rules.lua")
+  add_test(NAME falling_blocks_lit_clear_rows COMMAND acuppa_falling_blocks_rules_test
+           "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit/scripts/board.lua"
+           "${PROJECT_SOURCE_DIR}/tests/falling_blocks_lit_board.lua")
+  add_test(NAME falling_blocks_lit_feedback_tiers COMMAND acuppa_falling_blocks_rules_test
+           "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit/scripts/clear_feedback.lua"
+           "${PROJECT_SOURCE_DIR}/tests/falling_blocks_lit_feedback.lua")
+  add_test(NAME falling_blocks_lit_feedback_game COMMAND acuppa_falling_blocks_rules_test
+           "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit"
+           "${PROJECT_SOURCE_DIR}/tests/falling_blocks_lit_feedback_game.lua")
   add_executable(acuppa_garage_run_rules_test tests/garage_run_rules_test.cpp)
   target_link_libraries(acuppa_garage_run_rules_test PRIVATE acuppa_lua)
   add_test(NAME garage_run_driving_rules COMMAND acuppa_garage_run_rules_test
@@ -372,6 +381,9 @@ if(BUILD_TESTING)
              "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit")
     add_test(NAME falling_blocks_lit_ssao COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/falling_blocks_lit_ssao_test.py" $<TARGET_FILE:acuppa>
+             "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit")
+    add_test(NAME falling_blocks_lit_clear_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/falling_blocks_lit_clear_capture_test.py" $<TARGET_FILE:acuppa>
              "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit")
     add_test(NAME falling_blocks_lit_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:acuppa>

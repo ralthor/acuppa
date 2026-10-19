@@ -32,6 +32,9 @@ for source in games:
     assert player.is_file() and not (bundle / "acuppa-editor").exists()
     assert not (bundle / "game/README.md").exists()
     assert not (bundle / "game/make_assets.py").exists()
+    if source.name == "falling_blocks_lit":
+        for cue in ("clear.wav", "burst.wav"):
+            assert (bundle / "game/assets" / cue).is_file(), f"missing exported {cue}"
     invoke(player, "--check")
     if not graphical:
         invalid = subprocess.run([str(player), "--hold-key", ""], cwd=work,
