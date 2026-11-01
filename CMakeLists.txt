@@ -301,6 +301,22 @@ if(BUILD_TESTING)
   add_test(NAME siege_sling_rules COMMAND acuppa_siege_sling_rules_test
            "${PROJECT_SOURCE_DIR}/games/siege_sling/scripts/rules.lua"
            "${PROJECT_SOURCE_DIR}/tests/siege_sling_rules.lua")
+  add_test(NAME siege_sling_play_modules COMMAND acuppa_siege_sling_rules_test
+           "${PROJECT_SOURCE_DIR}/games/siege_sling/scripts"
+           "${PROJECT_SOURCE_DIR}/tests/siege_sling_play_modules.lua")
+  add_executable(acuppa_siege_sling_game_test tests/siege_sling_game_test.cpp)
+  target_link_libraries(acuppa_siege_sling_game_test PRIVATE acuppa_core)
+  add_test(NAME siege_sling_gameplay COMMAND acuppa_siege_sling_game_test
+           "${PROJECT_SOURCE_DIR}/games/siege_sling"
+           "${PROJECT_BINARY_DIR}/siege_sling_game_fixture")
+  add_test(NAME siege_sling_assets COMMAND "${Python3_EXECUTABLE}"
+           "${PROJECT_SOURCE_DIR}/tests/siege_sling_assets_test.py"
+           "${PROJECT_SOURCE_DIR}/games/siege_sling"
+           "${PROJECT_BINARY_DIR}/siege_sling_assets_fixture")
+  add_test(NAME siege_sling_project_test COMMAND acuppa test
+           "${PROJECT_SOURCE_DIR}/games/siege_sling")
+  set_tests_properties(siege_sling_project_test PROPERTIES
+                       PASS_REGULAR_EXPRESSION "PASS level1")
   add_executable(acuppa_garage_run_impact_test tests/garage_run_impact_test.cpp)
   target_link_libraries(acuppa_garage_run_impact_test PRIVATE acuppa_lua)
   add_test(NAME garage_run_impact_camera COMMAND acuppa_garage_run_impact_test
@@ -410,6 +426,12 @@ if(BUILD_TESTING)
              "${PROJECT_SOURCE_DIR}/games/falling_blocks"
              "${PROJECT_SOURCE_DIR}/games/falling_blocks_lit"
              "${PROJECT_BINARY_DIR}/falling_blocks_export_capture" --graphical)
+    add_test(NAME siege_sling_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/siege_sling_capture_test.py" $<TARGET_FILE:acuppa>
+             "${PROJECT_SOURCE_DIR}/games/siege_sling" "${PROJECT_BINARY_DIR}/siege_sling_capture")
+    add_test(NAME siege_sling_live_startup COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:acuppa>
+             "${PROJECT_SOURCE_DIR}/games/siege_sling")
     add_test(NAME garage_run_capture COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/garage_run_capture_test.py" $<TARGET_FILE:acuppa>
              "${PROJECT_SOURCE_DIR}/games/garage_run" "${PROJECT_BINARY_DIR}/garage_run_capture")

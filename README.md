@@ -59,6 +59,12 @@ The Lua-authored car game uses a Jolt four-wheel vehicle, collision and checkpoi
 
 ![Garage Run car driving toward the second checkpoint in a 3D practice yard](docs/images/garage-run.png)
 
+### Siege Sling
+
+A slingshot game in development: pull back the sling with the mouse (or aim with keys or a gamepad) to launch a ball along a dotted arc at a wood, stone, and glass fort guarding round grumps. It uses Jolt material bodies with continuous collision, the gradient sky with a sun disc, an HDRI, and a shadowed sun. See [its README](games/siege_sling/README.md).
+
+![Siege Sling aim view: a sling on a grassy hill, a dotted arc, and a three-tower fort under a blue sky](docs/images/siege-sling.png)
+
 ### Falling Blocks
 
 The original game and its separate PBR-lit version use the same source-authored rules: a seven-piece bag, wall kicks, hold, next and ghost pieces, scoring, levels, pause, and restart. The lit version adds glTF materials, an HDRI, and tile shadows.
@@ -88,6 +94,7 @@ On Ubuntu 24+ with `uv`, `git`, `curl`, `apt-get`, and a working Vulkan driver, 
 ```sh
 bash scripts/bootstrap-local.sh
 build/acuppa run games/garage_run
+build/acuppa run games/siege_sling
 build/acuppa run games/falling_blocks
 build/acuppa run games/falling_blocks_lit
 ```
