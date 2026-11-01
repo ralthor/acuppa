@@ -1,4 +1,4 @@
-"""Build the checked-in glTF tiles and studio HDRI with Python's standard library."""
+"""Build the checked-in glTF, HDRI, and sound assets with Python's standard library."""
 
 import json
 import math
@@ -133,21 +133,48 @@ def sound(name, seconds, sample):
         file.writeframes(frames)
 
 
-sound("clear", 0.24, lambda t: math.exp(-13 * t) *
-      (0.55 * math.sin(2 * math.pi * (620 * t + 900 * t * t)) +
-       0.22 * math.sin(2 * math.pi * 1240 * t)))
+def noise_source(seed):
+    state, smooth = seed, 0.0
 
-noise_state = 17
-smoothed_noise = 0.0
+    def sample():
+        nonlocal state, smooth
+        state = (state * 1103515245 + 12345) % (1 << 31)
+        raw = state / (1 << 30) - 1
+        smooth = 0.72 * smooth + 0.28 * raw
+        return raw, smooth
 
-
-def burst(t):
-    global noise_state, smoothed_noise
-    noise_state = (noise_state * 1103515245 + 12345) % (1 << 31)
-    noise = noise_state / (1 << 30) - 1
-    smoothed_noise = 0.78 * smoothed_noise + 0.22 * noise
-    return math.exp(-9 * t) * (0.65 * math.sin(2 * math.pi * (95 * t - 50 * t * t)) +
-                                0.65 * smoothed_noise)
+    return sample
 
 
-sound("burst", 0.38, burst)
+for index, (duration, frequency) in enumerate(
+    ((0.10, 165), (0.12, 185), (0.09, 150), (0.14, 175)), 1
+):
+    noise = noise_source(100 + index)
+
+    def landing(t, frequency=frequency, duration=duration, noise=noise):
+        raw, _ = noise()
+        onset = min(1, t / 0.002)
+        thud = math.sin(2 * math.pi * (frequency * t - 60 * t * t))
+        return onset * (1 - t / duration) * (
+            0.48 * thud * math.exp(-27 * t) + 0.12 * raw * math.exp(-55 * t)
+        )
+
+    sound(f"land_{index}", duration, landing)
+
+
+for index, (duration, frequency) in enumerate(
+    ((0.24, 145), (0.32, 125), (0.42, 105), (0.52, 88)), 1
+):
+    noise = noise_source(200 + index)
+
+    def explosion(t, frequency=frequency, duration=duration, noise=noise):
+        raw, smooth = noise()
+        onset = min(1, t / 0.002)
+        boom = math.sin(2 * math.pi * (frequency * t - 35 * t * t))
+        return onset * (1 - t / duration) * (
+            0.62 * boom * math.exp(-7 * t) +
+            0.25 * raw * math.exp(-38 * t) +
+            0.38 * smooth * math.exp(-10 * t)
+        )
+
+    sound(f"clear_{index}", duration, explosion)

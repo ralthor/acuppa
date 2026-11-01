@@ -8,7 +8,7 @@ The main scene uses a short-range directional shadow map for the colored tiles a
 
 Pieces come from deterministic, shuffled seven-piece bags. They fall with fixed-step gravity, lock, clear complete rows, and stop at top-out. The window shows the next and held pieces, a ghost landing outline, score, lines, level, pause, and game over. Every ten cleared lines raises the level and fall speed. Hard drops score two points per row and soft drops score one; line clears score 100, 300, 500, or 800 times the current level. Wall kicks try nearby positions when a rotation is blocked. Restart begins the same reproducible sequence.
 
-Cleared rows flash briefly with a small camera shake and a sound. Two-line clears last longer and shake more; three- and four-line clears add outward sparks and a bass burst. The effect plays after both gravity locks and hard drops, and restart removes any remaining visual effect.
+Every piece that locks without clearing a row makes a short thud and a tiny camera bump. Four thud recordings cycle with different pitch and duration. Cleared rows flash with a stronger camera shake and orange sparks; one through four cleared rows each have a distinct, increasingly full explosion cue and longer effect. This works after both gravity locks and hard drops. Restart removes any remaining visual effect.
 
 `make_assets.py` uses only Python's standard library to generate the checked-in glTF, HDRI, and WAV assets. To regenerate them, run `python3 games/falling_blocks_lit/make_assets.py` from the repository root. The game itself only needs ACuppa; Python is not required to play. To test the copied game after building, run `ctest --test-dir build -R falling_blocks_lit --output-on-failure`.
 

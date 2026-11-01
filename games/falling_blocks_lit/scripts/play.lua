@@ -4,7 +4,7 @@ local Font = require("scripts.font")
 local Feedback = require("scripts.clear_feedback")
 local board, rendered, status, message, previous, hold_time
 local gravity, score, lines, level, paused
-local effect
+local effect, land_count
 
 local function block(x, y, z, sx, sy, sz)
   return tp.spawn({mesh = "builtin:cube", position = {x, y, z},
@@ -99,7 +99,8 @@ local function start_effect(rows)
   if #rows == 0 then return end
   end_effect()
   local profile = Feedback.profile(#rows)
-  effect = {ids = {}, bars = {}, sparks = {}, elapsed = 0, profile = profile}
+  effect = {ids = {}, bars = {}, sparks = {}, elapsed = 0, profile = profile,
+            lines = #rows}
   for _, row in ipairs(rows) do
     local y = row - 9.5
     local bar = block(0, y, 0.65, 5.05, 0.23, 0.05)
@@ -108,18 +109,33 @@ local function start_effect(rows)
     for i = 1, profile.sparks do
       local side = i % 2 == 0 and 1 or -1
       local lane = math.floor((i - 1) / 2)
-      local x = side * (4.2 - lane * 0.25)
-      local spark = block(x, y, 0.72, 0.09, 0.09, 0.06)
+      local x = side * (0.75 + lane * 0.8)
+      local spark = tp.spawn({mesh = i % 4 == 0 and "assets/O.gltf" or "assets/L.gltf",
+                              position = {x, y, 0.9}, scale = {0.14, 0.14, 0.08},
+                              casts_shadows = false})
       effect.ids[#effect.ids + 1] = spark
       effect.sparks[#effect.sparks + 1] = {id = spark, x = x, y = y,
-                                          speed = side * (4 + lane),
-                                          rise = (lane - 1) * 3}
+                                          speed = side * (5 + lane * 0.6),
+                                          rise = lane % 2 == 0 and 4 or -4}
     end
   end
-  tp.sound_play("assets/clear.wav", {volume = profile.volume, pitch = profile.pitch})
-  if #rows >= 3 then
-    tp.sound_play("assets/burst.wav", {volume = #rows == 4 and 0.85 or 0.60})
-  end
+  tp.set_camera({eye = {0, -profile.shake, 24}, target = {0, -profile.shake, 0}})
+  tp.sound_play("assets/clear_" .. #rows .. ".wav",
+                {volume = profile.volume, pitch = profile.pitch})
+end
+
+local function start_landing(distance)
+  land_count = land_count + 1
+  local variant = (land_count - 1) % 4 + 1
+  tp.sound_play("assets/land_" .. variant .. ".wav",
+                {volume = 0.32 + math.min(distance, 18) * 0.01,
+                 pitch = 0.96 + (land_count * 7 % 5) * 0.02})
+  if effect and effect.lines > 0 then return end
+  end_effect()
+  effect = {ids = {}, bars = {}, sparks = {}, elapsed = 0,
+            profile = Feedback.landing, lines = 0}
+  tp.set_camera({eye = {0, -Feedback.landing.shake, 24},
+                 target = {0, -Feedback.landing.shake, 0}})
 end
 
 local function update_effect(dt)
@@ -134,14 +150,14 @@ local function update_effect(dt)
   for _, spark in ipairs(effect.sparks) do
     tp.component_set(spark.id, "transform", {
       position = {spark.x + spark.speed * effect.elapsed,
-                  spark.y + spark.rise * effect.elapsed, 0.72},
-      scale = {0.09 * fade + 0.01, 0.09 * fade + 0.01, 0.06},
+                  spark.y + spark.rise * effect.elapsed, 0.9},
+      scale = {0.14 * fade + 0.01, 0.14 * fade + 0.01, 0.08},
     })
   end
   local shake = effect.profile.shake * fade * fade
-  tp.set_camera({eye = {shake * math.sin(effect.elapsed * 61),
-                         shake * math.sin(effect.elapsed * 83), 24},
-                 target = {0, 0, 0}})
+  local x = shake * 0.55 * math.sin(effect.elapsed * 54)
+  local y = -shake * math.cos(effect.elapsed * 45)
+  tp.set_camera({eye = {x, y, 24}, target = {x, y, 0}})
   if progress >= 1 then end_effect() end
 end
 
@@ -149,7 +165,7 @@ local function start_game()
   end_effect()
   board = Board.new(16) -- fixed seed makes game runs and regression captures reproducible
   board:spawn()
-  gravity, score, lines, level, paused = 0, 0, 0, 1, false
+  gravity, score, lines, level, paused, land_count = 0, 0, 0, 1, false, 0
   hold_time = {}
   draw_status()
   draw_board()
@@ -159,7 +175,8 @@ local function award(cleared, drop_distance, cleared_rows)
   score = score + 2 * drop_distance + Board.line_score(cleared, level)
   lines = lines + cleared
   level = Board.level_for_lines(lines)
-  if cleared > 0 then start_effect(cleared_rows) end
+  if cleared > 0 then start_effect(cleared_rows)
+  else start_landing(drop_distance) end
   board:spawn()
   draw_status()
 end

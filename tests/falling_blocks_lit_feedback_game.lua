@@ -80,26 +80,24 @@ local function run_case(lines, with_gravity)
   end
   local profile = Feedback.profile(lines)
   assert(count_at(0.65) == lines)
-  assert(count_at(0.72) == lines * profile.sparks)
-  assert(sounds[1].path == "assets/clear.wav" and
+  assert(count_at(0.9) == lines * profile.sparks)
+  assert(sounds[1].path == "assets/clear_" .. lines .. ".wav" and
          sounds[1].options.volume == profile.volume and
          sounds[1].options.pitch == profile.pitch)
-  assert(#sounds == (lines >= 3 and 2 or 1))
-  if lines >= 3 then
-    assert(sounds[2].path == "assets/burst.wav" and
-           sounds[2].options.volume == (lines == 4 and 0.85 or 0.60))
-  end
+  assert(#sounds == 1 and camera.eye[2] == -profile.shake and
+         camera.target[2] == camera.eye[2])
   game.update(1 / 60)
-  assert(math.abs(camera.eye[1]) + math.abs(camera.eye[2]) > 0)
+  assert(math.abs(camera.eye[1]) + math.abs(camera.eye[2]) > 0.02 and
+         camera.target[1] == camera.eye[1] and camera.target[2] == camera.eye[2])
   if lines == 4 then
     actions.restart = 1
     game.update(0)
-    assert(count_at(0.65) == 0 and count_at(0.72) == 0)
+    assert(count_at(0.65) == 0 and count_at(0.9) == 0)
     assert(camera.eye[1] == 0 and camera.eye[2] == 0)
     return
   end
   for _ = 1, 35 do game.update(1 / 60) end
-  assert(count_at(0.65) == 0 and count_at(0.72) == 0)
+  assert(count_at(0.65) == 0 and count_at(0.9) == 0)
   assert(camera.eye[1] == 0 and camera.eye[2] == 0)
 end
 
@@ -111,6 +109,25 @@ line_count, gravity_lock = 0, false
 entities, sounds, actions, camera, next_id = {}, {}, {hard_drop = 1}, nil, 0
 local ordinary = assert(loadfile(root .. "/scripts/play.lua"))()
 ordinary.start()
-ordinary.update(0)
-assert(#sounds == 0 and count_at(0.65) == 0 and count_at(0.72) == 0)
+for i = 1, 4 do
+  actions.hard_drop = 1
+  ordinary.update(0)
+  assert(sounds[i].path == "assets/land_" .. i .. ".wav" and
+         sounds[i].options.volume >= 0.32 and sounds[i].options.volume <= 0.50)
+  assert(camera.eye[2] == -Feedback.landing.shake and
+         camera.target[2] == camera.eye[2])
+  actions.hard_drop = 0
+  ordinary.update(1 / 60)
+end
+assert(#sounds == 4 and count_at(0.65) == 0 and count_at(0.9) == 0)
+for _ = 1, 10 do ordinary.update(1 / 60) end
+assert(camera.eye[1] == 0 and camera.eye[2] == 0)
+
+line_count, gravity_lock = 0, true
+entities, sounds, actions, camera, next_id = {}, {}, {}, nil, 0
+local soft = assert(loadfile(root .. "/scripts/play.lua"))()
+soft.start()
+for _ = 1, 43 do soft.fixed_update(1 / 60) end
+assert(#sounds == 1 and sounds[1].path == "assets/land_1.wav")
+assert(camera.eye[2] == -Feedback.landing.shake)
 print("Falling Blocks Lit clear feedback passed through gameplay")

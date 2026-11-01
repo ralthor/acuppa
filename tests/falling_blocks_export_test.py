@@ -33,7 +33,8 @@ for source in games:
     assert not (bundle / "game/README.md").exists()
     assert not (bundle / "game/make_assets.py").exists()
     if source.name == "falling_blocks_lit":
-        for cue in ("clear.wav", "burst.wav"):
+        for cue in ("land_1.wav", "land_2.wav", "land_3.wav", "land_4.wav",
+                    "clear_1.wav", "clear_2.wav", "clear_3.wav", "clear_4.wav"):
             assert (bundle / "game/assets" / cue).is_file(), f"missing exported {cue}"
     invoke(player, "--check")
     if not graphical:

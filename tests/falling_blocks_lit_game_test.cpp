@@ -31,7 +31,8 @@ float active_x(const acuppa::SceneFrame& frame) {
 int main(int argc, char* argv[]) {
     if (argc != 2) throw std::runtime_error("lit game path required");
     acuppa::AudioWorld audio(false);
-    for (const char* name : {"clear.wav", "burst.wav"}) {
+    for (const char* name : {"land_1.wav", "land_2.wav", "land_3.wav", "land_4.wav",
+                             "clear_1.wav", "clear_2.wav", "clear_3.wav", "clear_4.wav"}) {
         const auto path = std::filesystem::path(argv[1]) / "assets" / name;
         const auto id = audio.play(path, {});
         double energy = 0;

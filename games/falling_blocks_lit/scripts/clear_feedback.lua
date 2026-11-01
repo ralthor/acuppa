@@ -1,10 +1,12 @@
 local Feedback = {}
 
+Feedback.landing = {duration = 0.14, shake = 0.17}
+
 local profiles = {
-  [1] = {duration = 0.22, shake = 0.07, volume = 0.45, pitch = 1.05, sparks = 0},
-  [2] = {duration = 0.30, shake = 0.14, volume = 0.65, pitch = 0.95, sparks = 2},
-  [3] = {duration = 0.40, shake = 0.27, volume = 0.85, pitch = 0.85, sparks = 4},
-  [4] = {duration = 0.50, shake = 0.40, volume = 1.00, pitch = 0.75, sparks = 6},
+  [1] = {duration = 0.29, shake = 0.34, volume = 0.52, pitch = 1.08, sparks = 4},
+  [2] = {duration = 0.38, shake = 0.50, volume = 0.68, pitch = 1.00, sparks = 6},
+  [3] = {duration = 0.48, shake = 0.68, volume = 0.84, pitch = 0.92, sparks = 8},
+  [4] = {duration = 0.58, shake = 0.86, volume = 1.00, pitch = 0.84, sparks = 10},
 }
 
 function Feedback.profile(lines)
