@@ -113,17 +113,20 @@ foreach(shader IN ITEMS cube pbr tonemap shadow_cube shadow_pbr)
     list(APPEND ACUPPA_SHADER_HEADERS "${shader_header}")
   endforeach()
 endforeach()
-set(shader_source "${PROJECT_SOURCE_DIR}/src/render/shaders/ssao.frag")
-set(shader_binary "${PROJECT_BINARY_DIR}/shaders/ssao.frag.spv")
-set(shader_header "${PROJECT_BINARY_DIR}/generated/ssao_frag_spv.hpp")
-add_custom_command(OUTPUT "${shader_header}"
-  COMMAND "${CMAKE_COMMAND}" -E make_directory "${PROJECT_BINARY_DIR}/shaders" "${PROJECT_BINARY_DIR}/generated"
-  COMMAND "${ACUPPA_GLSLANG_VALIDATOR}" -V "${shader_source}" -o "${shader_binary}"
-  COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/embed_spirv.py"
-          "${shader_binary}" "${shader_header}" "ssao_frag_spv"
-  DEPENDS "${shader_source}" "${PROJECT_SOURCE_DIR}/scripts/embed_spirv.py"
-  VERBATIM)
-list(APPEND ACUPPA_SHADER_HEADERS "${shader_header}")
+# Fragment-only passes reuse the fullscreen tonemap vertex shader.
+foreach(shader IN ITEMS ssao sky)
+  set(shader_source "${PROJECT_SOURCE_DIR}/src/render/shaders/${shader}.frag")
+  set(shader_binary "${PROJECT_BINARY_DIR}/shaders/${shader}.frag.spv")
+  set(shader_header "${PROJECT_BINARY_DIR}/generated/${shader}_frag_spv.hpp")
+  add_custom_command(OUTPUT "${shader_header}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${PROJECT_BINARY_DIR}/shaders" "${PROJECT_BINARY_DIR}/generated"
+    COMMAND "${ACUPPA_GLSLANG_VALIDATOR}" -V "${shader_source}" -o "${shader_binary}"
+    COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/embed_spirv.py"
+            "${shader_binary}" "${shader_header}" "${shader}_frag_spv"
+    DEPENDS "${shader_source}" "${PROJECT_SOURCE_DIR}/scripts/embed_spirv.py"
+    VERBATIM)
+  list(APPEND ACUPPA_SHADER_HEADERS "${shader_header}")
+endforeach()
 
 add_library(acuppa_core STATIC src/core/project.cpp src/core/scene_document.cpp
             src/core/source_document.cpp
@@ -133,7 +136,8 @@ add_library(acuppa_core STATIC src/core/project.cpp src/core/scene_document.cpp
             src/core/ui_canvas.cpp
             src/core/world.cpp src/core/physics_world.cpp src/core/save_data.cpp
             src/core/gltf_asset.cpp src/core/cgltf_impl.c src/core/stb_image_impl.c
-            src/core/hdr_image.cpp src/core/environment_filter.cpp src/core/lua_project.cpp)
+            src/core/hdr_image.cpp src/core/environment_filter.cpp src/core/lua_project.cpp
+            src/core/sky.cpp)
 target_compile_features(acuppa_core PUBLIC cxx_std_17)
 target_include_directories(acuppa_core PUBLIC include PRIVATE "${cgltf_SOURCE_DIR}"
                            "${stb_SOURCE_DIR}")
@@ -234,6 +238,9 @@ if(BUILD_TESTING)
   add_executable(acuppa_camera_test tests/camera_test.cpp)
   target_link_libraries(acuppa_camera_test PRIVATE acuppa_core)
   add_test(NAME camera_math COMMAND acuppa_camera_test)
+  add_executable(acuppa_sky_test tests/sky_test.cpp)
+  target_link_libraries(acuppa_sky_test PRIVATE acuppa_core)
+  add_test(NAME sky_gradient_math COMMAND acuppa_sky_test)
   add_executable(acuppa_lua_test tests/lua_project_test.cpp)
   target_link_libraries(acuppa_lua_test PRIVATE acuppa_core)
   add_test(NAME lua_scene_logic COMMAND acuppa_lua_test
@@ -449,6 +456,12 @@ if(BUILD_TESTING)
     add_test(NAME physics_materials_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:acuppa>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene" "physics_materials")
+    add_test(NAME sky_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/sky_capture_test.py" $<TARGET_FILE:acuppa>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+    add_test(NAME sky_live_startup COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:acuppa>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene" "sky")
     add_test(NAME audio_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:acuppa>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene" "audio")

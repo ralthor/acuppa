@@ -36,6 +36,7 @@ local invalid = {
   set_exposure = function() tp.set_exposure() end,
   set_rotation = function() tp.set_rotation() end,
   set_ssao = function() tp.set_ssao() end,
+  set_sky = function() tp.set_sky() end,
   sound_play = function() tp.sound_play() end,
   sound_set_listener = function() tp.sound_set_listener() end,
   sound_set_pitch = function() tp.sound_set_pitch() end,

@@ -18,6 +18,8 @@ return {
             shadow_point_second = "scenes/shadow.scene.lua",
             ssao = "scenes/ssao.scene.lua", ssao_off = "scenes/ssao.scene.lua",
             ssao_low = "scenes/ssao.scene.lua", ssao_shift = "scenes/ssao.scene.lua",
+            sky = "scenes/sky.scene.lua", sky_off = "scenes/sky.scene.lua",
+            sky_clear = "scenes/sky.scene.lua", sky_switch = "scenes/sky.scene.lua",
             physics = "scenes/physics.scene.lua",
             physics_materials = "scenes/physics_materials.scene.lua",
             vehicle = "scenes/vehicle.scene.lua",

@@ -67,6 +67,7 @@ struct LuaProject::Impl {
     static int set_exposure(lua_State* lua);
     static int set_ssao(lua_State* lua);
     static int set_environment(lua_State* lua);
+    static int set_sky(lua_State* lua);
     static int entity_create(lua_State* lua);
     static int entity_destroy(lua_State* lua);
     static int entity_exists(lua_State* lua);
@@ -571,6 +572,7 @@ SceneFrame LuaProject::Impl::snapshot() {
     scene.ssao_strength = frame.ssao_strength;
     scene.environment = frame.environment;
     scene.environment_intensity = frame.environment_intensity;
+    scene.sky = frame.sky;
     scene.ui = frame.ui;
     for (auto& instance : scene.imported) instance.asset = ensure_asset(instance.source);
     return scene;
@@ -682,6 +684,7 @@ void LuaProject::Impl::load_scene(const std::string& name) {
     frame.ssao_strength = 2.0f;
     frame.environment.reset();
     frame.environment_intensity = 0.0f;
+    frame.sky.reset();
     frame.ui.clear();
     previous_ui_buttons.clear();
     current_ui_buttons.clear();
@@ -829,6 +832,7 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("set_exposure", &set_exposure);
     add_function("set_ssao", &set_ssao);
     add_function("set_environment", &set_environment);
+    add_function("set_sky", &set_sky);
     add_function("entity_create", &entity_create);
     add_function("entity_destroy", &entity_destroy);
     add_function("entity_exists", &entity_exists);
@@ -1059,6 +1063,68 @@ int LuaProject::Impl::set_ssao(lua_State* lua) {
     frame.ssao_quality = int(quality);
     frame.ssao_radius = float(radius);
     frame.ssao_strength = float(strength);
+    return 0;
+}
+
+namespace {
+
+glm::vec3 sky_vector(lua_State* lua, int table, const char* field, glm::vec3 fallback) {
+    lua_getfield(lua, table, field);
+    if (lua_isnil(lua, -1)) {
+        lua_pop(lua, 1);
+        return fallback;
+    }
+    const std::string message = std::string("sky.") + field + " must be three numbers";
+    if (!lua_istable(lua, -1) || lua_rawlen(lua, -1) != 3) throw std::invalid_argument(message);
+    glm::vec3 value;
+    for (int i = 0; i < 3; ++i) {
+        lua_rawgeti(lua, -1, i + 1);
+        if (lua_type(lua, -1) != LUA_TNUMBER) throw std::invalid_argument(message);
+        value[i] = float(lua_tonumber(lua, -1));
+        lua_pop(lua, 1);
+    }
+    lua_pop(lua, 1);
+    return value;
+}
+
+}  // namespace
+
+int LuaProject::Impl::set_sky(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "set_sky() expects a sky table or nil");
+    Impl& state = context(lua);
+    if (lua_isnil(lua, 1)) {
+        state.frame.sky.reset();
+        return 0;
+    }
+    if (!lua_istable(lua, 1)) return luaL_error(lua, "set_sky() expects a sky table or nil");
+    try {
+        lua_pushnil(lua);
+        while (lua_next(lua, 1) != 0) {
+            lua_pop(lua, 1);
+            if (lua_type(lua, -1) != LUA_TSTRING)
+                throw std::invalid_argument("sky fields must be names");
+            const std::string key = lua_tostring(lua, -1);
+            if (key != "zenith" && key != "horizon" && key != "ground" &&
+                key != "sun_direction" && key != "sun_color" && key != "sun_size")
+                throw std::invalid_argument("unknown sky field: " + key);
+        }
+        SkyGradient sky;
+        sky.zenith = sky_vector(lua, 1, "zenith", sky.zenith);
+        sky.horizon = sky_vector(lua, 1, "horizon", sky.horizon);
+        sky.ground = sky_vector(lua, 1, "ground", sky.ground);
+        sky.sun_direction = sky_vector(lua, 1, "sun_direction", sky.sun_direction);
+        sky.sun_color = sky_vector(lua, 1, "sun_color", sky.sun_color);
+        lua_getfield(lua, 1, "sun_size");
+        if (!lua_isnil(lua, -1)) {
+            if (lua_type(lua, -1) != LUA_TNUMBER)
+                throw std::invalid_argument("sky.sun_size must be a number");
+            sky.sun_size = float(lua_tonumber(lua, -1));
+        }
+        lua_pop(lua, 1);
+        state.frame.sky = validated_sky(sky);
+    } catch (const std::exception& error) {
+        return luaL_error(lua, "%s", error.what());
+    }
     return 0;
 }
 

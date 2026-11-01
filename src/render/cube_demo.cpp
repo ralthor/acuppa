@@ -11,6 +11,7 @@
 #include "tonemap_frag_spv.hpp"
 #include "acuppa/ui_canvas.hpp"
 #include "ssao_frag_spv.hpp"
+#include "sky_frag_spv.hpp"
 #include "shadow_cube_vert_spv.hpp"
 #include "shadow_cube_frag_spv.hpp"
 #include "shadow_pbr_vert_spv.hpp"
@@ -86,6 +87,18 @@ struct TonemapSettings {
     glm::vec4 camera_focal{0.0f};
 };
 static_assert(sizeof(TonemapSettings) == 96);
+
+struct SkyFrame {
+    glm::mat4 inverse_view_projection{1.0f};
+    glm::vec4 eye{0.0f};
+    glm::vec4 zenith{0.0f};
+    glm::vec4 horizon{0.0f};
+    glm::vec4 ground{0.0f};
+    glm::vec4 sun_direction{0.0f};
+    glm::vec4 sun_color{0.0f};
+    glm::vec4 sun_shape{0.0f};
+};
+static_assert(sizeof(SkyFrame) == 176);
 
 constexpr uint32_t shadow_tile = ShadowAtlasLayout::tile;
 constexpr uint32_t shadow_columns = ShadowAtlasLayout::columns;
@@ -295,6 +308,27 @@ CubeDemo::CubeDemo(nvrhi::IDevice* device) : device_(device) {
     require(tonemap_vertex_shader_ && tonemap_fragment_shader_ && tonemap_binding_layout_ &&
             ssao_fragment_shader_ && ssao_binding_layout_ &&
             tonemap_sampler_ && depth_sampler_, "create tonemap resources");
+    sky_fragment_shader_ = device_->createShader(
+        nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Pixel).setDebugName("sky fragment"),
+        sky_frag_spv, sizeof(sky_frag_spv));
+    nvrhi::BufferDesc sky_desc;
+    sky_desc.byteSize = sizeof(SkyFrame);
+    sky_desc.isConstantBuffer = true;
+    sky_desc.isVolatile = true;
+    sky_desc.maxVersions = 16;
+    sky_desc.debugName = "sky frame";
+    sky_frame_buffer_ = device_->createBuffer(sky_desc);
+    sky_binding_layout_ = device_->createBindingLayout(
+        nvrhi::BindingLayoutDesc().setVisibility(nvrhi::ShaderType::Pixel)
+            .setBindingOffsets(nvrhi::VulkanBindingOffsets().setConstantBufferOffset(0))
+            .addItem(nvrhi::BindingLayoutItem::VolatileConstantBuffer(0)));
+    require(sky_fragment_shader_ && sky_frame_buffer_ && sky_binding_layout_,
+            "create sky resources");
+    sky_binding_set_ = device_->createBindingSet(
+        nvrhi::BindingSetDesc().addItem(
+            nvrhi::BindingSetItem::ConstantBuffer(0, sky_frame_buffer_)),
+        sky_binding_layout_);
+    require(sky_binding_set_, "create sky binding set");
 
     const CubeMesh mesh = make_cube();
     nvrhi::BufferDesc vertex_desc;
@@ -555,6 +589,7 @@ void CubeDemo::release_size_dependent() {
     pbr_pipeline_ = nullptr;
     tonemap_pipeline_ = nullptr;
     ssao_pipeline_ = nullptr;
+    sky_pipeline_ = nullptr;
     depth_ = nullptr;
     hdr_color_ = nullptr;
     ssao_color_ = nullptr;
@@ -667,6 +702,15 @@ void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t 
     ssao_pipeline_ = device_->createGraphicsPipeline(
         ssao_pipeline_desc, ssao_framebuffer_->getFramebufferInfo());
     require(ssao_pipeline_, "create SSAO graphics pipeline");
+    nvrhi::GraphicsPipelineDesc sky_pipeline_desc;
+    sky_pipeline_desc.setVertexShader(tonemap_vertex_shader_)
+        .setFragmentShader(sky_fragment_shader_)
+        .addBindingLayout(sky_binding_layout_);
+    sky_pipeline_desc.renderState.rasterState.setCullNone();
+    sky_pipeline_desc.renderState.depthStencilState.disableDepthTest().disableDepthWrite();
+    sky_pipeline_ = device_->createGraphicsPipeline(
+        sky_pipeline_desc, hdr_framebuffer_->getFramebufferInfo());
+    require(sky_pipeline_, "create sky graphics pipeline");
     nvrhi::GraphicsPipelineDesc tonemap_desc;
     tonemap_desc.setVertexShader(tonemap_vertex_shader_)
         .setFragmentShader(tonemap_fragment_shader_)
@@ -781,6 +825,30 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
     commands->clearDepthStencilTexture(depth_, nvrhi::AllSubresources, true, 1.0f, false, 0);
     const glm::mat4 view_projection = scene.camera.view_projection(
         float(width_) / float(height_));
+    if (scene.sky) {
+        // The sky fills the HDR target first; geometry then depth-tests over it.
+        const SkyGradient& sky = *scene.sky;
+        const SkySunShape sun = sky_sun_shape(sky.sun_size);
+        SkyFrame sky_frame;
+        sky_frame.inverse_view_projection = glm::inverse(view_projection);
+        sky_frame.eye = glm::vec4(scene.camera.eye, 1.0f);
+        sky_frame.zenith = glm::vec4(sky.zenith, 1.0f);
+        sky_frame.horizon = glm::vec4(sky.horizon, 1.0f);
+        sky_frame.ground = glm::vec4(sky.ground, 1.0f);
+        sky_frame.sun_direction = glm::vec4(glm::normalize(sky.sun_direction),
+                                            sky.sun_size > 0.0f ? 1.0f : 0.0f);
+        sky_frame.sun_color = glm::vec4(sky.sun_color, 1.0f);
+        sky_frame.sun_shape = glm::vec4(sun.outer_cos, sun.inner_cos, sun.halo_sharpness,
+                                        sun.halo_strength);
+        commands->writeBuffer(sky_frame_buffer_, &sky_frame, sizeof(sky_frame));
+        nvrhi::GraphicsState sky_state;
+        sky_state.setPipeline(sky_pipeline_).setFramebuffer(hdr_framebuffer_);
+        sky_state.viewport.addViewportAndScissorRect(
+            nvrhi::Viewport(float(width_), float(height_)));
+        sky_state.addBindingSet(sky_binding_set_);
+        commands->setGraphicsState(sky_state);
+        commands->draw(nvrhi::DrawArguments().setVertexCount(3));
+    }
     nvrhi::GraphicsState state;
     state.setPipeline(pipeline_).setFramebuffer(hdr_framebuffer_);
     state.viewport.addViewportAndScissorRect(nvrhi::Viewport(float(width_), float(height_)));

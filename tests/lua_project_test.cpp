@@ -1,5 +1,7 @@
 #include "acuppa/lua_project.hpp"
 
+#include <glm/geometric.hpp>
+
 #include <cmath>
 #include <stdexcept>
 
@@ -62,6 +64,32 @@ int main(int argc, char* argv[]) {
            environment.environment_intensity == 1.0f &&
            !no_environment.environment && no_environment.environment_intensity == 0.0f,
            "source-authored HDRI did not reach the render frame");
+    {
+        acuppa::LuaProject sky(argv[1], "sky");
+        const auto frame = sky.step(0.0);
+        expect(frame.sky && std::abs(frame.sky->zenith.b - 1.1f) < 1e-6f &&
+               std::abs(frame.sky->horizon.r - 0.8f) < 1e-6f &&
+               std::abs(frame.sky->ground.g - 0.3f) < 1e-6f &&
+               frame.sky->sun_color.r == 14.0f &&
+               std::abs(frame.sky->sun_size - 2.2f) < 1e-6f &&
+               std::abs(glm::length(frame.sky->sun_direction) - 1.0f) < 1e-5f &&
+               frame.sky->sun_direction.z < -0.8f,
+               "Lua sky did not reach the frame or invalid calls replaced it");
+        for (int i = 0; i < 3; ++i) sky.step(1.0 / 60.0);
+        expect(sky.step(0.0).sky.has_value(), "sky did not persist across frames");
+        acuppa::LuaProject sky_off(argv[1], "sky_off");
+        expect(!sky_off.step(0.0).sky, "scene without set_sky drew a sky");
+        acuppa::LuaProject sky_clear(argv[1], "sky_clear");
+        expect(sky_clear.step(0.0).sky.has_value(), "sky_clear did not start with a sky");
+        sky_clear.step(1.0 / 60.0);
+        expect(!sky_clear.step(0.0).sky, "set_sky(nil) did not clear the sky");
+        acuppa::LuaProject sky_switch(argv[1], "sky_switch");
+        expect(sky_switch.step(0.0).sky.has_value(), "sky_switch did not start with a sky");
+        sky_switch.step(1.0 / 60.0);
+        expect(!sky_switch.step(0.0).sky, "scene switch kept the previous scene's sky");
+        acuppa::LuaProject preview(argv[1], "sky", acuppa::LuaProject::Mode::EditorPreview);
+        expect(!preview.step(0.0).sky, "editor preview ran the sky start callback");
+    }
     acuppa::LuaProject physics(argv[1], "physics");
     const auto initial_physics = physics.step(0.0);
     expect(initial_physics.cubes.size() == 2 &&

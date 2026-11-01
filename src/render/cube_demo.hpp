@@ -40,6 +40,7 @@ private:
     nvrhi::ShaderHandle tonemap_vertex_shader_;
     nvrhi::ShaderHandle tonemap_fragment_shader_;
     nvrhi::ShaderHandle ssao_fragment_shader_;
+    nvrhi::ShaderHandle sky_fragment_shader_;
     nvrhi::InputLayoutHandle pbr_input_layout_;
     nvrhi::BindingLayoutHandle pbr_binding_layout_;
     nvrhi::BindingLayoutHandle environment_binding_layout_;
@@ -50,6 +51,9 @@ private:
     nvrhi::BindingSetHandle tonemap_binding_set_;
     nvrhi::BindingLayoutHandle ssao_binding_layout_;
     nvrhi::BindingSetHandle ssao_binding_set_;
+    nvrhi::BindingLayoutHandle sky_binding_layout_;
+    nvrhi::BindingSetHandle sky_binding_set_;
+    nvrhi::BufferHandle sky_frame_buffer_;
     nvrhi::BufferHandle pbr_frame_buffer_;
     nvrhi::BufferHandle shadow_frame_buffer_;
     nvrhi::SamplerHandle pbr_sampler_;
@@ -92,6 +96,7 @@ private:
     nvrhi::GraphicsPipelineHandle pbr_pipeline_;
     nvrhi::GraphicsPipelineHandle tonemap_pipeline_;
     nvrhi::GraphicsPipelineHandle ssao_pipeline_;
+    nvrhi::GraphicsPipelineHandle sky_pipeline_;
     nvrhi::FramebufferHandle hdr_framebuffer_;
     nvrhi::FramebufferHandle ssao_framebuffer_;
     std::vector<nvrhi::FramebufferHandle> framebuffers_;

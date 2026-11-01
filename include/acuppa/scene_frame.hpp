@@ -3,12 +3,14 @@
 #include "acuppa/camera.hpp"
 #include "acuppa/gltf_asset.hpp"
 #include "acuppa/hdr_image.hpp"
+#include "acuppa/sky.hpp"
 
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -58,6 +60,8 @@ struct SceneFrame {
     float ssao_strength = 2.0f;
     std::shared_ptr<const HdrImage> environment;
     float environment_intensity = 0.0f;
+    // Unset draws the original fixed clear color behind geometry.
+    std::optional<SkyGradient> sky;
     std::vector<CubeInstance> cubes;
     std::vector<ImportedInstance> imported;
     std::vector<LightInstance> lights;
