@@ -175,15 +175,30 @@ void PhysicsWorld::add(const PhysicsBodyDesc& desc) {
         throw std::invalid_argument("sphere radius must be finite and positive");
     if (desc.motion == PhysicsMotion::Static && glm::length(desc.velocity) != 0.0f)
         throw std::invalid_argument("static physics body cannot have velocity");
+    if (!std::isfinite(desc.density) || desc.density <= 0.0f)
+        throw std::invalid_argument("physics density must be finite and positive");
+    if (!std::isfinite(desc.friction) || desc.friction < 0.0f)
+        throw std::invalid_argument("physics friction must be finite and non-negative");
+    if (!std::isfinite(desc.restitution) || desc.restitution < 0.0f ||
+        desc.restitution > 1.0f)
+        throw std::invalid_argument("physics restitution must be between 0 and 1");
+    if (!std::isfinite(desc.linear_damping) || desc.linear_damping < 0.0f ||
+        !std::isfinite(desc.angular_damping) || desc.angular_damping < 0.0f)
+        throw std::invalid_argument("physics damping must be finite and non-negative");
 
     JPH::RefConst<JPH::Shape> shape;
-    if (desc.shape == ColliderShape::Box)
-        shape = new JPH::BoxShape(JPH::Vec3(desc.half_extents.x, desc.half_extents.y,
-                                            desc.half_extents.z));
-    else if (desc.shape == ColliderShape::Sphere)
-        shape = new JPH::SphereShape(desc.radius);
-    else
+    if (desc.shape == ColliderShape::Box) {
+        auto* box = new JPH::BoxShape(JPH::Vec3(desc.half_extents.x, desc.half_extents.y,
+                                                desc.half_extents.z));
+        box->SetDensity(desc.density);
+        shape = box;
+    } else if (desc.shape == ColliderShape::Sphere) {
+        auto* sphere = new JPH::SphereShape(desc.radius);
+        sphere->SetDensity(desc.density);
+        shape = sphere;
+    } else {
         throw std::invalid_argument("unknown collider shape");
+    }
 
     JPH::EMotionType motion;
     switch (desc.motion) {
@@ -199,6 +214,12 @@ void PhysicsWorld::add(const PhysicsBodyDesc& desc) {
         motion == JPH::EMotionType::Static ? kStatic : kMoving);
     settings.mIsSensor = desc.trigger;
     settings.mUserData = desc.id;
+    settings.mFriction = desc.friction;
+    settings.mRestitution = desc.restitution;
+    settings.mLinearDamping = desc.linear_damping;
+    settings.mAngularDamping = desc.angular_damping;
+    settings.mMotionQuality = desc.ccd ? JPH::EMotionQuality::LinearCast
+                                       : JPH::EMotionQuality::Discrete;
     settings.mLinearVelocity = JPH::Vec3(desc.velocity.x, desc.velocity.y, desc.velocity.z);
     const JPH::BodyID body = impl_->system.GetBodyInterface().CreateAndAddBody(
         settings, motion == JPH::EMotionType::Static ? JPH::EActivation::DontActivate

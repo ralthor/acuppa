@@ -95,6 +95,25 @@ int main() {
     catch (const std::invalid_argument&) { bad_body = true; }
     expect(bad_body && world.physics(first)->radius == 0.5f,
            "invalid physics component changed the stored body");
+    body.radius = 0.5f;
+    body.density = 2400.0f;
+    body.ccd = true;
+    world.set_physics(first, body);
+    expect(world.physics(first)->density == 2400.0f && world.physics(first)->ccd,
+           "physics material did not persist");
+    for (int field = 0; field < 4; ++field) {
+        acuppa::PhysicsComponent bad = body;
+        if (field == 0) bad.density = 0.0f;
+        if (field == 1) bad.friction = -1.0f;
+        if (field == 2) bad.restitution = 1.5f;
+        if (field == 3) bad.angular_damping = -0.1f;
+        bad_body = false;
+        try { world.set_physics(first, bad); }
+        catch (const std::invalid_argument&) { bad_body = true; }
+        expect(bad_body && world.physics(first)->density == 2400.0f &&
+               world.physics(first)->restitution == 0.0f,
+               "invalid physics material changed the stored body");
+    }
     bad_body = false;
     try { world.remove_transform(first); }
     catch (const std::invalid_argument&) { bad_body = true; }

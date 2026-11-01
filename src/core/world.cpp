@@ -138,6 +138,13 @@ void World::set_physics(EntityId id, const PhysicsComponent& value) {
         value.half_extents.y <= 0.0f || value.half_extents.z <= 0.0f ||
         !std::isfinite(value.radius) || value.radius <= 0.0f || !finite(value.velocity))
         throw std::invalid_argument("physics collider dimensions must be finite and positive");
+    if (!std::isfinite(value.density) || value.density <= 0.0f ||
+        !std::isfinite(value.friction) || value.friction < 0.0f ||
+        !std::isfinite(value.restitution) || value.restitution < 0.0f ||
+        value.restitution > 1.0f || !std::isfinite(value.linear_damping) ||
+        value.linear_damping < 0.0f || !std::isfinite(value.angular_damping) ||
+        value.angular_damping < 0.0f)
+        throw std::invalid_argument("physics material values are out of range");
     Entity& entity = require(id);
     if (!entity.transform || entity.transform->parent)
         throw std::invalid_argument("physics component requires an unparented transform");

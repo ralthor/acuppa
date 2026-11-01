@@ -53,6 +53,12 @@ struct PhysicsComponent {
     float radius = 0.5f;
     glm::vec3 velocity{0.0f};
     bool trigger = false;
+    float density = 1000.0f;
+    float friction = 0.2f;
+    float restitution = 0.0f;
+    float linear_damping = 0.05f;
+    float angular_damping = 0.05f;
+    bool ccd = false;
 };
 
 class World {

@@ -35,6 +35,13 @@ int main(int argc, char* argv[]) {
         expect(rejected, "unsupported source value accepted");
         document.set_field("editor cube", "transform", "position", "{2, 0, 0}");
         document.set_field("editor cube", "mesh", "mesh", "\"builtin:cube\"");
+        document.set_field("editor cube", "physics", "motion", "\"static\"");
+        document.set_field("editor cube", "physics", "density", "2500");
+        document.set_field("editor cube", "physics", "friction", "0.75");
+        document.set_field("editor cube", "physics", "restitution", "0.25");
+        document.set_field("editor cube", "physics", "linear_damping", "0.125");
+        document.set_field("editor cube", "physics", "angular_damping", "0.5");
+        document.set_field("editor cube", "physics", "ccd", "true");
         document.save();
     }
     {
@@ -42,6 +49,13 @@ int main(int argc, char* argv[]) {
         expect(reopened.tree().size() == 3 &&
                reopened.inspect("editor cube").find("builtin:cube") != std::string::npos,
                "editor scene did not survive reopen");
+        const std::string physics = reopened.inspect("editor cube");
+        for (const char* field : {"[\"density\"] = 2500,", "[\"friction\"] = 0.75,",
+                                  "[\"restitution\"] = 0.25,",
+                                  "[\"linear_damping\"] = 0.125,",
+                                  "[\"angular_damping\"] = 0.5,", "[\"ccd\"] = true,"})
+            expect(physics.find(field) != std::string::npos,
+                   "editor did not round-trip a physics material field");
     }
     {
         acuppa::LuaProject runtime(work, "editor");

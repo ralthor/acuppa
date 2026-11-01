@@ -22,10 +22,199 @@ bool touched(const acuppa::PhysicsWorld& world, uint64_t a, uint64_t b, bool tri
             return true;
     return false;
 }
+
+acuppa::PhysicsBodyDesc ground(uint64_t id) {
+    acuppa::PhysicsBodyDesc desc;
+    desc.id = id;
+    desc.position = {0, -0.5f, 0};
+    desc.half_extents = {40, 0.5f, 40};
+    return desc;
+}
+
+// Box `pusher` slides into a resting box; returns how far the target moved.
+float pushed_distance(float pusher_density, float target_density) {
+    using namespace acuppa;
+    PhysicsWorld world;
+    world.add(ground(1));
+    PhysicsBodyDesc pusher;
+    pusher.id = 2;
+    pusher.motion = PhysicsMotion::Dynamic;
+    pusher.position = {0, 0.5f, 0};
+    pusher.velocity = {6, 0, 0};
+    pusher.density = pusher_density;
+    world.add(pusher);
+    PhysicsBodyDesc target = pusher;
+    target.id = 3;
+    target.position = {1.5f, 0.5f, 0};
+    target.velocity = {0, 0, 0};
+    target.density = target_density;
+    world.add(target);
+    for (int i = 0; i < 120; ++i) world.step();
+    return world.state(3)->position.x - 1.5f;
+}
+
+// Highest sphere center reached after the first floor contact.
+float bounce_peak(float restitution) {
+    using namespace acuppa;
+    PhysicsWorld world;
+    world.add(ground(1));
+    PhysicsBodyDesc ball;
+    ball.id = 2;
+    ball.motion = PhysicsMotion::Dynamic;
+    ball.shape = ColliderShape::Sphere;
+    ball.radius = 0.25f;
+    ball.position = {0, 3, 0};
+    ball.restitution = restitution;
+    world.add(ball);
+    bool landed = false;
+    float peak = 0;
+    for (int i = 0; i < 180; ++i) {
+        world.step();
+        for (const auto& contact : world.contacts()) landed |= contact.began;
+        if (landed) peak = std::max(peak, world.state(2)->position.y);
+    }
+    return peak;
+}
+
+float slide_distance(float friction) {
+    using namespace acuppa;
+    PhysicsWorld world;
+    world.add(ground(1));
+    PhysicsBodyDesc box;
+    box.id = 2;
+    box.motion = PhysicsMotion::Dynamic;
+    box.position = {0, 0.5f, 0};
+    box.velocity = {4, 0, 0};
+    box.friction = friction;
+    world.add(box);
+    for (int i = 0; i < 240; ++i) world.step();
+    return world.state(2)->position.x;
+}
+
+float free_speed(float linear_damping) {
+    using namespace acuppa;
+    PhysicsWorld world;
+    PhysicsBodyDesc ball;
+    ball.id = 2;
+    ball.motion = PhysicsMotion::Dynamic;
+    ball.shape = ColliderShape::Sphere;
+    ball.velocity = {10, 0, 0};
+    ball.linear_damping = linear_damping;
+    world.add(ball);
+    for (int i = 0; i < 60; ++i) world.step();
+    return world.state(2)->velocity.x;
+}
+
+// A rolling sphere keeps its spin unless angular damping removes it.
+float roll_distance(float angular_damping) {
+    using namespace acuppa;
+    PhysicsWorld world;
+    world.add(ground(1));
+    PhysicsBodyDesc ball;
+    ball.id = 2;
+    ball.motion = PhysicsMotion::Dynamic;
+    ball.shape = ColliderShape::Sphere;
+    ball.position = {0, 0.5f, 0};
+    ball.velocity = {5, 0, 0};
+    ball.friction = 1.0f;
+    ball.linear_damping = 0.0f;
+    ball.angular_damping = angular_damping;
+    world.add(ball);
+    for (int i = 0; i < 180; ++i) world.step();
+    return world.state(2)->position.x;
+}
+
+// A 0.1 m sphere at 120 m/s moves 2 m per step toward a 0.05 m thick wall.
+acuppa::PhysicsBodyState fast_shot(bool ccd) {
+    using namespace acuppa;
+    PhysicsWorld world;
+    PhysicsBodyDesc wall;
+    wall.id = 1;
+    wall.position = {0, 0, 0};
+    wall.half_extents = {0.025f, 5, 5};
+    world.add(wall);
+    PhysicsBodyDesc shot;
+    shot.id = 2;
+    shot.motion = PhysicsMotion::Dynamic;
+    shot.shape = ColliderShape::Sphere;
+    shot.radius = 0.05f;
+    shot.position = {-3.1f, 0, 0};
+    shot.velocity = {120, 0, 0};
+    shot.ccd = ccd;
+    world.add(shot);
+    for (int i = 0; i < 30; ++i) world.step();
+    return *world.state(2);
+}
+
+void material_checks() {
+    using namespace acuppa;
+    const float heavy_push = pushed_distance(4000.0f, 250.0f);
+    const float light_push = pushed_distance(250.0f, 4000.0f);
+    expect(heavy_push > light_push * 2.0f && heavy_push > 0.5f,
+           "dense box did not push a light box further than the reverse");
+    expect(std::abs(pushed_distance(1000.0f, 1000.0f) - pushed_distance(1000.0f, 1000.0f)) == 0,
+           "material push runs diverged");
+
+    const float bouncy = bounce_peak(0.8f);
+    const float dead = bounce_peak(0.0f);
+    expect(bouncy > 1.2f && dead < 0.5f, "restitution did not change bounce height");
+    expect(bounce_peak(0.8f) == bouncy, "restitution runs diverged");
+
+    const float slippery = slide_distance(0.05f);
+    const float grippy = slide_distance(1.0f);
+    expect(slippery > grippy * 2.0f && grippy > 0.5f,
+           "higher friction did not shorten the slide");
+
+    const float undamped = free_speed(0.0f);
+    const float damped = free_speed(2.0f);
+    expect(std::abs(undamped - 10.0f) < 0.01f && damped < 3.0f && damped > 0.5f,
+           "linear damping did not slow a free body");
+    const float rolling = roll_distance(0.0f);
+    const float braked = roll_distance(5.0f);
+    expect(rolling > braked * 1.5f, "angular damping did not slow a rolling sphere");
+
+    const auto tunneled = fast_shot(false);
+    const auto stopped = fast_shot(true);
+    expect(tunneled.position.x > 1.0f, "non-CCD test shot no longer tunnels; retune it");
+    expect(stopped.position.x < 0.0f, "CCD shot passed through the thin wall");
+    const auto repeat = fast_shot(true);
+    expect(repeat.position.x == stopped.position.x && repeat.position.y == stopped.position.y,
+           "CCD runs diverged");
+
+    PhysicsWorld world;
+    PhysicsBodyDesc body;
+    body.id = 9;
+    body.motion = PhysicsMotion::Dynamic;
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    const float inf = std::numeric_limits<float>::infinity();
+    auto invalid = [&](auto change, const char* message) {
+        PhysicsBodyDesc copy = body;
+        change(copy);
+        rejects([&] { world.add(copy); }, message);
+    };
+    invalid([&](PhysicsBodyDesc& d) { d.density = 0; }, "zero density accepted");
+    invalid([&](PhysicsBodyDesc& d) { d.density = -5; }, "negative density accepted");
+    invalid([&](PhysicsBodyDesc& d) { d.density = nan; }, "NaN density accepted");
+    invalid([&](PhysicsBodyDesc& d) { d.friction = -0.1f; }, "negative friction accepted");
+    invalid([&](PhysicsBodyDesc& d) { d.friction = inf; }, "infinite friction accepted");
+    invalid([&](PhysicsBodyDesc& d) { d.restitution = 1.1f; }, "restitution above 1 accepted");
+    invalid([&](PhysicsBodyDesc& d) { d.restitution = -0.1f; }, "negative restitution accepted");
+    invalid([&](PhysicsBodyDesc& d) { d.restitution = nan; }, "NaN restitution accepted");
+    invalid([&](PhysicsBodyDesc& d) { d.linear_damping = -1; }, "negative linear damping accepted");
+    invalid([&](PhysicsBodyDesc& d) { d.angular_damping = nan; }, "NaN angular damping accepted");
+    expect(!world.state(9), "rejected material body was added");
+    body.restitution = 1.0f;
+    body.friction = 0.0f;
+    body.linear_damping = 0.0f;
+    body.angular_damping = 0.0f;
+    world.add(body);
+    expect(world.state(9).has_value(), "boundary material values were rejected");
+}
 }
 
 int main() {
     using namespace acuppa;
+    material_checks();
     PhysicsWorld world;
     PhysicsBodyDesc floor;
     floor.id = 1;

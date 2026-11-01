@@ -18,6 +18,7 @@ extern "C" {
 #include <cmath>
 #include <cstring>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <memory>
 #include <optional>
@@ -284,7 +285,31 @@ PhysicsBodyDesc physics_desc(EntityId id, const PhysicsComponent& component,
     desc.radius = component.radius;
     desc.trigger = component.trigger;
     desc.velocity = velocity;
+    desc.density = component.density;
+    desc.friction = component.friction;
+    desc.restitution = component.restitution;
+    desc.linear_damping = component.linear_damping;
+    desc.angular_damping = component.angular_damping;
+    desc.ccd = component.ccd;
     return desc;
+}
+
+// Reads an optional physics material number; omitted fields keep `fallback`.
+float physics_material(lua_State* lua, int table, const char* field, float fallback,
+                       float minimum, bool exclusive_minimum, float maximum,
+                       const char* range) {
+    lua_getfield(lua, table, field);
+    if (lua_isnil(lua, -1)) {
+        lua_pop(lua, 1);
+        return fallback;
+    }
+    const bool number = lua_type(lua, -1) == LUA_TNUMBER;
+    const double value = number ? lua_tonumber(lua, -1) : 0.0;
+    lua_pop(lua, 1);
+    if (!number || !std::isfinite(value) ||
+        (exclusive_minimum ? value <= minimum : value < minimum) || value > maximum)
+        throw std::invalid_argument(std::string("physics.") + field + " must be " + range);
+    return float(value);
 }
 
 std::string timer_name(lua_State* lua, int index) {
@@ -1227,6 +1252,24 @@ int LuaProject::Impl::component_set(lua_State* lua) {
             value.radius = optional_number(lua, 3, "radius", value.radius, "physics");
             value.velocity = vector_field(lua, 3, "velocity", value.velocity, false);
             value.trigger = optional_boolean(lua, 3, "trigger", value.trigger);
+            constexpr float unbounded = std::numeric_limits<float>::max();
+            value.density = physics_material(lua, 3, "density", value.density, 0.0f, true,
+                                             unbounded, "a finite number above 0");
+            value.friction = physics_material(lua, 3, "friction", value.friction, 0.0f,
+                                              false, unbounded, "a finite number >= 0");
+            value.restitution = physics_material(lua, 3, "restitution", value.restitution,
+                                                 0.0f, false, 1.0f, "a number from 0 to 1");
+            value.linear_damping = physics_material(lua, 3, "linear_damping",
+                value.linear_damping, 0.0f, false, unbounded, "a finite number >= 0");
+            value.angular_damping = physics_material(lua, 3, "angular_damping",
+                value.angular_damping, 0.0f, false, unbounded, "a finite number >= 0");
+            lua_getfield(lua, 3, "ccd");
+            if (!lua_isnil(lua, -1)) {
+                if (!lua_isboolean(lua, -1))
+                    throw std::invalid_argument("physics.ccd must be boolean");
+                value.ccd = lua_toboolean(lua, -1) != 0;
+            }
+            lua_pop(lua, 1);
             const auto transform = state.world.transform(id);
             if (!transform || transform->parent)
                 throw std::invalid_argument("physics component requires an unparented transform");
@@ -1315,7 +1358,7 @@ int LuaProject::Impl::component_get(lua_State* lua) {
         } else if (std::strcmp(kind, "physics") == 0) {
             const auto value = world.physics(id);
             if (!value) { lua_pushnil(lua); return 1; }
-            lua_createtable(lua, 0, 6);
+            lua_createtable(lua, 0, 13);
             const char* motion = value->motion == PhysicsMotion::Static ? "static" :
                 value->motion == PhysicsMotion::Dynamic ? "dynamic" : "kinematic";
             lua_pushstring(lua, motion); lua_setfield(lua, -2, "motion");
@@ -1327,6 +1370,14 @@ int LuaProject::Impl::component_get(lua_State* lua) {
             push_vec3(lua, body ? body->velocity : value->velocity);
             lua_setfield(lua, -2, "velocity");
             lua_pushboolean(lua, value->trigger); lua_setfield(lua, -2, "trigger");
+            lua_pushnumber(lua, value->density); lua_setfield(lua, -2, "density");
+            lua_pushnumber(lua, value->friction); lua_setfield(lua, -2, "friction");
+            lua_pushnumber(lua, value->restitution); lua_setfield(lua, -2, "restitution");
+            lua_pushnumber(lua, value->linear_damping);
+            lua_setfield(lua, -2, "linear_damping");
+            lua_pushnumber(lua, value->angular_damping);
+            lua_setfield(lua, -2, "angular_damping");
+            lua_pushboolean(lua, value->ccd); lua_setfield(lua, -2, "ccd");
         } else {
             return luaL_error(lua, "unknown component kind: %s", kind);
         }

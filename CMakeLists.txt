@@ -225,6 +225,10 @@ if(BUILD_TESTING)
   target_link_libraries(acuppa_vehicle_scene_test PRIVATE acuppa_core)
   add_test(NAME lua_vehicle_scene COMMAND acuppa_vehicle_scene_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+  add_executable(acuppa_physics_materials_scene_test tests/physics_materials_scene_test.cpp)
+  target_link_libraries(acuppa_physics_materials_scene_test PRIVATE acuppa_core)
+  add_test(NAME lua_physics_materials_scene COMMAND acuppa_physics_materials_scene_test
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene")
   add_executable(acuppa_core_test tests/core_test.cpp)
   target_link_libraries(acuppa_core_test PRIVATE acuppa_core)
   add_executable(acuppa_camera_test tests/camera_test.cpp)
@@ -442,6 +446,9 @@ if(BUILD_TESTING)
     add_test(NAME physics_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:acuppa>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene" "physics")
+    add_test(NAME physics_materials_live_startup COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:acuppa>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene" "physics_materials")
     add_test(NAME audio_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:acuppa>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene" "audio")

@@ -23,6 +23,13 @@ struct PhysicsBodyDesc {
     float radius = 0.5f;
     glm::vec3 velocity{0.0f};
     bool trigger = false;
+    // Material defaults match Jolt's own (ConvexShape density, BodyCreationSettings).
+    float density = 1000.0f;        // kg/m^3, finite and > 0; mass = shape volume x density.
+    float friction = 0.2f;          // finite, >= 0; pairs combine as sqrt(a * b).
+    float restitution = 0.0f;       // 0..1; pairs combine as max(a, b).
+    float linear_damping = 0.05f;   // finite, >= 0.
+    float angular_damping = 0.05f;  // finite, >= 0.
+    bool ccd = false;               // Continuous (linear-cast) collision for fast bodies.
 };
 
 struct PhysicsBodyState {
