@@ -212,9 +212,42 @@ void material_checks() {
 }
 }
 
+// A sleeping plank must fall once both of its supports are removed.
+void removal_wakes_resting_bodies() {
+    using namespace acuppa;
+    PhysicsWorld world;
+    PhysicsBodyDesc ground;
+    ground.id = 1;
+    ground.position = {0, -0.5f, 0};
+    ground.half_extents = {10, 0.5f, 10};
+    world.add(ground);
+    for (uint64_t id : {2u, 3u}) {
+        PhysicsBodyDesc pillar;
+        pillar.id = id;
+        pillar.motion = PhysicsMotion::Dynamic;
+        pillar.position = {id == 2 ? -1.0f : 1.0f, 0.5f, 0};
+        pillar.half_extents = {0.2f, 0.5f, 0.2f};
+        world.add(pillar);
+    }
+    PhysicsBodyDesc plank;
+    plank.id = 4;
+    plank.motion = PhysicsMotion::Dynamic;
+    plank.position = {0, 1.1f, 0};
+    plank.half_extents = {1.5f, 0.1f, 0.3f};
+    world.add(plank);
+    for (int i = 0; i < 240; ++i) world.step();
+    expect(!world.state(4)->active, "resting plank never went to sleep");
+    const float rest = world.state(4)->position.y;
+    expect(world.remove(2) && world.remove(3), "support removal failed");
+    for (int i = 0; i < 60; ++i) world.step();
+    expect(world.state(4)->position.y < rest - 0.5f,
+           "plank stayed in mid-air after its supports were removed");
+}
+
 int main() {
     using namespace acuppa;
     material_checks();
+    removal_wakes_resting_bodies();
     PhysicsWorld world;
     PhysicsBodyDesc floor;
     floor.id = 1;

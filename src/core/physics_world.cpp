@@ -238,7 +238,12 @@ bool PhysicsWorld::remove(uint64_t id) {
         impl_->vehicles.erase(vehicle);
     }
     auto& iface = impl_->system.GetBodyInterface();
+    // Jolt leaves sleeping bodies resting on a removed body asleep, so they would
+    // hang in mid-air; wake everything touching its slightly grown bounds.
+    JPH::AABox bounds = iface.GetTransformedShape(it->second).GetWorldSpaceBounds();
+    bounds.ExpandBy(JPH::Vec3::sReplicate(0.05f));
     iface.RemoveBody(it->second);
+    iface.ActivateBodiesInAABox(bounds, {}, {});
     impl_->entity_ids.erase(it->second.GetIndexAndSequenceNumber());
     for (auto contact = impl_->active_contacts.begin();
          contact != impl_->active_contacts.end();) {
