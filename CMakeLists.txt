@@ -296,6 +296,11 @@ if(BUILD_TESTING)
   add_test(NAME garage_run_driving_rules COMMAND acuppa_garage_run_rules_test
            "${PROJECT_SOURCE_DIR}/games/garage_run/scripts/driving.lua"
            "${PROJECT_SOURCE_DIR}/tests/garage_run_rules.lua")
+  add_executable(acuppa_siege_sling_rules_test tests/siege_sling_rules_test.cpp)
+  target_link_libraries(acuppa_siege_sling_rules_test PRIVATE acuppa_lua)
+  add_test(NAME siege_sling_rules COMMAND acuppa_siege_sling_rules_test
+           "${PROJECT_SOURCE_DIR}/games/siege_sling/scripts/rules.lua"
+           "${PROJECT_SOURCE_DIR}/tests/siege_sling_rules.lua")
   add_executable(acuppa_garage_run_impact_test tests/garage_run_impact_test.cpp)
   target_link_libraries(acuppa_garage_run_impact_test PRIVATE acuppa_lua)
   add_test(NAME garage_run_impact_camera COMMAND acuppa_garage_run_impact_test
