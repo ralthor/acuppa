@@ -14,6 +14,7 @@ int main(int argc, char* argv[]) {
     const fs::path work = argv[2];
     fs::remove_all(work);
     fs::copy(argv[1], work, fs::copy_options::recursive);
+    fs::remove_all(work / "saves"); // local play must not leak into the fixture
     for (int run = 0; run < 3; ++run) {
         acuppa::LuaProject project(work, "save");
         const auto frame = project.step(0.0);

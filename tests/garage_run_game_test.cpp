@@ -37,6 +37,7 @@ int main(int argc, char* argv[]) {
     const fs::path work = argv[2];
     fs::remove_all(work);
     fs::copy(argv[1], work, fs::copy_options::recursive);
+    fs::remove_all(work / "saves"); // local play must not leak into the fixture
     acuppa::LuaProject game(work, "course", acuppa::LuaProject::Mode::Game, false);
     auto frame = game.step(0);
     expect(frame.imported.size() >= 15 && frame.environment && frame.ssao_quality == 0 &&
