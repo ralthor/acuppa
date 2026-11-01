@@ -61,7 +61,7 @@ The Lua-authored car game uses a Jolt four-wheel vehicle, collision and checkpoi
 
 ### Siege Sling
 
-A 3D slingshot game: pull back the sling with the mouse (or aim with keys or a gamepad) to launch a ball along a dotted arc at a textured wood, stone, and glass fort guarding round grumps. Blocks break into debris, grumps pop, and material impact sounds, camera shake, scoring, stars, and a saved best result complete the level. It uses Jolt material bodies with continuous collision, the gradient sky, an HDRI, and a shadowed sun. See [its README](games/siege_sling/README.md).
+A 3D slingshot game: pull back the sling with the mouse (or aim with keys or a gamepad) to launch a ball along a dotted arc at a textured fortress of wood, stone, glass, and explosive crates hiding round grumps. Toppled blocks crush grumps, crates blast their neighbors, chain reactions build combo multipliers, blocks break into debris, and material impact sounds, camera shake, scoring, stars, and a saved best result complete the level. It uses Jolt material bodies with continuous collision, the gradient sky, an HDRI, and a shadowed sun. See [its README](games/siege_sling/README.md).
 
 ![Siege Sling aim view: a sling on a grassy hill, a dotted arc, and a three-tower fort under a blue sky](docs/images/siege-sling.png)
 

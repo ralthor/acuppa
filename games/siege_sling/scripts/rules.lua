@@ -27,6 +27,10 @@ local DEFAULTS = {
   target_points = 500,
   kill_y = -2,               -- grumps below this height are defeated
   shot_bonus = 1000,         -- points per unused shot on a win
+  combo_max = 5,             -- the Nth break in one shot scores min(N, combo_max)x
+  blast_radius = 3.2,        -- explosive crate reach (m)
+  blast_speed = 6,           -- velocity kick at the crate's center (m/s)
+  blast_damage = 90,         -- damage at the crate's center
   flight_timeout = 6,        -- seconds before a shot that never lands settles
   settle_speed = 0.15,       -- m/s; every tracked body must be slower
   settle_ticks = 30,         -- consecutive calm fixed ticks (0.5 s at 60 Hz)
@@ -43,6 +47,9 @@ Rules.MATERIALS = {
            restitution = 0.05, points = 200},
   glass = {health = 30, min_speed = 1.0, density = 1500, friction = 0.25,
            restitution = 0.3, points = 50},
+  -- Explosive crate: breaks easily and blasts its surroundings.
+  tnt = {health = 20, min_speed = 2.0, density = 500, friction = 0.6,
+         restitution = 0.1, points = 150, explosive = true},
 }
 
 local function fail(where, message) error(where .. ": " .. message, 3) end
@@ -103,13 +110,18 @@ local function check_config(where, config)
     fail(where, "config drag lengths must satisfy 0 <= cancel_drag < max_drag")
   end
   for _, key in ipairs({"yaw_rate", "pitch_rate", "power_rate", "damage_per_speed",
-                        "target_min_speed", "target_points", "shot_bonus", "settle_speed"}) do
+                        "target_min_speed", "target_points", "shot_bonus", "settle_speed",
+                        "blast_speed", "blast_damage"}) do
     if c[key] < 0 then fail(where, "config." .. key .. " must not be negative") end
   end
   if c.min_speed <= 0 or c.max_speed < c.min_speed then
     fail(where, "config speeds must satisfy 0 < min_speed <= max_speed")
   end
   if c.gravity >= 0 then fail(where, "config.gravity must be negative") end
+  if c.blast_radius <= 0 then fail(where, "config.blast_radius must be positive") end
+  if c.combo_max < 1 or c.combo_max ~= math.floor(c.combo_max) then
+    fail(where, "config.combo_max must be a positive integer")
+  end
   if c.target_health <= 0 then fail(where, "config.target_health must be positive") end
   if c.flight_timeout <= 0 or c.settle_timeout <= 0 then
     fail(where, "config timeouts must be positive")
@@ -283,6 +295,24 @@ function Rules.target_damage(closing_speed, config)
   return (closing_speed - config.target_min_speed) * config.damage_per_speed
 end
 
+-- Explosion strength at `distance` meters from a crate: 1 at the center,
+-- falling linearly to 0 at blast_radius and beyond. Multiply blast_speed
+-- (velocity kick) and blast_damage by it.
+function Rules.blast_falloff(distance, config)
+  local where = "Rules.blast_falloff"
+  check_number(where, "distance", distance, 0)
+  config = check_config(where, config)
+  return math.max(0, 1 - distance / config.blast_radius)
+end
+
+-- Score multiplier for the Nth break within one shot.
+function Rules.combo_multiplier(count, config)
+  local where = "Rules.combo_multiplier"
+  check_integer(where, "count", count, 1)
+  config = check_config(where, config)
+  return math.min(count, config.combo_max)
+end
+
 -- Stars for a final score: lost is 0; a win earns one star per threshold
 -- reached, and always at least one.
 function Rules.stars(score, thresholds, won)
@@ -345,7 +375,7 @@ function Rules.validate_level(level)
     if type(block) ~= "table" then fail(where, "level.blocks[" .. i .. "] must be a table") end
     check_id(where, "level.blocks[" .. i .. "].id", block.id, seen)
     if type(block.material) ~= "string" or not Rules.MATERIALS[block.material] then
-      fail(where, "level.blocks[" .. i .. "].material must be one of wood, stone, glass")
+      fail(where, "level.blocks[" .. i .. "].material must be one of glass, stone, tnt, wood")
     end
   end
   return level
@@ -365,6 +395,7 @@ function Rules.new_game(level, config)
     score = 0, bonus = 0, stars = 0, thresholds = {level.stars[1], level.stars[2], level.stars[3]},
     kill_y = level.kill_y or config.kill_y, blocks = {}, targets = {},
     targets_left = #level.targets, timer = 0, calm_ticks = 0,
+    combo = 0, best_combo = 0, last_points = 0,
   }, Game)
   for _, block in ipairs(level.blocks) do
     local material = Rules.MATERIALS[block.material]
@@ -390,6 +421,7 @@ function Game:launch(aim)
   check_aim(where, aim, self.config)
   self.shots_left = self.shots_left - 1
   self.state, self.timer, self.calm_ticks = "flying", 0, 0
+  self.combo = 0
   return Rules.launch_velocity(aim, self.config)
 end
 
@@ -402,10 +434,19 @@ function Game:landed()
   return self.state
 end
 
+-- Each break within one shot raises the combo; points scale with it.
+local function award(self, points)
+  self.combo = self.combo + 1
+  self.best_combo = math.max(self.best_combo, self.combo)
+  local multiplier = Rules.combo_multiplier(self.combo, self.config)
+  self.last_points = points * multiplier
+  self.score = self.score + self.last_points
+end
+
 local function defeat(self, target)
   target.defeated = true
   self.targets_left = self.targets_left - 1
-  self.score = self.score + self.config.target_points
+  award(self, self.config.target_points)
   -- A grump knocked over between shots still needs the yard to settle.
   if self.state == "aiming" then self.state, self.timer, self.calm_ticks = "settling", 0, 0 end
 end
@@ -423,8 +464,44 @@ function Game:hit_block(id, closing_speed)
   block.health = block.health - damage
   if block.health > 0 then return damage, false end
   block.health, block.destroyed = 0, true
-  self.score = self.score + Rules.MATERIALS[block.material].points
+  award(self, Rules.MATERIALS[block.material].points)
   return damage, true
+end
+
+local function apply_damage(self, id, damage)
+  local block, target = self.blocks[id], self.targets[id]
+  if block then
+    if block.destroyed or damage <= 0 then return 0, false end
+    block.health = block.health - damage
+    if block.health > 0 then return damage, false end
+    block.health, block.destroyed = 0, true
+    award(self, Rules.MATERIALS[block.material].points)
+    return damage, true
+  end
+  if target.defeated or damage <= 0 then return 0, false end
+  target.health = target.health - damage
+  if target.health > 0 then return damage, false end
+  target.health = 0
+  defeat(self, target)
+  return damage, true
+end
+
+-- Applies an explosion at `distance` meters to a block or grump (no speed
+-- threshold); returns damage dealt and whether it broke now.
+function Game:blast(id, distance)
+  local where = "game:blast"
+  check_game(where, self)
+  if not self.blocks[id] and not self.targets[id] then fail(where, "unknown body " .. tostring(id)) end
+  check_number(where, "distance", distance, 0)
+  if self:finished() then return 0, false end
+  return apply_damage(self, id, Rules.blast_falloff(distance, self.config) * self.config.blast_damage)
+end
+
+-- True when the named block explodes when it breaks.
+function Game:explosive(id)
+  check_game("game:explosive", self)
+  local block = self.blocks[id]
+  return block ~= nil and Rules.MATERIALS[block.material].explosive == true
 end
 
 -- Applies a contact to a grump; returns damage dealt and whether it fell now.

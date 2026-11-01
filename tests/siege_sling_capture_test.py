@@ -31,10 +31,12 @@ def count(pixels, x0, x1, y0, y1, test):
 aim = capture("siege_aim.ppm", 30)
 sky = count(aim, 0, 1280, 50, 170, lambda r, g, b: b > r + 25 and b > 150)
 assert sky > 140000, f"blue sky missing above the horizon: {sky}"
-fort = (440, 820, 250, 410)
+fort = (360, 920, 150, 420)
 wood = count(aim, *fort, lambda r, g, b: r > 140 and 80 < g < 170 and b < 100 and r > g + 30)
 stone = count(aim, *fort, lambda r, g, b: 130 < r < 210 and abs(r - g) < 15 and 0 < b - r < 30)
-assert wood > 4000 and stone > 3000, f"fort blocks not visible: wood={wood} stone={stone}"
+crate = count(aim, *fort, lambda r, g, b: r > 150 and g < 90 and b < 60)
+assert wood > 15000 and stone > 8000 and crate > 600, \
+    f"fortress not visible: wood={wood} stone={stone} crates={crate}"
 dot = lambda r, g, b: r > 180 and g > 175 and b < 190 and r > b + 25
 dots = count(aim, 620, 660, 260, 460, dot)
 assert dots > 200, f"aim arc dots not visible: {dots}"

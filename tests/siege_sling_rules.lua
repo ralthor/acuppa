@@ -262,21 +262,22 @@ check("broken block ignored", select(1, game:hit_block("pane", 20)) == 0 and gam
 damage, broke = game:hit_block("slab", 10)
 check("stone chipped", near(damage, 130) and not broke and near(game.blocks.slab.health, 30))
 damage, broke = game:hit_block("slab", 5.1)
-check("stone breaks", broke and game.blocks.slab.health == 0 and game.score == 250)
+check("stone breaks", broke and game.blocks.slab.health == 0 and game.score == 450
+  and game.combo == 2 and game.last_points == 400)
 damage, broke = game:hit_target("grump_a", 1.5)
 check("target soft hit", damage == 0 and not broke)
 damage, broke = game:hit_target("grump_a", 2.5)
 check("target bruised", near(damage, 20) and not broke and game.targets_left == 2)
 damage, broke = game:hit_target("grump_a", 4)
-check("target defeated by damage", broke and game.targets_left == 1 and game.score == 750)
+check("target defeated by damage", broke and game.targets_left == 1 and game.score == 1950)
 check("target above kill height", not game:target_height("grump_b", -1.9))
 check("target defeated by falling", game:target_height("grump_b", -2.1)
-  and game.targets_left == 0 and game.score == 1250)
+  and game.targets_left == 0 and game.score == 3950)
 check("fallen target ignored", not game:target_height("grump_b", -9))
 check("win waits for settle", game.state == "flying")
 game:landed()
-check("won", settle(game) == "won" and game.bonus == 2000 and game.score == 3250
-  and game.stars == 2)
+check("won", settle(game) == "won" and game.bonus == 2000 and game.score == 5950
+  and game.stars == 2 and game.best_combo == 4)
 fails("launch after win", function() game:launch(rest) end, "cannot launch while won")
 
 -- The last shot wins: no bonus, at least one star.
@@ -297,6 +298,57 @@ check("partial defeat back to aiming", settle(game) == "aiming")
 game:hit_target("grump_b", 50)
 check("between-shot win", game.state == "settling" and settle(game) == "won" and game.bonus == 3000
   and game.stars == 2)
+
+-- Combos: each break in one shot raises the multiplier up to combo_max;
+-- a new shot starts again at 1x.
+check("combo multiplier", Rules.combo_multiplier(1) == 1 and Rules.combo_multiplier(3) == 3
+  and Rules.combo_multiplier(9) == 5 and Rules.combo_multiplier(9, Rules.config({combo_max = 2})) == 2)
+fails("combo count", function() Rules.combo_multiplier(0) end, "count")
+fails("combo integer", function() Rules.combo_multiplier(1.5) end, "integer")
+fails("combo config", function() Rules.config({combo_max = 0}) end, "combo_max")
+local many = {shots = 3, stars = {1, 2, 3}, targets = {{id = "g"}}, blocks = {}}
+for i = 1, 7 do many.blocks[i] = {id = "b" .. i, material = "glass"} end
+game = Rules.new_game(many, fast)
+game:launch(rest)
+for i = 1, 7 do game:hit_block("b" .. i, 10) end
+check("combo capped", game.combo == 7 and game.score == 50 * (1 + 2 + 3 + 4 + 5 + 5 + 5))
+game:landed(); settle(game)
+game:launch(rest)
+check("combo resets per shot", game.combo == 0 and game.best_combo == 7)
+
+-- Explosions: linear falloff, damage without a speed threshold, chains.
+check("blast center", Rules.blast_falloff(0) == 1)
+local R, D = cfg.blast_radius, cfg.blast_damage
+check("blast half", near(Rules.blast_falloff(R / 2), 0.5))
+check("blast edge", Rules.blast_falloff(R) == 0 and Rules.blast_falloff(50) == 0)
+check("blast radius config", near(Rules.blast_falloff(1, Rules.config({blast_radius = 2})), 0.5))
+fails("blast distance", function() Rules.blast_falloff(-1) end, "distance")
+fails("blast nan", function() Rules.blast_falloff(0 / 0) end, "distance")
+fails("blast radius", function() Rules.config({blast_radius = 0}) end, "blast_radius")
+check("tnt fragile", M.tnt.explosive and M.tnt.health < M.glass.health + 1)
+local crates = {shots = 2, stars = {1, 2, 3}, targets = {{id = "g"}},
+                blocks = {{id = "crate", material = "tnt"}, {id = "crate2", material = "tnt"},
+                          {id = "wall", material = "stone"}}}
+game = Rules.new_game(Rules.validate_level(crates), fast)
+check("explosive lookup", game:explosive("crate") and not game:explosive("wall")
+  and not game:explosive("g") and not game:explosive("nope"))
+game:launch(rest)
+damage, broke = game:hit_block("crate", 4)
+check("crate breaks", broke and near(damage, 40))
+damage, broke = game:blast("crate2", 3.1)
+check("faint blast spares a crate", not broke and near(damage, D * (1 - 3.1 / R)))
+damage, broke = game:blast("crate2", 1.0)
+check("chain crate", broke)
+damage, broke = game:blast("wall", 0.5)
+check("stone survives blast", not broke and near(game.blocks.wall.health, 160 - D * (1 - 0.5 / R)))
+damage, broke = game:blast("g", R - 0.1)
+check("far blast bruises", not broke and damage > 0 and damage < 4)
+damage, broke = game:blast("g", 1)
+check("blast defeats grump", broke and game.targets_left == 0)
+check("blasted again ignored", select(1, game:blast("g", 0)) == 0)
+check("out of reach", select(1, game:blast("wall", 9)) == 0)
+fails("blast unknown", function() game:blast("zz", 1) end, "unknown body")
+fails("blast negative", function() game:blast("wall", -1) end, "distance")
 
 -- Invalid shot-flow calls.
 game = Rules.new_game(level(), fast)

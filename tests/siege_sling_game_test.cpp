@@ -4,7 +4,10 @@
 
 #include <cmath>
 #include <filesystem>
+#include <functional>
+#include <fstream>
 #include <map>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -38,7 +41,7 @@ std::map<uint64_t, Pose> fort(const SceneFrame& frame) {
     std::map<uint64_t, Pose> poses;
     for (const auto& item : frame.imported)
         if (uses(item, "assets/wood.gltf") || uses(item, "assets/stone.gltf") ||
-            uses(item, "assets/glass.gltf") ||
+            uses(item, "assets/glass.gltf") || uses(item, "assets/tnt.gltf") ||
             uses(item, "grump.gltf"))
             poses[item.id] = {glm::vec3(item.transform[3]),
                               glm::normalize(glm::vec3(item.transform[0]))};
@@ -133,13 +136,20 @@ void hold(LuaProject& game, const char* positive, const char* negative, int tick
     game.step(tick);
 }
 
+int count_mesh(const SceneFrame& frame, const char* mesh) {
+    int count = 0;
+    for (const auto& item : frame.imported) count += uses(item, mesh);
+    return count;
+}
+
 int chips(const SceneFrame& frame) {
     int count = 0;
     for (const auto& item : frame.imported) count += uses(item, "assets/chip_");
     return count;
 }
 
-SceneFrame shoot(LuaProject& game, const Shot& shot, int* most_chips = nullptr) {
+SceneFrame shoot(LuaProject& game, const Shot& shot, int* most_chips = nullptr,
+                 const std::function<void(const SceneFrame&)>& watch = {}) {
     hold(game, "d", "a", shot.yaw);
     hold(game, "w", "s", shot.pitch);
     hold(game, "e", "q", shot.power);
@@ -149,6 +159,7 @@ SceneFrame shoot(LuaProject& game, const Shot& shot, int* most_chips = nullptr) 
     for (int i = 0; i < 60 * 20; ++i) {
         frame = game.step(tick);
         if (most_chips) *most_chips = std::max(*most_chips, chips(frame));
+        if (watch) watch(frame);
         if (has_text(frame, "PITCH") || has_text(frame, "VICTORY") ||
             has_text(frame, "OUT OF SHOTS")) break;
     }
@@ -173,10 +184,10 @@ int main(int argc, char* argv[]) {
     expect(frame.environment && frame.sky && frame.sky->sun_size > 0 && frame.lights.size() == 1 &&
                frame.lights[0].directional && frame.lights[0].shadows && frame.ssao_quality == 0,
            "level lacks the HDRI, sky sun disc, shadowed sun, or SSAO-off setting");
-    expect(has_text(frame, "SHOTS 4") && has_text(frame, "SCORE 0") && has_text(frame, "GRUMPS 3"),
-           "HUD did not show four shots, zero score, and three grumps");
+    expect(has_text(frame, "SHOTS 4") && has_text(frame, "SCORE 0") && has_text(frame, "GRUMPS 4"),
+           "HUD did not show four shots, zero score, and four grumps");
     const auto start = fort(frame);
-    expect(start.size() == 26, "fort should have 23 blocks and 3 grumps, found " +
+    expect(start.size() == 55, "fort should have 51 blocks and 4 grumps, found " +
                                    std::to_string(start.size()));
     expect(dots(frame).size() >= 10 && !flying_ball(frame), "aim view lacks the arc or has a ball");
 
@@ -207,7 +218,11 @@ int main(int argc, char* argv[]) {
         frame = game.step(tick);
         aiming = has_text(frame, "PITCH");
     }
-    expect(aiming, "shot never settled back to aiming");
+    if (!aiming) {
+        std::string all;
+        for (const auto& item : frame.ui) all += item.text + " | ";
+        throw std::runtime_error("shot never settled back to aiming: " + all);
+    }
     expect(!has_text(frame, "SCORE 0 "), "knocking the fort did not score");
 
     // Keys change aim: holding E raises power and the arc reaches farther.
@@ -270,28 +285,88 @@ int main(int argc, char* argv[]) {
     expect(std::abs(frame.camera.eye.x - eye.x) > 2.0f && has_text(frame, "SHOTS 3"),
            "right-drag did not orbit the camera, or it fired");
 
-    // A win from real shots: the left tower, the center keep, then the right
-    // tower (each shot's keys adjust the previous aim). Found by searching
-    // key-tick aims against this deterministic level; Jolt runs the same here.
+    // Removing a support from the sleeping fortress makes what it held fall.
+    // A fixture-only entity script deletes the far-left ground pillar after
+    // 10 s; the lintel on it (center x -5.625, y 1.52) must drop or break.
+    {
+        const fs::path fixture = work.parent_path() / "siege_sling_support_fixture";
+        fs::remove_all(fixture);
+        fs::copy(work, fixture, fs::copy_options::recursive);
+        std::ofstream(fixture / "scripts/remove_support.lua") <<
+            "local tp = require(\"acuppa\")\nlocal ticks = 0\n"
+            "return {fixed_update = function(id, dt)\n"
+            "  ticks = ticks + 1\n"
+            "  if ticks == 600 then tp.entity_destroy(assert(tp.entity_find(\"g_pillar_1\"))) end\n"
+            "end}\n";
+        const fs::path scene = fixture / "scenes/level1.scene.lua";
+        std::ifstream in(scene);
+        std::string text(std::istreambuf_iterator<char>{in}, {});
+        in.close();
+        const auto at = text.find("entities = {");
+        expect(at != std::string::npos, "support fixture could not edit the scene");
+        text.insert(at + 12, "\n    {name = \"test remover\", script = {path = \"scripts/remove_support.lua\"}},");
+        std::ofstream(scene, std::ios::trunc) << text;
+        LuaProject support(fixture, "level1", LuaProject::Mode::Game, false);
+        frame = support.step(0);
+        auto lintel = [&](const SceneFrame& f) -> std::optional<glm::vec3> {
+            for (const auto& item : f.imported) {
+                const glm::vec3 p(item.transform[3]);
+                if (uses(item, "assets/wood.gltf") && glm::length(p - glm::vec3(-5.625f, 1.52f, -18)) < 0.6f)
+                    return p;
+            }
+            return std::nullopt;
+        };
+        expect(lintel(frame).has_value(), "support fixture lintel missing");
+        frame = run(support, 598);
+        const auto before = lintel(frame);
+        expect(before && std::abs(before->y - 1.52f) < 0.03f, "lintel sagged before removal");
+        frame = run(support, 90);
+        const auto after = lintel(frame);
+        expect(!after || after->y < before->y - 0.3f,
+               "blocks above a removed support stayed floating");
+    }
+
+    // One real shot at the left crates sets off a chain: both crates blow,
+    // the fortress's left side collapses, and every grump falls, including
+    // ones the ball never came near. The aim (key-tick offsets from the
+    // level's aim) was found by searching this deterministic level.
     {
         const fs::path saves = work / "saves";
         fs::remove_all(saves);
         LuaProject winner(work, "level1", LuaProject::Mode::Game, false);
         frame = winner.step(0);
         expect(!has_text(frame, "BEST"), "a fresh project showed a best result");
+        const int crates = count_mesh(frame, "assets/tnt.gltf");
+        std::map<uint64_t, float> nearest;  // grump id -> closest ball distance
+        bool combo_shown = false;
+        for (const auto& item : frame.imported)
+            if (uses(item, "assets/grump.gltf")) nearest[item.id] = 1e9f;
         int most_chips = 0;
-        frame = shoot(winner, {-12, 0, 0}, &most_chips);
-        expect(hud_number(frame, "GRUMPS") == 2 && hud_number(frame, "SHOTS") == 3,
-               "shot at the left tower did not knock out its grump");
-        expect(fort(frame).size() < start.size(), "broken pieces were not removed");
-        frame = shoot(winner, {12, 0, -4}, &most_chips);
-        expect(hud_number(frame, "GRUMPS") == 1, "shot at the keep did not knock out its grump");
-        frame = shoot(winner, {8, 0, 0}, &most_chips);
+        frame = shoot(winner, {-9, -4, -4}, &most_chips, [&](const SceneFrame& f) {
+            combo_shown |= has_text(f, "COMBO x");
+            const auto* ball = flying_ball(f);
+            if (!ball) return;
+            for (const auto& item : f.imported)
+                if (uses(item, "assets/grump.gltf"))
+                    nearest[item.id] = std::min(nearest[item.id],
+                        glm::length(glm::vec3(item.transform[3]) - glm::vec3(ball->transform[3])));
+        });
+        expect(count_mesh(frame, "assets/tnt.gltf") <= crates - 2, "the crate chain did not blow");
+        expect(combo_shown, "no COMBO popup during the chain");
+        int untouched = 0;
+        for (const auto& [id, distance] : nearest) {
+            bool alive = false;
+            for (const auto& item : frame.imported) alive |= item.id == id;
+            if (!alive && distance > 1.2f) ++untouched;
+        }
+        expect(untouched >= 1, "the crate shot defeated no grump the ball never touched");
         expect(has_text(frame, "VICTORY!") && hud_number(frame, "GRUMPS") == 0,
-               "three real shots did not win");
+               "the crate chain did not win in one shot");
+        expect(fort(frame).size() < start.size() / 2, "broken pieces were not removed");
         const int score = hud_number(frame, "SCORE");
-        expect(has_text(frame, "INCLUDES 1000 SHOT BONUS") && score >= 1500 + 1000,
-               "win score lacks grumps or the unused-shot bonus");
+        expect(has_text(frame, "INCLUDES 3000 SHOT BONUS") && score >= 2000 + 3000 &&
+                   has_text(frame, "3 STARS"),
+               "a one-shot chain win lacks grumps, the shot bonus, or three stars");
         expect(has_text(frame, "STARS") && fs::exists(saves / "best.tpsave"),
                "win did not show stars or save the best result");
         expect(most_chips > 0, "breaking blocks threw no debris");
@@ -316,7 +391,7 @@ int main(int argc, char* argv[]) {
         LuaProject loser(work, "level1", LuaProject::Mode::Game, false);
         loser.step(0);
         frame = shoot(loser, {-45, 0, 0});
-        expect(hud_number(frame, "SHOTS") == 3 && hud_number(frame, "GRUMPS") == 3 &&
+        expect(hud_number(frame, "SHOTS") == 3 && hud_number(frame, "GRUMPS") == 4 &&
                    !flying_ball(frame), "a wasted shot changed the fort or left its ball");
         for (int i = 0; i < 3; ++i) frame = shoot(loser, {0, 0, 0});
         expect(has_text(frame, "OUT OF SHOTS") && has_text(frame, "0 STARS") &&

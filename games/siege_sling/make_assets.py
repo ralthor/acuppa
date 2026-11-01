@@ -213,6 +213,20 @@ def grass_texture(x, y):
     return (255 * v * 0.97, 255 * v, 255 * v * 0.9)
 
 
+def crate_texture(x, y):
+    """Explosive crate: dark frame, diagonal brace, and a yellow hazard band."""
+    edge = min(x, y, 127 - x, 127 - y)
+    grain = 0.9 + 0.1 * smooth_noise(x * 0.3, y * 2, 8, 31, 128)
+    if edge < 10 or abs(x - y) < 7:
+        v = 0.55 * grain
+        return (255 * v, 120 * v, 60 * v)
+    if 52 <= y < 76:
+        stripe = ((x + y) // 12) % 2
+        return (40, 30, 20) if stripe else (255, 215, 40)
+    return (255 * grain, 150 * grain, 70 * grain)
+
+
+png("tnt", 128, crate_texture)
 png("wood", 256, wood_texture)
 png("stone", 256, stone_texture)
 png("glass", 128, glass_texture)
@@ -231,6 +245,8 @@ for name, color, metallic, roughness, texture in [
     ("chip_stone", (0.48, 0.52, 0.58), 0.0, 0.8, None),
     ("chip_glass", (0.65, 0.95, 1.0), 0.0, 0.1, None),
     ("chip_grump", (0.25, 0.85, 0.1), 0.0, 0.5, None),
+    ("tnt", (0.95, 0.32, 0.08), 0.0, 0.55, "tnt"),
+    ("chip_tnt", (1.0, 0.45, 0.05), 0.0, 0.5, None),
 ]:
     mesh(name, *box(), color, metallic, roughness, texture)
 
@@ -314,3 +330,5 @@ sound("pop", 0.22, lambda t: math.exp(-18 * t) * 0.7 * sine(260 + 900 * t, t) +
       math.exp(-200 * t) * 0.4 * rattle(t, 4))
 sound("twang", 0.45, lambda t: math.exp(-7 * t) * (0.5 * sine(150 * (1 + 0.3 * math.exp(-20 * t)), t) +
       0.2 * sine(300, t)) * (1 - math.exp(-400 * t)))
+sound("boom", 0.9, lambda t: math.exp(-5 * t) * (0.6 * sine(48 + 30 * math.exp(-8 * t), t) +
+      0.5 * rattle(t, 5) * math.exp(-3 * t)) * (1 - math.exp(-600 * t)))

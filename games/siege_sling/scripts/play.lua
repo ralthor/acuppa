@@ -8,7 +8,9 @@ local level = require("levels.level1")
 local DOTS = 24          -- arc preview spheres
 local DOT_STEP = 0.07    -- seconds between preview dots
 local SOUND_GAP = 0.09   -- seconds between repeats of one impact sound
-local SOUNDS = {wood = "assets/knock.wav", stone = "assets/thud.wav", glass = "assets/clink.wav"}
+local SOUNDS = {wood = "assets/knock.wav", stone = "assets/thud.wav", glass = "assets/clink.wav",
+                tnt = "assets/knock.wav"}
+local CONFIG = Rules.config()
 
 local game, rig, drag, debris
 local aim                -- current aim (keys and drags edit it)
@@ -23,6 +25,9 @@ local orbit_from
 local held = {}
 local best               -- saved {score, stars} or nil
 local was_state
+local blasts = {}        -- pending explosion centers (processed each tick)
+local popup = {time = 0, text = ""}
+local shown_combo = 0
 
 local function edge(name)
   local down = tp.action(name) > 0
@@ -57,7 +62,9 @@ local function spawn_fort()
                      {motion = "dynamic", shape = "box", half_extents = block.half_extents,
                       density = material.density, friction = material.friction,
                       restitution = material.restitution})
-    bodies[id] = {kind = "block", id = block.id, material = block.material, children = {}}
+    local h = block.half_extents
+    bodies[id] = {kind = "block", id = block.id, material = block.material, children = {},
+                  mass = 8 * h[1] * h[2] * h[3] * material.density}
   end
   local r = level.target_radius
   for _, target in ipairs(level.targets) do
@@ -76,7 +83,8 @@ local function spawn_fort()
       tp.component_set(pupil, "mesh", {mesh = "assets/pupil.gltf", casts_shadows = false})
       children[#children + 1], children[#children + 2] = eye, pupil
     end
-    bodies[id] = {kind = "target", id = target.id, children = children}
+    bodies[id] = {kind = "target", id = target.id, children = children,
+                  mass = 4 / 3 * math.pi * r ^ 3 * 500}
   end
 end
 
@@ -91,7 +99,11 @@ local function shatter(entity)
   local file = body.kind == "target" and "assets/pop.wav" or SOUNDS[body.material]
   cooldown[file] = 0
   cue(file, state.position, 0.9)
-  local added, evicted = debris:burst(kind, state.position, body.kind == "target" and 8 or 6, 3)
+  local explosive = body.kind == "block" and game:explosive(body.id)
+  if explosive then blasts[#blasts + 1] = state.position end
+  local added, evicted = debris:burst(kind, state.position,
+                                      explosive and 16 or (body.kind == "target" and 8 or 6),
+                                      explosive and 5.5 or 3)
   for _, piece in ipairs(evicted) do
     if chips[piece.serial] then tp.entity_destroy(chips[piece.serial]) end
     chips[piece.serial] = nil
@@ -99,6 +111,37 @@ local function shatter(entity)
   for _, piece in ipairs(added) do
     chips[piece.serial] = spawn("debris", piece.position, "assets/chip_" .. kind .. ".gltf",
                                 {0.09, 0.09, 0.09}, nil, false)
+  end
+end
+
+-- A crate blast pushes every nearby block and grump outward (a velocity kick
+-- that falls off linearly with distance, so heavy stone moves less in
+-- meters but just as fast) and damages them; broken crates queue more blasts.
+local function explode(center)
+  cooldown["assets/boom.wav"] = 0
+  cue("assets/boom.wav", center, 1)
+  rig:shake(1)
+  for _, id in ipairs(tp.physics_overlap_sphere(center, CONFIG.blast_radius)) do
+    local body = bodies[id]
+    if body then
+      local p = tp.physics_state(id).position
+      local d = {p[1] - center[1], p[2] - center[2] + 0.5, p[3] - center[3]}
+      local distance = math.sqrt((p[1] - center[1]) ^ 2 + (p[2] - center[2]) ^ 2 + (p[3] - center[3]) ^ 2)
+      local kick = Rules.blast_falloff(distance) * CONFIG.blast_speed * body.mass
+      local norm = math.max(1e-3, math.sqrt(d[1] ^ 2 + d[2] ^ 2 + d[3] ^ 2))
+      if kick > 0 then
+        tp.physics_apply_impulse(id, {d[1] / norm * kick, d[2] / norm * kick, d[3] / norm * kick})
+      end
+      if select(2, game:blast(body.id, distance)) then shatter(id) end
+    end
+  end
+end
+
+local function run_blasts()
+  local rounds = 0
+  while #blasts > 0 and rounds < 8 do
+    rounds = rounds + 1
+    explode(table.remove(blasts, 1))
   end
 end
 
@@ -187,9 +230,13 @@ end
 local function tracked_speeds()
   local speeds = {}
   for id, body in pairs(bodies) do
-    local state = tp.physics_state(id)
-    speeds[#speeds + 1] = length(state.velocity)
-    if body.kind == "target" and game:target_height(body.id, state.position[2]) then shatter(id) end
+    if not tp.entity_exists(id) then
+      bodies[id] = nil  -- removed by another script
+    else
+      local state = tp.physics_state(id)
+      speeds[#speeds + 1] = length(state.velocity)
+      if body.kind == "target" and game:target_height(body.id, state.position[2]) then shatter(id) end
+    end
   end
   if ball then
     local state = tp.physics_state(ball)
@@ -287,7 +334,7 @@ return {
     game = Rules.new_game(level)
     rig = Rig.new({pouch = level.pouch, fort = level.fort_center, look_ahead = 17})
     drag = DragAim.new(Rules)
-    debris = Debris.new({cap = 48, life = 1.0, ground = 0.05})
+    debris = Debris.new({cap = 64, life = 1.0, ground = 0.05})
     aim = {yaw = level.aim.yaw, pitch = level.aim.pitch, power = level.aim.power}
     best = tp.load("best")
     spawn_fort()
@@ -310,7 +357,15 @@ return {
   fixed_update = function(dt)
     for file, left in pairs(cooldown) do cooldown[file] = math.max(0, left - dt) end
     feed_contacts()
+    run_blasts()
     local speeds = tracked_speeds()
+    run_blasts()
+    if game.combo > shown_combo and game.combo >= 2 then
+      popup.time, popup.text = 1.4, string.format("COMBO x%d  +%d",
+        Rules.combo_multiplier(game.combo), game.last_points)
+    end
+    shown_combo = game.combo
+    popup.time = math.max(0, popup.time - dt)
     if game.state == "aiming" then
       aim_input(dt)
     else
@@ -352,6 +407,11 @@ return {
                                             math.floor(current.pitch + 0.5)), 1)
       tp.ui_rect(0, h - 26, 560, 26, 0.05, 0.12, 0.25, 0.3)
       tp.ui_text(12, h - 18, "DRAG OR WASD AIM  Q/E POWER  SPACE FIRE  R RESTART  ESC EXIT", 1)
+    end
+    if popup.time > 0 then
+      local a = math.min(1, popup.time * 2)
+      tp.ui_rect(w / 2 - 150, 66, 300, 40, 1, 0.55, 0.1, 0.75 * a)
+      tp.ui_text(w / 2 - 132, 76, popup.text, 2)
     end
     if game:finished() then
       local x, y = w / 2 - 260, h / 2 - 150
