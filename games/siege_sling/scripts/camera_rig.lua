@@ -92,7 +92,35 @@ function Rig:snap(mode, info)
   return self.eye, self.target
 end
 
--- Eases toward the pose for `mode` with rate-per-second smoothing.
+-- Starts a camera shake of `strength` (0..1; a stronger hit overrides a
+-- weaker one). It decays over about half a second and never moves the
+-- smoothed pose itself.
+function Rig:shake(strength)
+  if not finite(strength) or strength < 0 or strength > 1 then
+    error("rig:shake: strength must be in [0, 1]", 2)
+  end
+  if strength > (self.shake_amount or 0) then
+    self.shake_amount, self.shake_time = strength, 0
+  end
+end
+
+local function shaken(self, dt)
+  local amount = self.shake_amount or 0
+  if amount <= 0.001 then
+    self.shake_amount = 0
+    return self.eye, self.target
+  end
+  self.shake_time = self.shake_time + dt
+  local t = self.shake_time
+  local o = {math.sin(t * 53) * 0.3 * amount, math.sin(t * 41 + 1) * 0.22 * amount,
+             math.sin(t * 47 + 2) * 0.3 * amount}
+  self.shake_amount = amount * math.exp(-7 * dt)
+  return {self.eye[1] + o[1], self.eye[2] + o[2], self.eye[3] + o[3]},
+         {self.target[1] + o[1] * 0.4, self.target[2] + o[2] * 0.4, self.target[3] + o[3] * 0.4}
+end
+
+-- Eases toward the pose for `mode` with rate-per-second smoothing and
+-- returns the (possibly shaken) eye and target.
 function Rig:update(dt, mode, info)
   number("rig:update", "dt", dt)
   if dt < 0 or dt > 1 then error("rig:update: dt must be in [0, 1]", 2) end
@@ -105,7 +133,7 @@ function Rig:update(dt, mode, info)
     self.target[i] = self.target[i] + (target[i] - self.target[i]) * blend
   end
   self.mode = mode
-  return self.eye, self.target
+  return shaken(self, dt)
 end
 
 return Rig

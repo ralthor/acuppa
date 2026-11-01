@@ -43,7 +43,7 @@ cp "$root/README.md" "$root/DEPENDENCIES.md" "$root/RELEASE.md" \
    "$stage/packages/$engine/"
 notices "$stage/packages/$engine"
 
-for game in falling_blocks falling_blocks_lit garage_run; do
+for game in falling_blocks falling_blocks_lit garage_run siege_sling; do
   package="$base-$game"
   "$build_dir/acuppa" build "$root/games/$game" "$stage/packages/$package"
   notices "$stage/packages/$package"

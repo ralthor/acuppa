@@ -71,13 +71,16 @@
     {
       "pbrMetallicRoughness": {
         "baseColorFactor": [
-          0.2,
-          0.62,
-          0.1,
+          0.22,
+          0.6,
+          0.11,
           1
         ],
         "metallicFactor": 0.0,
-        "roughnessFactor": 0.92
+        "roughnessFactor": 0.92,
+        "baseColorTexture": {
+          "index": 0
+        }
       }
     }
   ],
@@ -108,5 +111,15 @@
       ]
     }
   ],
-  "scene": 0
+  "scene": 0,
+  "images": [
+    {
+      "uri": "grass.png"
+    }
+  ],
+  "textures": [
+    {
+      "source": 0
+    }
+  ]
 }

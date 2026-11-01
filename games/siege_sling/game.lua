@@ -22,6 +22,7 @@ return {
     orbit = {mouse_button = "right"},
     orbit_x = {gamepad_axis = "right_x"},
     orbit_y = {gamepad_axis = "right_y"},
+    play_again = {keyboard = "enter"},
     restart = {keyboard = "r", gamepad_button = "back"},
     exit = {keyboard = "escape", gamepad_button = "start"},
   },

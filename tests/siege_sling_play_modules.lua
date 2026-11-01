@@ -3,6 +3,7 @@ local dir = rules_file
 local Rules = assert(loadfile(dir .. "/rules.lua"))()
 local Rig = assert(loadfile(dir .. "/camera_rig.lua"))()
 local Drag = assert(loadfile(dir .. "/drag_aim.lua"))()
+local Debris = assert(loadfile(dir .. "/debris.lua"))()
 
 local function near(a, b, t) return math.abs(a - b) <= (t or 1e-6) end
 local function dist(a, b)
@@ -84,5 +85,53 @@ fails(function() Drag.new({}) end, "rules module")
 fails(function() drag:update(1, 0, 0) end, "pressed")
 fails(function() drag:update(true, 0 / 0, 0) end, "pointer")
 fails(function() drag:update(true, 0, math.huge) end, "pointer")
+
+-- Camera shake ---------------------------------------------------------------------
+local shaker = Rig.new({pouch = pouch, fort = fort})
+shaker:snap("aim", {yaw = 0})
+local calm_eye = {shaker:update(1 / 60, "aim", {yaw = 0})}
+shaker:shake(0.8)
+local shaken = shaker:update(1 / 60, "aim", {yaw = 0})
+assert(dist(shaken, shaker.eye) > 0.005, "shake offsets the eye")
+assert(dist(shaker.eye, calm_eye[1]) < 1e-9, "shake leaves the smoothed pose alone")
+shaker:shake(0.2)
+assert(shaker.shake_amount > 0.7, "a weaker shake does not override a stronger one")
+for _ = 1, 120 do shaken = shaker:update(1 / 60, "aim", {yaw = 0}) end
+assert(dist(shaken, shaker.eye) < 1e-9, "shake decays to nothing")
+fails(function() shaker:shake(2) end, "strength")
+fails(function() shaker:shake(0 / 0) end, "strength")
+
+-- Debris ------------------------------------------------------------------------------
+local pile = Debris.new({cap = 10, life = 1, ground = 0})
+local added, evicted = pile:burst("wood", {0, 2, 0}, 6, 3)
+assert(#added == 6 and #evicted == 0 and pile:count() == 6, "burst adds pieces")
+local spread = {}
+for _, piece in ipairs(added) do
+  assert(piece.velocity[2] > 0, "pieces fly upward first")
+  spread[#spread + 1] = math.atan(piece.velocity[3], piece.velocity[1])
+end
+assert(math.abs(spread[1] - spread[2]) > 0.5, "pieces fan out")
+added, evicted = pile:burst("glass", {1, 1, 0}, 6, 2)
+assert(#evicted == 2 and pile:count() == 10 and evicted[1].kind == "wood", "cap evicts oldest")
+local lowest = math.huge
+for _ = 1, 50 do
+  pile:step(1 / 60)
+  for _, piece in ipairs(pile.pieces) do lowest = math.min(lowest, piece.position[2]) end
+end
+assert(lowest >= 0 and pile:count() == 10, "pieces stay above ground until they expire")
+local expired = pile:step(0.25)
+for _ = 1, 3 do for _, p in ipairs(pile:step(0.25)) do expired[#expired + 1] = p end end
+assert(#expired == 10 and pile:count() == 0, "pieces expire after their life")
+local replay_a, replay_b = Debris.new(), Debris.new()
+local a1 = replay_a:burst("stone", {0, 1, 0}, 4, 3)
+local b1 = replay_b:burst("stone", {0, 1, 0}, 4, 3)
+assert(a1[3].velocity[1] == b1[3].velocity[1], "bursts are deterministic")
+fails(function() Debris.new({cap = 0}) end, "cap")
+fails(function() Debris.new({life = -1}) end, "life")
+fails(function() pile:burst(1, {0, 0, 0}, 4, 3) end, "kind")
+fails(function() pile:burst("wood", {0, 0}, 4, 3) end, "center")
+fails(function() pile:burst("wood", {0, 0, 0}, 40, 3) end, "count")
+fails(function() pile:burst("wood", {0, 0, 0}, 4, 0) end, "speed")
+fails(function() pile:step(-1) end, "dt")
 
 print("siege_sling_play_modules: ok")

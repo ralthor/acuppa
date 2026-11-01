@@ -19,7 +19,7 @@ result = subprocess.run(["bash", str(script), str(release), str(cli.parent)],
                         capture_output=True, text=True, timeout=60)
 assert result.returncode == 0, result.stdout + result.stderr
 archives = sorted(release.glob("*.tar.gz"))
-assert len(archives) == 4, archives
+assert len(archives) == 5, archives
 verified = subprocess.run(["sha256sum", "-c", "SHA256SUMS"], cwd=release,
                           capture_output=True, text=True, timeout=10)
 assert verified.returncode == 0, verified.stdout + verified.stderr
@@ -38,7 +38,7 @@ for archive in archives:
 
 engine = next(path for name, path in packages.items() if name.endswith("-engine"))
 player_games = [path for name, path in packages.items() if not name.endswith("-engine")]
-assert len(player_games) == 3
+assert len(player_games) == 4
 assert (engine / "acuppa-editor").is_file()
 assert (engine / "acuppa-player").is_file()
 assert (engine / "RELEASE.md").is_file()

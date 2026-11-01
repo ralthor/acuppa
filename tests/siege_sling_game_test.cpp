@@ -67,7 +67,10 @@ float max_move(const std::map<uint64_t, Pose>& a, const std::map<uint64_t, Pose>
     float moved = 0, turned = 0;
     for (const auto& [id, pose] : a) {
         const auto other = b.find(id);
-        if (other == b.end()) throw std::runtime_error("fort body disappeared");
+        if (other == b.end()) {  // broken and removed
+            moved = 100;
+            continue;
+        }
         moved = std::max(moved, glm::length(other->second.position - pose.position));
         turned = std::max(turned, glm::length(other->second.x_axis - pose.x_axis));
     }
@@ -107,6 +110,51 @@ SceneFrame check_flight(LuaProject& game, const std::vector<glm::vec3>& predicte
     return frame;
 }
 
+
+// A shot adjusts the aim with held keys (signed tick counts: yaw D/A at
+// 1 degree, pitch W/S at 0.75 degrees, power E/Q at 0.8/60 per tick), fires
+// with Space, then waits until the shot resolves.
+struct Shot { int yaw, pitch, power; };
+
+int hud_number(const SceneFrame& frame, const std::string& label) {
+    for (const auto& item : frame.ui) {
+        const auto at = item.text.find(label + " ");
+        if (at != std::string::npos) return std::stoi(item.text.substr(at + label.size() + 1));
+    }
+    return -1;
+}
+
+void hold(LuaProject& game, const char* positive, const char* negative, int ticks) {
+    const char* name = ticks >= 0 ? positive : negative;
+    if (ticks == 0) return;
+    key(game, name, 1);
+    run(game, std::abs(ticks));
+    key(game, name, 0);
+    game.step(tick);
+}
+
+int chips(const SceneFrame& frame) {
+    int count = 0;
+    for (const auto& item : frame.imported) count += uses(item, "assets/chip_");
+    return count;
+}
+
+SceneFrame shoot(LuaProject& game, const Shot& shot, int* most_chips = nullptr) {
+    hold(game, "d", "a", shot.yaw);
+    hold(game, "w", "s", shot.pitch);
+    hold(game, "e", "q", shot.power);
+    key(game, "space", 1);
+    SceneFrame frame = run(game, 2);
+    key(game, "space", 0);
+    for (int i = 0; i < 60 * 20; ++i) {
+        frame = game.step(tick);
+        if (most_chips) *most_chips = std::max(*most_chips, chips(frame));
+        if (has_text(frame, "PITCH") || has_text(frame, "VICTORY") ||
+            has_text(frame, "OUT OF SHOTS")) break;
+    }
+    return frame;
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -128,7 +176,7 @@ int main(int argc, char* argv[]) {
     expect(has_text(frame, "SHOTS 4") && has_text(frame, "SCORE 0") && has_text(frame, "GRUMPS 3"),
            "HUD did not show four shots, zero score, and three grumps");
     const auto start = fort(frame);
-    expect(start.size() == 16, "fort should have 13 blocks and 3 grumps, found " +
+    expect(start.size() == 26, "fort should have 23 blocks and 3 grumps, found " +
                                    std::to_string(start.size()));
     expect(dots(frame).size() >= 10 && !flying_ball(frame), "aim view lacks the arc or has a ball");
 
@@ -221,6 +269,65 @@ int main(int argc, char* argv[]) {
     mouse.inject({InputDevice::MouseButton, "right", 0});
     expect(std::abs(frame.camera.eye.x - eye.x) > 2.0f && has_text(frame, "SHOTS 3"),
            "right-drag did not orbit the camera, or it fired");
+
+    // A win from real shots: the left tower, the center keep, then the right
+    // tower (each shot's keys adjust the previous aim). Found by searching
+    // key-tick aims against this deterministic level; Jolt runs the same here.
+    {
+        const fs::path saves = work / "saves";
+        fs::remove_all(saves);
+        LuaProject winner(work, "level1", LuaProject::Mode::Game, false);
+        frame = winner.step(0);
+        expect(!has_text(frame, "BEST"), "a fresh project showed a best result");
+        int most_chips = 0;
+        frame = shoot(winner, {-12, 0, 0}, &most_chips);
+        expect(hud_number(frame, "GRUMPS") == 2 && hud_number(frame, "SHOTS") == 3,
+               "shot at the left tower did not knock out its grump");
+        expect(fort(frame).size() < start.size(), "broken pieces were not removed");
+        frame = shoot(winner, {12, 0, -4}, &most_chips);
+        expect(hud_number(frame, "GRUMPS") == 1, "shot at the keep did not knock out its grump");
+        frame = shoot(winner, {8, 0, 0}, &most_chips);
+        expect(has_text(frame, "VICTORY!") && hud_number(frame, "GRUMPS") == 0,
+               "three real shots did not win");
+        const int score = hud_number(frame, "SCORE");
+        expect(has_text(frame, "INCLUDES 1000 SHOT BONUS") && score >= 1500 + 1000,
+               "win score lacks grumps or the unused-shot bonus");
+        expect(has_text(frame, "STARS") && fs::exists(saves / "best.tpsave"),
+               "win did not show stars or save the best result");
+        expect(most_chips > 0, "breaking blocks threw no debris");
+        frame = run(winner, 75);
+        expect(chips(frame) == 0, "debris did not despawn after a second");
+
+        LuaProject reopened(work, "level1", LuaProject::Mode::Game, false);
+        frame = reopened.step(0);
+        expect(hud_number(frame, "BEST") == score, "best score did not reload in a fresh game");
+
+        key(winner, "space", 1);
+        frame = run(winner, 3);
+        key(winner, "space", 0);
+        frame = run(winner, 3);
+        expect(hud_number(frame, "SHOTS") == 4 && hud_number(frame, "SCORE") == 0 &&
+                   hud_number(frame, "BEST") == score && fort(frame).size() == start.size() &&
+                   !flying_ball(frame),
+               "Space on the win screen did not start a fresh round");
+
+        // A loss: four shots wasted far to the left. A ball that rolls away
+        // from the fort is removed rather than kept in the settle check.
+        LuaProject loser(work, "level1", LuaProject::Mode::Game, false);
+        loser.step(0);
+        frame = shoot(loser, {-45, 0, 0});
+        expect(hud_number(frame, "SHOTS") == 3 && hud_number(frame, "GRUMPS") == 3 &&
+                   !flying_ball(frame), "a wasted shot changed the fort or left its ball");
+        for (int i = 0; i < 3; ++i) frame = shoot(loser, {0, 0, 0});
+        expect(has_text(frame, "OUT OF SHOTS") && has_text(frame, "0 STARS") &&
+                   hud_number(frame, "BEST") == score,
+               "wasting every shot did not lose with zero stars and keep the best");
+        key(loser, "enter", 1);
+        frame = run(loser, 3);
+        key(loser, "enter", 0);
+        frame = run(loser, 2);
+        expect(hud_number(frame, "SHOTS") == 4, "Enter on the lose screen did not play again");
+    }
 
     key(mouse, "escape", 1);
     expect(mouse.step(0).quit, "Escape did not exit");

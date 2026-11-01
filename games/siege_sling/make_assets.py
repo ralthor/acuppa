@@ -10,13 +10,16 @@ import math
 from pathlib import Path
 import struct
 import sys
+import wave
+import zlib
 
 
 output = Path(sys.argv[1]) if len(sys.argv) == 2 else Path(__file__).parent / "assets"
 output.mkdir(parents=True, exist_ok=True)
 
 
-def mesh(name, positions, normals, uvs, indices, color, metallic=0.0, roughness=0.7):
+def mesh(name, positions, normals, uvs, indices, color, metallic=0.0, roughness=0.7,
+         texture=None):
     chunks = [
         struct.pack(f"<{len(positions) * 3}f", *(v for row in positions for v in row)),
         struct.pack(f"<{len(normals) * 3}f", *(v for row in normals for v in row)),
@@ -52,6 +55,10 @@ def mesh(name, positions, normals, uvs, indices, color, metallic=0.0, roughness=
                                    "indices": 3, "material": 0}]}],
         "nodes": [{"mesh": 0}], "scenes": [{"nodes": [0]}], "scene": 0,
     }
+    if texture:
+        asset["images"] = [{"uri": f"{texture}.png"}]
+        asset["textures"] = [{"source": 0}]
+        asset["materials"][0]["pbrMetallicRoughness"]["baseColorTexture"] = {"index": 0}
     (output / f"{name}.gltf").write_text(json.dumps(asset, indent=2) + "\n")
 
 
@@ -133,15 +140,99 @@ def plane(tiles):
     return positions, [(0, 1, 0)] * 4, uvs, [0, 1, 2, 0, 2, 3]
 
 
-# Bright, saturated, cheerful palette (linear base colors).
-for name, color, metallic, roughness in [
-    ("wood", (0.72, 0.36, 0.1), 0.0, 0.62),
-    ("stone", (0.42, 0.46, 0.52), 0.0, 0.78),
-    ("glass", (0.55, 0.9, 1.0), 0.0, 0.08),
-    ("sling_wood", (0.36, 0.17, 0.05), 0.0, 0.55),
-    ("band", (0.65, 0.08, 0.04), 0.0, 0.45),
+def hash01(*values):
+    """Deterministic value noise in [0, 1) from integer coordinates."""
+    h = 2166136261
+    for value in values:
+        h = ((h ^ (value & 0xffffffff)) * 16777619) & 0xffffffff
+    h ^= h >> 13
+    h = (h * 1274126177) & 0xffffffff
+    return (h ^ (h >> 16)) / 2 ** 32
+
+
+def smooth_noise(x, y, cell, seed, wrap):
+    gx, gy = x / cell, y / cell
+    x0, y0 = int(math.floor(gx)), int(math.floor(gy))
+    fx, fy = gx - x0, gy - y0
+    fx, fy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+    cells = wrap // cell
+    corner = lambda cx, cy: hash01(seed, cx % cells, cy % cells)
+    top = corner(x0, y0) * (1 - fx) + corner(x0 + 1, y0) * fx
+    bottom = corner(x0, y0 + 1) * (1 - fx) + corner(x0 + 1, y0 + 1) * fx
+    return top * (1 - fy) + bottom * fy
+
+
+def png(name, size, shade):
+    rows = []
+    for y in range(size):
+        row = bytearray([0])
+        for x in range(size):
+            row += bytes(max(0, min(255, int(v))) for v in shade(x, y))
+        rows.append(bytes(row))
+    def chunk(kind, data):
+        return (struct.pack(">I", len(data)) + kind + data +
+                struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff))
+    (output / f"{name}.png").write_bytes(
+        b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)) +
+        chunk(b"IDAT", zlib.compress(b"".join(rows), 9)) + chunk(b"IEND", b""))
+
+
+def wood_texture(x, y):
+    plank = y // 64                       # four planks with dark seams
+    seam = 0.55 if y % 64 in (0, 1, 63) else 1.0
+    grain = smooth_noise(x * 0.25, (y % 64) * 3 + plank * 40, 8, 11, 64 * 3 + 160)
+    ring = 0.5 + 0.5 * math.sin((y % 64) * 0.45 + grain * 6 + x * 0.02 + plank)
+    v = (0.82 + 0.18 * ring) * seam
+    return (255 * v, 205 * v, 150 * v)
+
+
+def stone_texture(x, y):
+    row = y // 64                         # staggered stone courses
+    shift = 64 if row % 2 else 0
+    mortar = (y % 64) < 3 or ((x + shift) % 128) < 3
+    if mortar:
+        return (120, 120, 118)
+    n = 0.6 * smooth_noise(x, y, 16, 3, 256) + 0.4 * smooth_noise(x, y, 4, 5, 256)
+    tint = hash01(17, (x + shift) // 128, row) * 0.12
+    v = 0.86 + 0.18 * n - tint
+    return (255 * v, 252 * v, 245 * v)
+
+
+def glass_texture(x, y):
+    n = smooth_noise(x, y, 8, 7, 128)
+    edge = min(x, y, 127 - x, 127 - y)
+    frame = 1.0 if edge < 6 else 0.86 + 0.1 * n
+    streak = 0.06 if (x + y) % 48 < 6 else 0
+    v = min(1.0, frame + streak)
+    return (255 * v, 255 * v, 255 * v)
+
+
+def grass_texture(x, y):
+    n = 0.5 * smooth_noise(x, y, 32, 21, 256) + 0.5 * smooth_noise(x, y, 8, 23, 256)
+    v = 0.86 + 0.14 * n
+    return (255 * v * 0.97, 255 * v, 255 * v * 0.9)
+
+
+png("wood", 256, wood_texture)
+png("stone", 256, stone_texture)
+png("glass", 128, glass_texture)
+png("grass", 256, grass_texture)
+
+# Bright, saturated, cheerful palette (linear base colors; textures multiply).
+for name, color, metallic, roughness, texture in [
+    ("wood", (0.8, 0.42, 0.13), 0.0, 0.62, "wood"),
+    ("stone", (0.5, 0.54, 0.6), 0.0, 0.78, "stone"),
+    ("glass", (0.6, 0.93, 1.0), 0.0, 0.08, "glass"),
+    ("sling_wood", (0.36, 0.17, 0.05), 0.0, 0.55, None),
+    ("band", (0.65, 0.08, 0.04), 0.0, 0.45, None),
+    ("fence", (0.62, 0.36, 0.16), 0.0, 0.7, "wood"),
+    ("trunk", (0.3, 0.16, 0.06), 0.0, 0.8, None),
+    ("chip_wood", (0.75, 0.4, 0.12), 0.0, 0.6, None),
+    ("chip_stone", (0.48, 0.52, 0.58), 0.0, 0.8, None),
+    ("chip_glass", (0.65, 0.95, 1.0), 0.0, 0.1, None),
+    ("chip_grump", (0.25, 0.85, 0.1), 0.0, 0.5, None),
 ]:
-    mesh(name, *box(), color, metallic, roughness)
+    mesh(name, *box(), color, metallic, roughness, texture)
 
 for name, color, metallic, roughness in [
     ("ball", (0.55, 0.02, 0.03), 0.1, 0.32),
@@ -152,8 +243,16 @@ for name, color, metallic, roughness in [
 ]:
     mesh(name, *sphere(), color, metallic, roughness)
 
-mesh("grass", *plane(75), (0.2, 0.62, 0.1), 0.0, 0.92)
-mesh("hill", *hill(), (0.3, 0.7, 0.14), 0.0, 0.9)
+for name, color, roughness in [
+    ("foliage", (0.12, 0.5, 0.08), 0.85),
+    ("foliage_light", (0.3, 0.62, 0.08), 0.85),
+    ("rock", (0.4, 0.42, 0.44), 0.85),
+]:
+    mesh(name, *sphere(16, 8), color, 0.0, roughness)
+
+mesh("grass", *plane(75), (0.22, 0.6, 0.11), 0.0, 0.92, "grass")
+mesh("hill", *hill(), (0.3, 0.68, 0.14), 0.0, 0.9, "grass")
+mesh("far_hill", *hill(10, 32, 1.0, 12.0, 2.0), (0.2, 0.5, 0.16), 0.0, 0.95)
 
 
 def rgbe(rgb):
@@ -185,3 +284,33 @@ with (output / "day.hdr").open("wb") as file:
         file.write(bytes((2, 2, 0, width)))
         for channel in range(4):
             file.write(bytes((width, *(pixel[channel] for pixel in row))))
+
+
+def sound(name, seconds, sample):
+    frames = bytearray()
+    rate = 24000
+    for index in range(int(seconds * rate)):
+        frames += struct.pack("<h", int(max(-1, min(1, sample(index / rate))) * 25000))
+    with wave.open(str(output / f"{name}.wav"), "wb") as file:
+        file.setnchannels(1)
+        file.setsampwidth(2)
+        file.setframerate(rate)
+        file.writeframes(frames)
+
+
+def rattle(t, seed):
+    """Deterministic noise burst for impact texture."""
+    return hash01(seed, int(t * 24000)) * 2 - 1
+
+
+sine = lambda f, t: math.sin(2 * math.pi * f * t)
+sound("knock", 0.18, lambda t: math.exp(-30 * t) * (0.55 * sine(320, t) + 0.3 * sine(710, t)) +
+      math.exp(-90 * t) * 0.25 * rattle(t, 1))
+sound("thud", 0.3, lambda t: math.exp(-16 * t) * (0.7 * sine(85, t) + 0.25 * sine(140, t)) +
+      math.exp(-60 * t) * 0.2 * rattle(t, 2))
+sound("clink", 0.35, lambda t: math.exp(-14 * t) * (0.35 * sine(2350, t) + 0.25 * sine(3720, t)) +
+      math.exp(-120 * t) * 0.2 * rattle(t, 3))
+sound("pop", 0.22, lambda t: math.exp(-18 * t) * 0.7 * sine(260 + 900 * t, t) +
+      math.exp(-200 * t) * 0.4 * rattle(t, 4))
+sound("twang", 0.45, lambda t: math.exp(-7 * t) * (0.5 * sine(150 * (1 + 0.3 * math.exp(-20 * t)), t) +
+      0.2 * sine(300, t)) * (1 - math.exp(-400 * t)))

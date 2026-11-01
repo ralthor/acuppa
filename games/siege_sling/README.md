@@ -6,9 +6,11 @@ of wood, stone, and glass blocks guarding three round green grumps. The sling
 turns left and right as well as up and down. You have four shots per level;
 knock out every grump to win and earn one to three stars.
 
-*In development:* level 1 is playable. Broken blocks and defeated grumps are
-counted and scored but not yet removed, and the win/lose screens are minimal
-(Phase 32). Textures arrive in Phase 33.
+Level 1 is complete: blocks break apart in bursts of debris when hit hard
+enough (glass shatters easily, stone takes a solid hit), grumps pop when they
+are struck or fall, and each material has its own impact sound. Win and lose
+screens show your score, stars, and best result, which is saved between runs
+and shown in the top bar. Press Space or Enter on either screen to play again.
 
 From the repository root, run:
 
@@ -24,6 +26,7 @@ build/acuppa run games/siege_sling
 | Less / more power | Q / E | Left / right trigger |
 | Fire | Space | A button |
 | Orbit the aim camera | Right-drag | Right stick |
+| Play again (win/lose screen) | Space or Enter | A button |
 | Restart | R | Back |
 | Exit | Escape | Start |
 
@@ -41,9 +44,16 @@ the fort while blocks settle, then eases back to the sling for the next shot.
 - `levels/level1.lua`: shots, star scores, and the fort's blocks and grumps.
   `scripts/play.lua` spawns them with physics from the rules' material table.
 - `scripts/rules.lua`: pure aim, launch, arc, damage, shot-flow, and score rules.
-- `scripts/camera_rig.lua`, `scripts/drag_aim.lua`: small engine-free modules.
-- `make_assets.py`: regenerates every file in `assets/` exactly; the meshes
-  carry UVs ready for textures.
+- `scripts/camera_rig.lua` (views and impact shake), `scripts/drag_aim.lua`,
+  and `scripts/debris.lua`: small engine-free modules.
+- `make_assets.py`: regenerates every file in `assets/` exactly: textured
+  glTF blocks (wood planks, stone courses, frosted glass, grass), the sling,
+  ball, grumps, trees, rocks, fence, and far hills, the daytime HDRI, and the
+  knock, thud, clink, pop, and twang sounds.
+
+Scoring: wood 100, stone 200, glass 50, each grump 500, and 1000 per unused
+shot on a win. Stars come at 3000, 5000, and 6500 points; a win always earns
+at least one.
 
 SSAO is off: on this open meadow it drew visible bands across the grass.
 
@@ -56,4 +66,5 @@ ctest --test-dir build -R siege_sling --output-on-failure
 `siege_sling_rules` and `siege_sling_play_modules` test the pure modules.
 `siege_sling_gameplay` runs the real game headlessly with injected keys and
 mouse drags. `siege_sling_capture` checks a Vulkan capture of the aim and
-follow views. `siege_sling_live_startup` opens the interactive window.
+follow views. `siege_sling_live_startup` opens the interactive window. `siege_sling_export`
+and `siege_sling_export_capture` check the exported player.

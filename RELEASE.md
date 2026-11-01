@@ -6,7 +6,7 @@ Extract the engine archive and run `./acuppa --version`. To run a source project
 
 Exported games from before the engine rename stored saves under `threepoint/<game.id>/saves/` in XDG user data. Copy those save files to `acuppa/<game.id>/saves/` if you want a newly exported ACuppa game to continue an earlier save. Source-project saves remain in their project folders.
 
-After building and testing the repository, run `bash scripts/package-linux-release.sh`. It exports and checks all three sample games, writes four deterministic archives under `build/release/`, and records SHA-256 hashes in `SHA256SUMS`. The archives include the notices for statically linked dependencies. Verify an archive with `sha256sum -c SHA256SUMS` from that folder.
+After building and testing the repository, run `bash scripts/package-linux-release.sh`. It exports and checks all four sample games (Falling Blocks, Falling Blocks Lit, Garage Run, and Siege Sling), writes five deterministic archives under `build/release/`, and records SHA-256 hashes in `SHA256SUMS`. The archives include the notices for statically linked dependencies. Verify an archive with `sha256sum -c SHA256SUMS` from that folder.
 
 Run `bash scripts/verify-clean-release.sh` to build only committed source in an isolated directory and run the complete unit, integration, Vulkan capture, live-startup, and archive suite. It uses the locally bootstrapped pinned toolchain and dependencies. The separate sanitizer gate is `bash scripts/test-sanitizers-local.sh`.
 
