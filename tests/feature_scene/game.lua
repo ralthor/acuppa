@@ -25,9 +25,10 @@ return {
             vehicle = "scenes/vehicle.scene.lua",
             audio = "scenes/audio.scene.lua",
             timers = "scenes/timers.scene.lua",
-            save = "scenes/save.scene.lua", menu = "scenes/menu.scene.lua",
+            save = "scenes/save.scene.lua", data_files = "scenes/data_files.scene.lua", menu = "scenes/menu.scene.lua",
             menu_play = "scenes/menu_play.scene.lua",
             editor = "scenes/editor.scene.lua"},
+  writable = {"levels"},
   prefabs = {probe = "prefabs/probe.prefab.lua"},
   input = {
     turn = {keyboard = "space", gamepad_button = "a"},

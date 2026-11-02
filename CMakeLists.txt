@@ -134,7 +134,7 @@ add_library(acuppa_core STATIC src/core/project.cpp src/core/scene_document.cpp
             src/core/editor_gizmo.cpp src/core/editor_viewport.cpp
             src/core/camera.cpp src/core/input.cpp
             src/core/ui_canvas.cpp
-            src/core/world.cpp src/core/physics_world.cpp src/core/save_data.cpp
+            src/core/world.cpp src/core/physics_world.cpp src/core/save_data.cpp src/core/data_file.cpp
             src/core/gltf_asset.cpp src/core/cgltf_impl.c src/core/stb_image_impl.c
             src/core/hdr_image.cpp src/core/environment_filter.cpp src/core/lua_project.cpp
             src/core/sky.cpp)
@@ -222,6 +222,15 @@ if(BUILD_TESTING)
   add_test(NAME lua_save_roundtrip COMMAND acuppa_save_lua_test
            "${PROJECT_SOURCE_DIR}/tests/feature_scene"
            "${PROJECT_BINARY_DIR}/save_lua_fixture")
+  add_executable(acuppa_data_file_test tests/data_file_test.cpp)
+  target_link_libraries(acuppa_data_file_test PRIVATE acuppa_core)
+  add_test(NAME data_file_integrity COMMAND acuppa_data_file_test
+           "${PROJECT_BINARY_DIR}/data_file_fixture")
+  add_executable(acuppa_data_files_lua_test tests/data_files_lua_test.cpp)
+  target_link_libraries(acuppa_data_files_lua_test PRIVATE acuppa_core)
+  add_test(NAME lua_data_files COMMAND acuppa_data_files_lua_test
+           "${PROJECT_SOURCE_DIR}/tests/feature_scene"
+           "${PROJECT_BINARY_DIR}/data_files_lua_fixture")
   add_executable(acuppa_physics_test tests/feature_scene/physics_core_test.cpp)
   target_link_libraries(acuppa_physics_test PRIVATE acuppa_core)
   add_test(NAME physics_core COMMAND acuppa_physics_test)

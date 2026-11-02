@@ -4,3 +4,4 @@
 __pycache__/
 *.pyc
 saves/
+/tests/feature_scene/levels/generated/

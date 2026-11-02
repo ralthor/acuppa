@@ -4,6 +4,7 @@
 #include "acuppa/audio_world.hpp"
 #include "acuppa/physics_world.hpp"
 #include "acuppa/save_data.hpp"
+#include "acuppa/data_file.hpp"
 #include "acuppa/world.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -99,6 +100,8 @@ struct LuaProject::Impl {
     static int timer_events(lua_State* lua);
     static int save(lua_State* lua);
     static int load(lua_State* lua);
+    static int data_write(lua_State* lua);
+    static int data_read(lua_State* lua);
     static int ui_rect(lua_State* lua);
     static int ui_text(lua_State* lua);
     static int ui_button(lua_State* lua);
@@ -120,6 +123,9 @@ struct LuaProject::Impl {
 
     fs::path root;
     fs::path save_root;
+    bool exported = false;  // the acuppa-game player passes an external save root
+    std::vector<std::string> writable;
+    std::string scene_script;
     Mode mode = Mode::Game;
     bool audio_output = true;
     lua_State* lua = nullptr;
@@ -326,70 +332,6 @@ std::string timer_name(lua_State* lua, int index) {
     return name;
 }
 
-SaveValue from_lua(lua_State* lua, int index, unsigned depth,
-                   size_t& entries, std::set<const void*>& active) {
-    if (depth > 16) throw std::invalid_argument("save table nesting exceeds 16 levels");
-    index = lua_absindex(lua, index);
-    SaveValue value;
-    switch (lua_type(lua, index)) {
-    case LUA_TBOOLEAN:
-        value.type = SaveValue::Type::Boolean;
-        value.boolean = lua_toboolean(lua, index) != 0;
-        break;
-    case LUA_TNUMBER:
-        if (lua_isinteger(lua, index)) {
-            value.type = SaveValue::Type::Integer;
-            value.integer = lua_tointeger(lua, index);
-        } else {
-            value.type = SaveValue::Type::Number;
-            value.number = lua_tonumber(lua, index);
-            if (!std::isfinite(value.number))
-                throw std::invalid_argument("save number must be finite");
-        }
-        break;
-    case LUA_TSTRING: {
-        value.type = SaveValue::Type::String;
-        size_t size = 0;
-        const char* bytes = lua_tolstring(lua, index, &size);
-        if (size > 1024 * 1024) throw std::invalid_argument("save string exceeds 1 MiB");
-        value.text.assign(bytes, size);
-        break;
-    }
-    case LUA_TTABLE: {
-        value.type = SaveValue::Type::Table;
-        const void* pointer = lua_topointer(lua, index);
-        if (!active.insert(pointer).second)
-            throw std::invalid_argument("save table contains a cycle");
-        lua_pushnil(lua);
-        while (lua_next(lua, index) != 0) {
-            if (++entries > 10000) throw std::invalid_argument("save table exceeds 10000 entries");
-            SaveKey key;
-            if (lua_isinteger(lua, -2)) {
-                key.integer = true;
-                key.number = lua_tointeger(lua, -2);
-            } else if (lua_type(lua, -2) == LUA_TSTRING) {
-                size_t size = 0;
-                const char* bytes = lua_tolstring(lua, -2, &size);
-                if (size > 1024 * 1024)
-                    throw std::invalid_argument("save key exceeds 1 MiB");
-                key.text.assign(bytes, size);
-            } else throw std::invalid_argument("save table keys must be strings or integers");
-            value.entries.emplace_back(std::move(key), from_lua(lua, -1, depth + 1, entries, active));
-            lua_pop(lua, 1);
-        }
-        std::sort(value.entries.begin(), value.entries.end(), [](const auto& a, const auto& b) {
-            if (a.first.integer != b.first.integer) return a.first.integer;
-            if (a.first.integer) return a.first.number < b.first.number;
-            return a.first.text < b.first.text;
-        });
-        active.erase(pointer);
-        break;
-    }
-    default: throw std::invalid_argument("save value must be a boolean, number, string, or table");
-    }
-    return value;
-}
-
 void push_saved(lua_State* lua, const SaveValue& value) {
     switch (value.type) {
     case SaveValue::Type::Boolean: lua_pushboolean(lua, value.boolean); break;
@@ -418,6 +360,7 @@ LuaProject::Impl::Impl(const fs::path& directory, const std::string& initial_sce
     const auto paths = require_project(directory);
     root = fs::canonical(paths.root);
     save_root = save_directory.empty() ? root : save_directory;
+    exported = !save_directory.empty();
     lua = luaL_newstate();
     if (!lua) throw std::runtime_error("could not create Lua state");
     std::unique_ptr<lua_State, decltype(&lua_close)> guard(lua, lua_close);
@@ -459,6 +402,23 @@ LuaProject::Impl::Impl(const fs::path& directory, const std::string& initial_sce
             if (lua_type(lua, -2) != LUA_TSTRING || lua_type(lua, -1) != LUA_TSTRING)
                 throw std::runtime_error("game.lua prefabs must map names to paths");
             prefabs.emplace(lua_tostring(lua, -2), lua_tostring(lua, -1));
+            lua_pop(lua, 1);
+        }
+    }
+    lua_pop(lua, 1);
+
+    lua_getfield(lua, -1, "writable");
+    if (!lua_isnil(lua, -1)) {
+        if (!lua_istable(lua, -1)) throw std::runtime_error("game.lua writable must be a list of directories");
+        const lua_Integer count = lua_Integer(lua_rawlen(lua, -1));
+        for (lua_Integer i = 1; i <= count; ++i) {
+            lua_rawgeti(lua, -1, i);
+            if (lua_type(lua, -1) != LUA_TSTRING)
+                throw std::runtime_error("game.lua writable must be a list of directories");
+            try { writable.push_back(normalize_writable_directory(lua_tostring(lua, -1))); }
+            catch (const std::exception& error) {
+                throw std::runtime_error(std::string("game.lua ") + error.what());
+            }
             lua_pop(lua, 1);
         }
     }
@@ -733,6 +693,7 @@ void LuaProject::Impl::load_scene(const std::string& name) {
     lua_pop(lua, 1);
     const std::string script_path = checked_string(lua, -1, "script");
     lua_pop(lua, 1);
+    scene_script = script_path;
     if (mode == Mode::EditorPreview) {
         project_file(script_path); // Validate the declared script path without executing it.
         return;
@@ -871,6 +832,8 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("timer_events", &timer_events);
     add_function("save", &save);
     add_function("load", &load);
+    add_function("data_write", &data_write);
+    add_function("data_read", &data_read);
     add_function("ui_rect", &ui_rect);
     add_function("ui_text", &ui_text);
     add_function("ui_button", &ui_button);
@@ -1984,9 +1947,7 @@ int LuaProject::Impl::save(lua_State* lua) {
     if (lua_gettop(lua) != 2) return luaL_error(lua, "save() expects slot and value");
     if (lua_type(lua, 1) != LUA_TSTRING) return luaL_error(lua, "save slot must be a string");
     try {
-        size_t entries = 0;
-        std::set<const void*> active;
-        const SaveValue value = from_lua(lua, 2, 0, entries, active);
+        const SaveValue value = save_value_from_lua(lua, 2);
         write_save(context(lua).save_root, lua_tostring(lua, 1), value);
     } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
     return 0;
@@ -1997,6 +1958,40 @@ int LuaProject::Impl::load(lua_State* lua) {
     if (lua_type(lua, 1) != LUA_TSTRING) return luaL_error(lua, "save slot must be a string");
     try {
         const auto value = read_save(context(lua).save_root, lua_tostring(lua, 1));
+        if (value) push_saved(lua, *value);
+        else lua_pushnil(lua);
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 1;
+}
+
+int LuaProject::Impl::data_write(lua_State* lua) {
+    if (lua_gettop(lua) != 2) return luaL_error(lua, "data_write() expects path and table");
+    if (lua_type(lua, 1) != LUA_TSTRING) return luaL_error(lua, "data_write path must be a string");
+    if (!lua_istable(lua, 2)) return luaL_error(lua, "data_write value must be a table");
+    auto& self = context(lua);
+    if (self.exported)
+        return luaL_error(lua, "data_write is read-only in exported games");
+    try {
+        DataWritePolicy policy;
+        policy.writable = self.writable;
+        auto protect = [&](const std::string& path) {
+            policy.protected_files.insert(fs::path(path).lexically_normal().generic_string());
+        };
+        for (const auto& [name, path] : self.scenes) protect(path);
+        for (const auto& [name, path] : self.prefabs) protect(path);
+        for (const auto& [id, refs] : self.scripts) protect(refs.path);
+        if (!self.scene_script.empty()) protect(self.scene_script);
+        const SaveValue value = save_value_from_lua(lua, 2);
+        write_data_file(self.root, lua_tostring(lua, 1), value, policy);
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::data_read(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "data_read() expects a path");
+    if (lua_type(lua, 1) != LUA_TSTRING) return luaL_error(lua, "data_read path must be a string");
+    try {
+        const auto value = read_data_file(context(lua).root, lua_tostring(lua, 1));
         if (value) push_saved(lua, *value);
         else lua_pushnil(lua);
     } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
