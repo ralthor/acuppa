@@ -226,6 +226,47 @@ def crate_texture(x, y):
     return (255 * grain, 150 * grain, 70 * grain)
 
 
+def ice_texture(x, y):
+    """Frosted ice: bright cracks over soft cloudy blue-white."""
+    n = 0.6 * smooth_noise(x, y, 32, 41, 128) + 0.4 * smooth_noise(x, y, 8, 43, 128)
+    crack = min(abs((x * 3 + y * 2) % 97 - 48), abs((x - y * 3) % 71 - 35))
+    v = 0.84 + 0.12 * n + (0.1 if crack < 2 else 0)
+    return (235 * v, 250 * v, 255 * min(1.0, v + 0.04))
+
+
+def metal_texture(x, y):
+    """Brushed steel plate with a rivet in each corner."""
+    brushed = 0.9 + 0.08 * smooth_noise(x * 0.1, y * 4, 8, 51, 128)
+    edge = min(x, y, 127 - x, 127 - y)
+    rivet = any((x - cx) ** 2 + (y - cy) ** 2 < 36 for cx in (14, 113) for cy in (14, 113))
+    v = brushed * (0.75 if edge < 4 else 1.0) * (1.15 if rivet else 1.0)
+    return (250 * v, 252 * v, 255 * v)
+
+
+def rubber_texture(x, y):
+    """Dark rubber with a raised diamond tread."""
+    tread = ((x + y) // 16 + (x - y + 512) // 16) % 2
+    n = 0.92 + 0.08 * smooth_noise(x, y, 8, 61, 128)
+    v = (0.75 if tread else 0.95) * n
+    return (255 * v, 255 * v, 255 * v)
+
+
+def brick_texture(x, y):
+    """Running-bond bricks with pale mortar."""
+    row = y // 32
+    shift = 32 if row % 2 else 0
+    if (y % 32) < 3 or ((x + shift) % 64) < 3:
+        return (225, 215, 200)
+    n = 0.85 + 0.15 * smooth_noise(x, y, 8, 71, 128)
+    tint = hash01(73, (x + shift) // 64, row) * 0.14
+    v = n - tint
+    return (255 * v, 235 * v, 220 * v)
+
+
+png("ice", 128, ice_texture)
+png("metal", 128, metal_texture)
+png("rubber", 128, rubber_texture)
+png("brick", 128, brick_texture)
 png("tnt", 128, crate_texture)
 png("wood", 256, wood_texture)
 png("stone", 256, stone_texture)
@@ -247,6 +288,14 @@ for name, color, metallic, roughness, texture in [
     ("chip_grump", (0.25, 0.85, 0.1), 0.0, 0.5, None),
     ("tnt", (0.95, 0.32, 0.08), 0.0, 0.55, "tnt"),
     ("chip_tnt", (1.0, 0.45, 0.05), 0.0, 0.5, None),
+    ("ice", (0.62, 0.86, 1.0), 0.0, 0.12, "ice"),
+    ("metal", (0.62, 0.64, 0.68), 1.0, 0.28, "metal"),
+    ("rubber", (0.07, 0.07, 0.08), 0.0, 0.9, "rubber"),
+    ("brick", (0.78, 0.26, 0.12), 0.0, 0.85, "brick"),
+    ("chip_ice", (0.7, 0.9, 1.0), 0.0, 0.1, None),
+    ("chip_metal", (0.6, 0.62, 0.66), 1.0, 0.3, None),
+    ("chip_rubber", (0.08, 0.08, 0.09), 0.0, 0.9, None),
+    ("chip_brick", (0.75, 0.25, 0.1), 0.0, 0.85, None),
 ]:
     mesh(name, *box(), color, metallic, roughness, texture)
 
@@ -258,6 +307,19 @@ for name, color, metallic, roughness in [
     ("dot", (1.0, 0.92, 0.35), 0.0, 0.4),
 ]:
     mesh(name, *sphere(), color, metallic, roughness)
+
+# Boulders: sphere blocks in every material, sharing the block textures.
+for name, color, metallic, roughness, texture in [
+    ("wood", (0.8, 0.42, 0.13), 0.0, 0.62, "wood"),
+    ("stone", (0.5, 0.54, 0.6), 0.0, 0.78, "stone"),
+    ("glass", (0.6, 0.93, 1.0), 0.0, 0.08, "glass"),
+    ("tnt", (0.95, 0.32, 0.08), 0.0, 0.55, "tnt"),
+    ("ice", (0.62, 0.86, 1.0), 0.0, 0.12, "ice"),
+    ("metal", (0.62, 0.64, 0.68), 1.0, 0.28, "metal"),
+    ("rubber", (0.07, 0.07, 0.08), 0.0, 0.9, "rubber"),
+    ("brick", (0.78, 0.26, 0.12), 0.0, 0.85, "brick"),
+]:
+    mesh(f"boulder_{name}", *sphere(24, 12), color, metallic, roughness, texture)
 
 for name, color, roughness in [
     ("foliage", (0.12, 0.5, 0.08), 0.85),
@@ -332,3 +394,9 @@ sound("twang", 0.45, lambda t: math.exp(-7 * t) * (0.5 * sine(150 * (1 + 0.3 * m
       0.2 * sine(300, t)) * (1 - math.exp(-400 * t)))
 sound("boom", 0.9, lambda t: math.exp(-5 * t) * (0.6 * sine(48 + 30 * math.exp(-8 * t), t) +
       0.5 * rattle(t, 5) * math.exp(-3 * t)) * (1 - math.exp(-600 * t)))
+sound("crack", 0.25, lambda t: math.exp(-25 * t) * (0.3 * sine(1650, t) + 0.25 * sine(2900, t)) +
+      math.exp(-70 * t) * 0.45 * rattle(t, 6))
+sound("clang", 0.6, lambda t: math.exp(-6 * t) * (0.35 * sine(620, t) + 0.3 * sine(1470, t) +
+      0.15 * sine(2210, t)) + math.exp(-150 * t) * 0.2 * rattle(t, 7))
+sound("boing", 0.4, lambda t: math.exp(-8 * t) * 0.7 * sine(110 + 160 * math.exp(-10 * t), t) *
+      (1 - math.exp(-300 * t)))

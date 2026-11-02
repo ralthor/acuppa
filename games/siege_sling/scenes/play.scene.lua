@@ -1,5 +1,5 @@
--- Static yard and scenery for level 1. The fort, grumps, ball, and arc dots are spawned
--- by scripts/play.lua from levels/level1.lua so their physics come from the
+-- Static yard and scenery shared by every level. The fort, grumps, ball, and arc dots are spawned
+-- by scripts/play.lua from the chosen level file (levels/index.lua) so their physics come from the
 -- rules' material table.
 return {
   entities = {

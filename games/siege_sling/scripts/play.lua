@@ -3,15 +3,17 @@ local Rules = require("scripts.rules")
 local Rig = require("scripts.camera_rig")
 local DragAim = require("scripts.drag_aim")
 local Debris = require("scripts.debris")
-local level = require("levels.level1")
+local Session = require("scripts.session")
 
 local DOTS = 24          -- arc preview spheres
 local DOT_STEP = 0.07    -- seconds between preview dots
 local SOUND_GAP = 0.09   -- seconds between repeats of one impact sound
 local SOUNDS = {wood = "assets/knock.wav", stone = "assets/thud.wav", glass = "assets/clink.wav",
-                tnt = "assets/knock.wav"}
+                tnt = "assets/knock.wav", ice = "assets/crack.wav", metal = "assets/clang.wav",
+                rubber = "assets/boing.wav", brick = "assets/thud.wav"}
 local CONFIG = Rules.config()
 
+local level, entry, level_count  -- chosen level data, its index entry, and the level count
 local game, rig, drag, debris
 local aim                -- current aim (keys and drags edit it)
 local preview            -- aim shown while a drag is held (nil = current aim)
@@ -57,14 +59,20 @@ end
 local function spawn_fort()
   for _, block in ipairs(level.blocks) do
     local material = Rules.MATERIALS[block.material]
-    local id = spawn(block.id, block.position, "assets/" .. block.material .. ".gltf",
-                     block.half_extents,
-                     {motion = "dynamic", shape = "box", half_extents = block.half_extents,
-                      density = material.density, friction = material.friction,
-                      restitution = material.restitution})
-    local h = block.half_extents
+    local physics = {motion = "dynamic", density = material.density, friction = material.friction,
+                     restitution = material.restitution}
+    local mesh, scale
+    if block.shape == "sphere" then
+      local r = block.radius
+      physics.shape, physics.radius, physics.angular_damping = "sphere", r, 0.6
+      mesh, scale = "assets/boulder_" .. block.material .. ".gltf", {r, r, r}
+    else
+      physics.shape, physics.half_extents = "box", block.half_extents
+      mesh, scale = "assets/" .. block.material .. ".gltf", block.half_extents
+    end
+    local id = spawn(block.id, block.position, mesh, scale, physics)
     bodies[id] = {kind = "block", id = block.id, material = block.material, children = {},
-                  mass = 8 * h[1] * h[2] * h[3] * material.density}
+                  mass = Rules.block_mass(block)}
   end
   local r = level.target_radius
   for _, target in ipairs(level.targets) do
@@ -275,11 +283,15 @@ end
 
 local function record_result()
   if game.state ~= "won" then return end
-  if not best or game.score > best.score or
-     (game.score == best.score and game.stars > best.stars) then
-    best = {score = game.score, stars = game.stars}
-    tp.save("best", best)
-  end
+  best = Session.record(entry.file, game.score, game.stars)
+end
+
+local function has_next() return Session.index < level_count end
+
+local function next_level()
+  if not has_next() then return end
+  Session.index = Session.index + 1
+  tp.scene_reload()
 end
 
 local function aim_input(dt)
@@ -331,12 +343,14 @@ end
 
 return {
   start = function()
+    if Session.index < 1 or Session.index > #Session.levels() then Session.index = 1 end
+    level, entry, level_count = Session.load(Session.index)
     game = Rules.new_game(level)
     rig = Rig.new({pouch = level.pouch, fort = level.fort_center, look_ahead = 17})
     drag = DragAim.new(Rules)
     debris = Debris.new({cap = 64, life = 1.0, ground = 0.05})
     aim = {yaw = level.aim.yaw, pitch = level.aim.pitch, power = level.aim.power}
-    best = tp.load("best")
+    best = Session.best(entry.file)
     spawn_fort()
     local b = level.ball.radius
     pouch_ball = spawn("pouch ball", level.pouch, "assets/ball.gltf", {b, b, b})
@@ -371,7 +385,8 @@ return {
     else
       drag.active, preview = false, nil
       if game:finished() then
-        if edge("fire") or edge("play_again") then tp.scene_reload() end
+        if edge("fire") then tp.scene_reload() end
+        if game.state == "won" and edge("next_level") then next_level() end
       else
         held.fire = tp.action("fire") > 0
         game:tick(dt, speeds)
@@ -387,7 +402,10 @@ return {
   end,
 
   update = function(dt)
-    if tp.action("exit") > 0 then tp.quit() end
+    if edge("exit") then
+      tp.scene_switch("menu")
+      return
+    end
     if edge("restart") then tp.scene_reload() end
     show_camera(rig:update(math.min(dt, 0.1), camera_mode(), camera_info()))
   end,
@@ -396,6 +414,8 @@ return {
     local w, h = tp.viewport_size()
     local current = shown_aim()
     tp.ui_rect(0, 0, w, 44, 0.05, 0.12, 0.25, 0.38)
+    tp.ui_rect(w - 330, h - 30, 330, 30, 0.05, 0.12, 0.25, 0.38)
+    tp.ui_text(w - 316, h - 22, string.format("LEVEL %d  %s", Session.index, entry.name:upper()), 1)
     tp.ui_text(18, 12, string.format("SHOTS %d   SCORE %d   GRUMPS %d",
                                      game.shots_left, game.score, game.targets_left), 2)
     if best then
@@ -406,7 +426,7 @@ return {
       tp.ui_text(w - 250, 28, string.format("YAW %+3d  PITCH %2d", math.floor(current.yaw + 0.5),
                                             math.floor(current.pitch + 0.5)), 1)
       tp.ui_rect(0, h - 26, 560, 26, 0.05, 0.12, 0.25, 0.3)
-      tp.ui_text(12, h - 18, "DRAG OR WASD AIM  Q/E POWER  SPACE FIRE  R RESTART  ESC EXIT", 1)
+      tp.ui_text(12, h - 18, "DRAG OR WASD AIM  Q/E POWER  SPACE FIRE  R RESTART  ESC MENU", 1)
     end
     if popup.time > 0 then
       local a = math.min(1, popup.time * 2)
@@ -424,7 +444,14 @@ return {
       end
       stars_row(x + 40, y + 142, game.stars)
       tp.ui_text(x + 260, y + 158, best and string.format("BEST %d", best.score) or "NO BEST YET", 2)
-      tp.ui_text(x + 40, y + 228, "SPACE OR ENTER TO PLAY AGAIN", 2)
+      -- Buttons: Enter activates the focused (first) one; Space plays again.
+      local bx = x + 40
+      if won and has_next() then
+        if tp.ui_button("next", bx, y + 222, 150, 50, "NEXT LEVEL") then next_level() end
+        bx = bx + 160
+      end
+      if tp.ui_button("again", bx, y + 222, 150, 50, "PLAY AGAIN") then tp.scene_reload() end
+      if tp.ui_button("menu", bx + 160, y + 222, 120, 50, "MENU") then tp.scene_switch("menu") end
     end
   end,
 }

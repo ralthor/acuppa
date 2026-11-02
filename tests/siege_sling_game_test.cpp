@@ -176,7 +176,7 @@ int main(int argc, char* argv[]) {
     fs::remove_all(work / "saves");
 
     // Start: lit, sky, shadows, HUD, and an aim arc.
-    LuaProject game(work, "level1", LuaProject::Mode::Game, false);
+    LuaProject game(work, "play", LuaProject::Mode::Game, false);
     SceneFrame frame = game.step(0);
     for (const auto& item : frame.imported)
         if (uses(item, "ball.gltf")) pouch_ball = item.id;
@@ -245,7 +245,7 @@ int main(int argc, char* argv[]) {
     expect(max_move(start, fort(frame)) < 0.01f, "restart did not rebuild the fort");
 
     // A tiny drag cancels and does not fire.
-    LuaProject mouse(work, "level1", LuaProject::Mode::Game, false);
+    LuaProject mouse(work, "play", LuaProject::Mode::Game, false);
     mouse.step(0);
     mouse.set_pointer(640, 400);
     mouse.inject({InputDevice::MouseButton, "left", 1});
@@ -298,7 +298,7 @@ int main(int argc, char* argv[]) {
             "  ticks = ticks + 1\n"
             "  if ticks == 600 then tp.entity_destroy(assert(tp.entity_find(\"g_pillar_1\"))) end\n"
             "end}\n";
-        const fs::path scene = fixture / "scenes/level1.scene.lua";
+        const fs::path scene = fixture / "scenes/play.scene.lua";
         std::ifstream in(scene);
         std::string text(std::istreambuf_iterator<char>{in}, {});
         in.close();
@@ -306,7 +306,7 @@ int main(int argc, char* argv[]) {
         expect(at != std::string::npos, "support fixture could not edit the scene");
         text.insert(at + 12, "\n    {name = \"test remover\", script = {path = \"scripts/remove_support.lua\"}},");
         std::ofstream(scene, std::ios::trunc) << text;
-        LuaProject support(fixture, "level1", LuaProject::Mode::Game, false);
+        LuaProject support(fixture, "play", LuaProject::Mode::Game, false);
         frame = support.step(0);
         auto lintel = [&](const SceneFrame& f) -> std::optional<glm::vec3> {
             for (const auto& item : f.imported) {
@@ -333,7 +333,7 @@ int main(int argc, char* argv[]) {
     {
         const fs::path saves = work / "saves";
         fs::remove_all(saves);
-        LuaProject winner(work, "level1", LuaProject::Mode::Game, false);
+        LuaProject winner(work, "play", LuaProject::Mode::Game, false);
         frame = winner.step(0);
         expect(!has_text(frame, "BEST"), "a fresh project showed a best result");
         const int crates = count_mesh(frame, "assets/tnt.gltf");
@@ -367,13 +367,15 @@ int main(int argc, char* argv[]) {
         expect(has_text(frame, "INCLUDES 3000 SHOT BONUS") && score >= 2000 + 3000 &&
                    has_text(frame, "3 STARS"),
                "a one-shot chain win lacks grumps, the shot bonus, or three stars");
-        expect(has_text(frame, "STARS") && fs::exists(saves / "best.tpsave"),
+        expect(has_text(frame, "STARS") && fs::exists(saves / "progress.tpsave"),
                "win did not show stars or save the best result");
+        expect(has_text(frame, "NEXT LEVEL") && has_text(frame, "PLAY AGAIN") && has_text(frame, "MENU"),
+               "win screen lacks next level, play again, or menu buttons");
         expect(most_chips > 0, "breaking blocks threw no debris");
         frame = run(winner, 75);
         expect(chips(frame) == 0, "debris did not despawn after a second");
 
-        LuaProject reopened(work, "level1", LuaProject::Mode::Game, false);
+        LuaProject reopened(work, "play", LuaProject::Mode::Game, false);
         frame = reopened.step(0);
         expect(hud_number(frame, "BEST") == score, "best score did not reload in a fresh game");
 
@@ -386,9 +388,38 @@ int main(int argc, char* argv[]) {
                    !flying_ball(frame),
                "Space on the win screen did not start a fresh round");
 
+        // Next level: win level 1 again, press N, and level 2 starts fresh;
+        // its fort rests without scoring. Escape returns to the menu.
+        {
+            LuaProject next(work, "play", LuaProject::Mode::Game, false);
+            next.step(0);
+            frame = shoot(next, {-9, -4, -4});
+            expect(has_text(frame, "VICTORY!"), "repeated winning shot did not win");
+            key(next, "n", 1);
+            run(next, 2);
+            key(next, "n", 0);
+            frame = run(next, 2);
+            expect(has_text(frame, "LEVEL 2  FROZEN FOUNDRY") && hud_number(frame, "SHOTS") == 4 &&
+                       hud_number(frame, "GRUMPS") == 5 && !has_text(frame, "BEST"),
+                   "next level did not start level 2 fresh");
+            expect(count_mesh(frame, "boulder_stone.gltf") == 1 && count_mesh(frame, "assets/metal.gltf") == 2 &&
+                       count_mesh(frame, "assets/ice.gltf") == 3 && count_mesh(frame, "assets/rubber.gltf") == 2 &&
+                       count_mesh(frame, "assets/brick.gltf") == 4,
+                   "level 2 did not spawn its boulder and new-material blocks");
+            frame = run(next, 300);
+            expect(hud_number(frame, "SCORE") == 0 && hud_number(frame, "GRUMPS") == 5,
+                   "level 2 fort scored or lost grumps while resting");
+            key(next, "escape", 1);
+            next.step(tick);
+            key(next, "escape", 0);
+            frame = run(next, 2);
+            expect(!frame.quit && has_text(frame, "LEVELS") && has_text(frame, "PLAY"),
+                   "Escape in a level did not return to the menu");
+        }
+
         // A loss: four shots wasted far to the left. A ball that rolls away
         // from the fort is removed rather than kept in the settle check.
-        LuaProject loser(work, "level1", LuaProject::Mode::Game, false);
+        LuaProject loser(work, "play", LuaProject::Mode::Game, false);
         loser.step(0);
         frame = shoot(loser, {-45, 0, 0});
         expect(hud_number(frame, "SHOTS") == 3 && hud_number(frame, "GRUMPS") == 4 &&
@@ -404,6 +435,47 @@ int main(int argc, char* argv[]) {
         expect(hud_number(frame, "SHOTS") == 4, "Enter on the lose screen did not play again");
     }
 
+    // Title menu: Play, Levels, Editor (source games only), Quit. Clicking
+    // Levels lists both indexed levels with level 1's saved best; Enter
+    // plays the focused first level.
+    {
+        LuaProject menu(work, "menu", LuaProject::Mode::Game, false);
+        frame = menu.step(0);
+        frame = menu.step(tick);
+        expect(has_text(frame, "SIEGE SLING") && has_text(frame, "PLAY") && has_text(frame, "LEVELS") &&
+                   has_text(frame, "EDITOR") && has_text(frame, "QUIT") && frame.sky,
+               "title menu lacks its buttons or sky");
+        menu.set_pointer(640, 368);
+        menu.inject({InputDevice::MouseButton, "left", 1});
+        menu.step(tick);
+        menu.inject({InputDevice::MouseButton, "left", 0});
+        frame = run(menu, 2);
+        expect(has_text(frame, "CHOOSE A LEVEL") && has_text(frame, "1  GRASSY HILL") &&
+                   has_text(frame, "2  FROZEN FOUNDRY") && has_text(frame, "NEW"),
+               "level select did not list both levels");
+        bool best_shown = false;
+        for (const auto& item : frame.ui) best_shown |= item.text.find_first_not_of("0123456789") ==
+            std::string::npos && !item.text.empty() && std::stoi(item.text) >= 5000;
+        expect(best_shown, "level select did not show level 1's best score");
+        key(menu, "enter", 1);
+        menu.step(tick);
+        key(menu, "enter", 0);
+        frame = run(menu, 2);
+        expect(has_text(frame, "LEVEL 1  GRASSY HILL") && hud_number(frame, "SHOTS") == 4 &&
+                   hud_number(frame, "BEST") > 0,
+               "choosing level 1 did not play it with its best result");
+        key(menu, "escape", 1);
+        menu.step(tick);
+        key(menu, "escape", 0);
+        frame = run(menu, 2);
+        expect(has_text(frame, "QUIT") && !frame.quit, "Escape did not return to the title menu");
+        key(menu, "escape", 1);
+        expect(menu.step(tick).quit, "Escape on the title menu did not quit");
+    }
+
     key(mouse, "escape", 1);
-    expect(mouse.step(0).quit, "Escape did not exit");
+    mouse.step(0);
+    key(mouse, "escape", 0);
+    frame = run(mouse, 2);
+    expect(!frame.quit && has_text(frame, "LEVELS"), "Escape in a level did not open the menu");
 }

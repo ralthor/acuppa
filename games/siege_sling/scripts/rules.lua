@@ -38,8 +38,11 @@ local DEFAULTS = {
 }
 
 -- Physics values feed the scene's physics component (Phase 28 fields).
--- Glass breaks from gentle knocks, wood takes a solid hit, stone needs a
--- near-direct fast shot or a heavy fall.
+-- Each material has one role: glass and ice shatter from gentle knocks (ice
+-- is also nearly frictionless, so it slides), wood takes a solid hit, brick
+-- and stone need a fast shot or a heavy fall, rubber is light and bouncy and
+-- shrugs off most hits, and metal is a heavy, almost unbreakable weight that
+-- crushes what it falls on. Crates explode.
 Rules.MATERIALS = {
   wood = {health = 60, min_speed = 2.0, density = 600, friction = 0.6,
           restitution = 0.15, points = 100},
@@ -50,7 +53,24 @@ Rules.MATERIALS = {
   -- Explosive crate: breaks easily and blasts its surroundings.
   tnt = {health = 20, min_speed = 2.0, density = 500, friction = 0.6,
          restitution = 0.1, points = 150, explosive = true},
+  ice = {health = 24, min_speed = 0.8, density = 900, friction = 0.03,
+         restitution = 0.1, points = 75},
+  metal = {health = 900, min_speed = 7.0, density = 5000, friction = 0.45,
+           restitution = 0.1, points = 500},
+  rubber = {health = 240, min_speed = 6.0, density = 450, friction = 0.9,
+            restitution = 0.8, points = 150},
+  brick = {health = 110, min_speed = 3.0, density = 1900, friction = 0.75,
+           restitution = 0.05, points = 150},
 }
+
+-- Sorted material names, for messages and editors.
+Rules.MATERIAL_NAMES = {}
+for name in pairs(Rules.MATERIALS) do Rules.MATERIAL_NAMES[#Rules.MATERIAL_NAMES + 1] = name end
+table.sort(Rules.MATERIAL_NAMES)
+
+-- Level data limits (meters) shared with the level editor.
+Rules.LIMITS = {max_blocks = 400, max_targets = 20, max_half_extent = 6, min_half_extent = 0.05,
+                max_radius = 3, min_radius = 0.1, max_coordinate = 100, max_name = 48}
 
 local function fail(where, message) error(where .. ": " .. message, 3) end
 
@@ -347,10 +367,51 @@ end
 -- {id}), blocks (array of {id, material}). Optional: name (string), kill_y
 -- (number). Ids are unique across blocks and targets. Other fields (such as
 -- positions for the scene) are left to the scene.
+local LEVEL_FIELDS = {name = true, shots = true, stars = true, kill_y = true, pouch = true,
+                      aim = true, fort_center = true, ball = true, target_radius = true,
+                      blocks = true, targets = true}
+local BLOCK_FIELDS = {id = true, material = true, shape = true, position = true,
+                      half_extents = true, radius = true}
+local TARGET_FIELDS = {id = true, position = true}
+local BALL_FIELDS = {radius = true, density = true, friction = true, restitution = true}
+
+local function check_fields(where, name, value, allowed)
+  for key in pairs(value) do
+    if not allowed[key] then fail(where, name .. " has unknown field " .. tostring(key)) end
+  end
+end
+
+local function check_array(where, name, value, max)
+  if type(value) ~= "table" then fail(where, name .. " must be an array") end
+  local count = #value
+  for key in pairs(value) do
+    if math.type(key) ~= "integer" or key < 1 or key > count then
+      fail(where, name .. " must be an array without gaps or named keys")
+    end
+  end
+  if count > max then fail(where, string.format("%s holds more than %d entries", name, max)) end
+  return count
+end
+
+local function check_point(where, name, value)
+  check_vec3(where, name, value)
+  local m = Rules.LIMITS.max_coordinate
+  for i = 1, 3 do check_number(where, name .. "[" .. i .. "]", value[i], -m, m) end
+  if #value ~= 3 then fail(where, name .. " must hold exactly three numbers") end
+end
+
+-- Checks level data. Fields the play scene needs (pouch, aim, fort_center,
+-- ball, target_radius, and block/target positions and sizes) are checked when
+-- present; Rules.check_playable also requires them. Unknown fields fail, so
+-- typos in hand-written or editor-written files are caught.
 function Rules.validate_level(level)
   local where = "Rules.validate_level"
   if type(level) ~= "table" then fail(where, "level must be a table") end
-  if level.name ~= nil and type(level.name) ~= "string" then fail(where, "level.name must be a string") end
+  check_fields(where, "level", level, LEVEL_FIELDS)
+  if level.name ~= nil and (type(level.name) ~= "string" or level.name == "" or
+                            #level.name > Rules.LIMITS.max_name) then
+    fail(where, "level.name must be a nonempty string of at most 48 bytes")
+  end
   check_integer(where, "level.shots", level.shots, 1, 20)
   if type(level.stars) ~= "table" or #level.stars ~= 3 then
     fail(where, "level.stars must hold three scores")
@@ -362,27 +423,95 @@ function Rules.validate_level(level)
     end
   end
   if level.kill_y ~= nil then check_number(where, "level.kill_y", level.kill_y) end
+  if level.pouch ~= nil then check_point(where, "level.pouch", level.pouch) end
+  if level.fort_center ~= nil then check_point(where, "level.fort_center", level.fort_center) end
+  if level.aim ~= nil then
+    if type(level.aim) ~= "table" then fail(where, "level.aim must be a {yaw, pitch, power} table") end
+    check_fields(where, "level.aim", level.aim, {yaw = true, pitch = true, power = true})
+    check_aim(where, level.aim, DEFAULTS)
+  end
+  if level.ball ~= nil then
+    local b = level.ball
+    if type(b) ~= "table" then fail(where, "level.ball must be a table") end
+    check_fields(where, "level.ball", b, BALL_FIELDS)
+    check_number(where, "level.ball.radius", b.radius, 0.05, 1)
+    check_number(where, "level.ball.density", b.density, 1, 20000)
+    check_number(where, "level.ball.friction", b.friction, 0, 2)
+    check_number(where, "level.ball.restitution", b.restitution, 0, 1)
+  end
+  if level.target_radius ~= nil then
+    check_number(where, "level.target_radius", level.target_radius, 0.1, 2)
+  end
   local seen = {}
   if type(level.targets) ~= "table" or #level.targets == 0 then
     fail(where, "level.targets must list at least one target")
   end
+  check_array(where, "level.targets", level.targets, Rules.LIMITS.max_targets)
   for i, target in ipairs(level.targets) do
-    if type(target) ~= "table" then fail(where, "level.targets[" .. i .. "] must be a table") end
-    check_id(where, "level.targets[" .. i .. "].id", target.id, seen)
+    local name = "level.targets[" .. i .. "]"
+    if type(target) ~= "table" then fail(where, name .. " must be a table") end
+    check_fields(where, name, target, TARGET_FIELDS)
+    check_id(where, name .. ".id", target.id, seen)
+    if target.position ~= nil then check_point(where, name .. ".position", target.position) end
   end
   if type(level.blocks) ~= "table" then fail(where, "level.blocks must be an array") end
+  check_array(where, "level.blocks", level.blocks, Rules.LIMITS.max_blocks)
+  local L = Rules.LIMITS
   for i, block in ipairs(level.blocks) do
-    if type(block) ~= "table" then fail(where, "level.blocks[" .. i .. "] must be a table") end
-    check_id(where, "level.blocks[" .. i .. "].id", block.id, seen)
+    local name = "level.blocks[" .. i .. "]"
+    if type(block) ~= "table" then fail(where, name .. " must be a table") end
+    check_fields(where, name, block, BLOCK_FIELDS)
+    check_id(where, name .. ".id", block.id, seen)
     if type(block.material) ~= "string" or not Rules.MATERIALS[block.material] then
-      fail(where, "level.blocks[" .. i .. "].material must be one of glass, stone, tnt, wood")
+      fail(where, name .. ".material must be one of " .. table.concat(Rules.MATERIAL_NAMES, ", "))
+    end
+    local shape = block.shape or "box"
+    if shape ~= "box" and shape ~= "sphere" then fail(where, name .. ".shape must be box or sphere") end
+    if block.position ~= nil then check_point(where, name .. ".position", block.position) end
+    if shape == "box" then
+      if block.radius ~= nil then fail(where, name .. ".radius is only for sphere blocks") end
+      if block.half_extents ~= nil then
+        check_vec3(where, name .. ".half_extents", block.half_extents)
+        for k = 1, 3 do
+          check_number(where, name .. ".half_extents[" .. k .. "]", block.half_extents[k],
+                       L.min_half_extent, L.max_half_extent)
+        end
+      end
+    else
+      if block.half_extents ~= nil then fail(where, name .. ".half_extents is only for box blocks") end
+      check_number(where, name .. ".radius", block.radius, L.min_radius, L.max_radius)
     end
   end
   return level
 end
 
--- Shot flow ----------------------------------------------------------------
--- states: aiming -> flying -> settling -> aiming | won | lost
+-- validate_level plus every field the play scene needs to spawn the level.
+function Rules.check_playable(level)
+  local where = "Rules.check_playable"
+  Rules.validate_level(level)
+  for _, key in ipairs({"pouch", "aim", "fort_center", "ball", "target_radius"}) do
+    if level[key] == nil then fail(where, "level." .. key .. " is required") end
+  end
+  for i, target in ipairs(level.targets) do
+    if target.position == nil then fail(where, "level.targets[" .. i .. "].position is required") end
+  end
+  for i, block in ipairs(level.blocks) do
+    if block.position == nil then fail(where, "level.blocks[" .. i .. "].position is required") end
+    if (block.shape or "box") == "box" and block.half_extents == nil then
+      fail(where, "level.blocks[" .. i .. "].half_extents is required")
+    end
+  end
+  return level
+end
+
+-- Mass in kilograms of a validated, playable block.
+function Rules.block_mass(block)
+  local density = Rules.MATERIALS[block.material].density
+  if (block.shape or "box") == "sphere" then return 4 / 3 * math.pi * block.radius ^ 3 * density end
+  local h = block.half_extents
+  return 8 * h[1] * h[2] * h[3] * density
+end
+
 local Game = {}
 Game.__index = Game
 

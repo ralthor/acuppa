@@ -154,7 +154,7 @@ check("glass breaks at 3 m/s", Rules.impact_damage("glass", 3) >= M.glass.health
 check("stone survives 10 m/s", Rules.impact_damage("stone", 10) < M.stone.health)
 check("custom damage rate", near(Rules.impact_damage("wood", 3,
   Rules.config({damage_per_speed = 5})), 5))
-fails("damage material", function() Rules.impact_damage("ice", 3) end, "unknown material ice")
+fails("damage material", function() Rules.impact_damage("lava", 3) end, "unknown material lava")
 fails("damage material type", function() Rules.impact_damage(1, 3) end, "material")
 fails("damage speed", function() Rules.impact_damage("wood", -1) end, "closing_speed")
 fails("damage nan", function() Rules.impact_damage("wood", 0 / 0) end, "closing_speed")
@@ -202,12 +202,80 @@ broken(function(l) l.targets = {} end, "at least one target")
 broken(function(l) l.targets = nil end, "at least one target")
 broken(function(l) l.targets[2] = 7 end, "targets[2]")
 broken(function(l) l.targets[1].id = "" end, "targets[1].id")
-broken(function(l) l.blocks[1].material = "ice" end, "blocks[1].material")
+broken(function(l) l.blocks[1].material = "lava" end, "blocks[1].material")
 broken(function(l) l.blocks[2].id = "grump_a" end, "duplicate id grump_a")
 broken(function(l) l.blocks = "none" end, "level.blocks")
 broken(function(l) l.name = 3 end, "level.name")
 broken(function(l) l.kill_y = math.huge end, "level.kill_y")
 fails("new_game validates", function() Rules.new_game({shots = 1}) end, "level.stars")
+
+-- New materials: each has a distinct role.
+check("all materials", M.ice and M.metal and M.rubber and M.brick and #Rules.MATERIAL_NAMES == 8)
+check("ice fragile and slippery", M.ice.health < M.wood.health and M.ice.min_speed < M.wood.min_speed
+  and M.ice.friction < 0.1 and M.ice.friction < M.glass.friction)
+check("metal heaviest and toughest", M.metal.density > M.stone.density
+  and M.metal.health > 4 * M.stone.health)
+check("metal survives fast hits and blasts", Rules.impact_damage("metal", 20) < M.metal.health
+  and Rules.config().blast_damage < M.metal.health)
+check("rubber bouncy, light, tough", M.rubber.restitution > 0.6 and M.rubber.density < M.wood.density
+  and Rules.impact_damage("rubber", 10) < M.rubber.health)
+check("brick between wood and stone", M.brick.density > M.wood.density
+  and M.brick.density < M.stone.density and M.brick.health > M.wood.health
+  and M.brick.health < M.stone.health)
+check("ice breaks at 2.5 m/s", Rules.impact_damage("ice", 2.5) >= M.ice.health)
+
+-- Full level data: positions, sizes, spheres, and play fields.
+local function full()
+  return {
+    name = "Full", shots = 2, stars = {1, 2, 3}, kill_y = -1, pouch = {0, 3.3, 0},
+    aim = {yaw = 0, pitch = 16, power = 0.42}, fort_center = {0, 1, -18},
+    ball = {radius = 0.3, density = 3500, friction = 0.5, restitution = 0.2}, target_radius = 0.45,
+    targets = {{id = "g", position = {0, 0.45, -18}}},
+    blocks = {{id = "box", material = "brick", position = {1, 0.5, -18}, half_extents = {0.5, 0.5, 0.5}},
+              {id = "rock", material = "metal", shape = "sphere", position = {2, 0.4, -18}, radius = 0.4},
+              {id = "board", material = "ice", shape = "box", position = {3, 0.1, -18},
+               half_extents = {2, 0.1, 0.4}}},
+  }
+end
+check("full level playable", Rules.check_playable(full()).shots == 2)
+check("sphere mass", near(Rules.block_mass(full().blocks[2]), 4 / 3 * math.pi * 0.4 ^ 3 * 5000, 1e-6))
+check("box mass", near(Rules.block_mass(full().blocks[1]), 1900))
+local function bad_full(change, pattern)
+  local data = full()
+  change(data)
+  fails("full level " .. pattern, function() Rules.check_playable(data) end, pattern)
+end
+bad_full(function(l) l.blocks[2].radius = nil end, "blocks[2].radius")
+bad_full(function(l) l.blocks[2].radius = 9 end, "blocks[2].radius")
+bad_full(function(l) l.blocks[2].half_extents = {1, 1, 1} end, "only for box")
+bad_full(function(l) l.blocks[1].radius = 1 end, "only for sphere")
+bad_full(function(l) l.blocks[1].shape = "cone" end, "box or sphere")
+bad_full(function(l) l.blocks[1].half_extents = {0.5, 0, 0.5} end, "half_extents[2]")
+bad_full(function(l) l.blocks[1].half_extents = {0.5, 7, 0.5} end, "half_extents[2]")
+bad_full(function(l) l.blocks[1].half_extents = nil end, "half_extents is required")
+bad_full(function(l) l.blocks[1].position = {1, 0 / 0, 2} end, "position")
+bad_full(function(l) l.blocks[1].position = {1, 2, 500} end, "position[3]")
+bad_full(function(l) l.blocks[1].position = nil end, "position is required")
+bad_full(function(l) l.blocks[1].colour = "red" end, "unknown field colour")
+bad_full(function(l) l.targets[1].position = nil end, "targets[1].position is required")
+bad_full(function(l) l.targets[1].radius = 1 end, "unknown field radius")
+bad_full(function(l) l.title = "x" end, "unknown field title")
+bad_full(function(l) l.name = "" end, "level.name")
+bad_full(function(l) l.name = string.rep("x", 49) end, "level.name")
+bad_full(function(l) l.pouch = nil end, "level.pouch is required")
+bad_full(function(l) l.pouch = {0, 1} end, "level.pouch")
+bad_full(function(l) l.fort_center = "here" end, "level.fort_center")
+bad_full(function(l) l.aim.pitch = 80 end, "aim.pitch")
+bad_full(function(l) l.aim.roll = 1 end, "unknown field roll")
+bad_full(function(l) l.ball.radius = 0 end, "level.ball.radius")
+bad_full(function(l) l.ball.restitution = 2 end, "level.ball.restitution")
+bad_full(function(l) l.ball.spin = 1 end, "unknown field spin")
+bad_full(function(l) l.target_radius = 5 end, "level.target_radius")
+bad_full(function(l) l.blocks[5] = {id = "gap", material = "wood"} end, "without gaps")
+bad_full(function(l) l.blocks.extra = {} end, "without gaps")
+bad_full(function(l) for i = 1, 401 do l.blocks[i] = {id = "b" .. i, material = "wood"} end end,
+         "more than 400")
+bad_full(function(l) l.blocks[1].material = "lava" end, "brick, glass, ice, metal, rubber, stone, tnt, wood")
 
 -- Shot flow ----------------------------------------------------------------------
 local fast = Rules.config({settle_ticks = 3, settle_timeout = 2, flight_timeout = 1})

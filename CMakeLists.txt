@@ -331,7 +331,7 @@ if(BUILD_TESTING)
   add_test(NAME siege_sling_project_test COMMAND acuppa test
            "${PROJECT_SOURCE_DIR}/games/siege_sling")
   set_tests_properties(siege_sling_project_test PROPERTIES
-                       PASS_REGULAR_EXPRESSION "PASS level1")
+                       PASS_REGULAR_EXPRESSION "Tested 2 source scenes")
   add_executable(acuppa_garage_run_impact_test tests/garage_run_impact_test.cpp)
   target_link_libraries(acuppa_garage_run_impact_test PRIVATE acuppa_lua)
   add_test(NAME garage_run_impact_camera COMMAND acuppa_garage_run_impact_test

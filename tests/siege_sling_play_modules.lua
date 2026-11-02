@@ -4,6 +4,7 @@ local Rules = assert(loadfile(dir .. "/rules.lua"))()
 local Rig = assert(loadfile(dir .. "/camera_rig.lua"))()
 local Drag = assert(loadfile(dir .. "/drag_aim.lua"))()
 local Debris = assert(loadfile(dir .. "/debris.lua"))()
+local Catalog = assert(loadfile(dir .. "/catalog.lua"))()
 
 local function near(a, b, t) return math.abs(a - b) <= (t or 1e-6) end
 local function dist(a, b)
@@ -133,5 +134,35 @@ fails(function() pile:burst("wood", {0, 0}, 4, 3) end, "center")
 fails(function() pile:burst("wood", {0, 0, 0}, 40, 3) end, "count")
 fails(function() pile:burst("wood", {0, 0, 0}, 4, 0) end, "speed")
 fails(function() pile:step(-1) end, "dt")
+
+-- Catalog ------------------------------------------------------------------------
+local shape_ids = {}
+for _, entry in ipairs(Catalog.SHAPES) do shape_ids[#shape_ids + 1] = entry.id end
+assert(table.concat(shape_ids, ",") == "cube,small_cube,plank,long_plank,pillar,slab,boulder",
+       "catalog shape palette order")
+local seen = {}
+for _, entry in ipairs(Catalog.MATERIALS) do
+  assert(Rules.MATERIALS[entry.id], "catalog material missing from rules: " .. entry.id)
+  assert(type(entry.name) == "string" and #entry.color == 3, "material display data " .. entry.id)
+  seen[entry.id] = true
+end
+for name in pairs(Rules.MATERIALS) do assert(seen[name], "rules material missing from catalog: " .. name) end
+local level = {name = "Catalog", shots = 1, stars = {1, 2, 3}, targets = {{id = "g", position = {0, 0.45, -5}}},
+               blocks = {}}
+for i, entry in ipairs(Catalog.SHAPES) do
+  level.blocks[i] = Catalog.block(entry.id, Catalog.MATERIALS[(i - 1) % 8 + 1].id, "b" .. i, {i, 1, -5})
+end
+Rules.validate_level(level)
+assert(level.blocks[7].shape == "sphere" and level.blocks[7].radius == 0.45 and not level.blocks[7].half_extents,
+       "boulder block is a sphere")
+local plank = Catalog.block("plank", "wood", "p", {0, 0, 0})
+plank.half_extents[1] = 2
+assert(Catalog.shape("plank").half_extents[1] == 0.6, "catalog blocks copy their sizes")
+assert(Catalog.material("ice").name == "Ice" and Catalog.shape("pillar").half_extents[2] == 0.7)
+fails(function() Catalog.shape("cone") end, "unknown shape cone")
+fails(function() Catalog.material("lava") end, "unknown material lava")
+fails(function() Catalog.block("cube", "lava", "x", {0, 0, 0}) end, "unknown material")
+fails(function() Catalog.block("cube", "wood", "", {0, 0, 0}) end, "id")
+fails(function() Catalog.block("cube", "wood", "x", {0, 0}) end, "position")
 
 print("siege_sling_play_modules: ok")

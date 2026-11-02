@@ -46,9 +46,10 @@ if graphical:
         assert header == b"P6\n1280 720" and len(pixels) == 1280 * 720 * 3
         return pixels
 
-    aiming = capture("start")
-    fired = capture("fired", "--hold-key", "space")
-    assert aiming != fired, "exported sling did not fire in the Vulkan view"
+    # The bundle opens on the menu; holding Space presses the focused Play.
+    menu = capture("start")
+    playing = capture("fired", "--hold-key", "space")
+    assert menu != playing, "exported menu did not start a level in the Vulkan view"
 
     live = subprocess.Popen([str(player)], cwd=work, stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE, text=True)

@@ -2,8 +2,9 @@ return {
   api = 1,
   title = "Siege Sling",
   window = {width = 1280, height = 720},
-  first_scene = "level1",
-  scenes = {level1 = "scenes/level1.scene.lua"},
+  first_scene = "menu",
+  scenes = {menu = "scenes/menu.scene.lua", play = "scenes/play.scene.lua"},
+  writable = {"levels"},
   input = {
     aim_left = {keyboard = "a", gamepad_button = "dpad_left"},
     aim_left_arrow = {keyboard = "left"},
@@ -22,8 +23,8 @@ return {
     orbit = {mouse_button = "right"},
     orbit_x = {gamepad_axis = "right_x"},
     orbit_y = {gamepad_axis = "right_y"},
-    play_again = {keyboard = "enter"},
     restart = {keyboard = "r", gamepad_button = "back"},
+    next_level = {keyboard = "n"},
     exit = {keyboard = "escape", gamepad_button = "start"},
   },
 }

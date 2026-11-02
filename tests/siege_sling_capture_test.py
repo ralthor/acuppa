@@ -1,4 +1,4 @@
-"""Siege Sling's aim view must render the sky, fort, and arc on Vulkan."""
+"""Siege Sling's menu and aim view must render the sky, UI, fort, and arc on Vulkan."""
 
 from pathlib import Path
 import subprocess
@@ -28,7 +28,14 @@ def count(pixels, x0, x1, y0, y1, test):
                if test(*pixels[(y * 1280 + x) * 3:(y * 1280 + x) * 3 + 3]))
 
 
-aim = capture("siege_aim.ppm", 30)
+menu = capture("siege_menu.ppm", 30)
+menu_sky = count(menu, 0, 1280, 0, 60, lambda r, g, b: b > r + 25 and b > 150)
+assert menu_sky > 60000, f"menu sky missing: {menu_sky}"
+panel = count(menu, 470, 810, 250, 520, lambda r, g, b: b > r and r + g + b < 360)
+assert panel > 30000, f"menu panel and buttons missing: {panel}"
+assert count(menu, 0, 1280, 300, 720, lambda r, g, b: g > b + 20) > 40000, "menu meadow missing"
+
+aim = capture("siege_aim.ppm", 30, "--scene", "play")
 sky = count(aim, 0, 1280, 50, 170, lambda r, g, b: b > r + 25 and b > 150)
 assert sky > 140000, f"blue sky missing above the horizon: {sky}"
 fort = (360, 920, 150, 420)
@@ -46,9 +53,9 @@ assert dots > 200, f"aim arc dots not visible: {dots}"
 scenery = count(aim, 0, 1280, 170, 215, lambda r, g, b: g > b + 20)
 assert scenery > 8000, f"horizon scenery missing: {scenery}"
 
-fired = capture("siege_fired.ppm", 50, "--hold-key", "space")
+fired = capture("siege_fired.ppm", 50, "--scene", "play", "--hold-key", "space")
 # The follow camera chases the red ball as it reaches the fort.
 red = count(fired, 0, 1280, 84, 720, lambda r, g, b: r > 100 and r > 3 * g and r > 3 * b)
 assert red > 800, f"follow view does not show the flying ball: {red}"
 assert fired != aim, "firing did not change the view"
-print("Siege Sling aim view rendered sky, fort, and arc")
+print("Siege Sling menu and aim view rendered sky, UI, fort, and arc")
