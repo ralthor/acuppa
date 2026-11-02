@@ -5,6 +5,7 @@ local Rig = assert(loadfile(dir .. "/camera_rig.lua"))()
 local Drag = assert(loadfile(dir .. "/drag_aim.lua"))()
 local Debris = assert(loadfile(dir .. "/debris.lua"))()
 local Catalog = assert(loadfile(dir .. "/catalog.lua"))()
+local Core = assert(loadfile(dir .. "/editor_core.lua"))()
 
 local function near(a, b, t) return math.abs(a - b) <= (t or 1e-6) end
 local function dist(a, b)
@@ -164,5 +165,88 @@ fails(function() Catalog.material("lava") end, "unknown material lava")
 fails(function() Catalog.block("cube", "lava", "x", {0, 0, 0}) end, "unknown material")
 fails(function() Catalog.block("cube", "wood", "", {0, 0, 0}) end, "id")
 fails(function() Catalog.block("cube", "wood", "x", {0, 0}) end, "position")
+
+-- Editor core ---------------------------------------------------------------------
+assert(Core.snap(0.12) == 0 and Core.snap(0.13) == 0.25 and Core.snap(-0.38) == -0.5
+       and Core.snap(1.3, 0.5) == 1.5, "grid snap")
+fails(function() Core.snap(0 / 0) end, "finite")
+fails(function() Core.snap(1, 0) end, "positive step")
+local h = {1.1, 0.12, 0.4}
+local turned = Core.rotate_y(h)
+assert(turned[1] == 0.4 and turned[2] == 0.12 and turned[3] == 1.1, "turn swaps X and Z")
+local tipped = Core.tip({0.25, 0.7, 0.3})
+assert(tipped[1] == 0.25 and tipped[2] == 0.3 and tipped[3] == 0.7, "tip lays a pillar along its longer axis")
+assert(Core.tip({0.6, 0.1, 0.35})[2] == 0.6, "tip stands a plank on its end")
+local tipped_z = Core.tip({0.2, 0.5, 0.6})
+assert(tipped_z[2] == 0.6 and tipped_z[3] == 0.5, "tip swaps with the longer horizontal axis")
+assert(Core.tip(Core.tip({0.25, 0.7, 0.3}))[2] == 0.7, "tipping twice restores")
+fails(function() Core.rotate_y({1, 2}) end, "three finite")
+assert(Core.half({shape = "sphere", radius = 0.45})[2] == 0.45, "sphere half")
+-- Stack height: a plank on a pillar rests on its top face.
+local pillar_top = Core.top({0, 0.7, -18}, {0.25, 0.7, 0.3})
+assert(near(pillar_top, 1.4), "pillar top")
+local spot = Core.place({0.13, 1.1, -17.9}, h, {top = pillar_top})
+assert(spot[1] == 0.25 and near(spot[2], 1.52) and spot[3] == -18, "stack placement")
+local ground = Core.place({1.37, 0, -18.1}, {0.35, 0.35, 0.35})
+assert(ground[1] == 1.25 and ground[2] == 0.35 and ground[3] == -18, "ground placement")
+assert(near(Core.top({0, 1, 0}, {1, 0.5, 0.2}, {0, 0, math.pi / 2}), 2), "rolled box top uses its X extent")
+assert(near(Core.top({0, 1, 0}, {1, 0.5, 0.2}, {math.pi / 2, 0, 0}), 1.2), "pitched box top uses Z")
+assert(near(Core.top({0, 1, 0}, {1, 0.5, 0.2}, {0, 1.0, 0}), 1.5), "yaw keeps the top")
+assert(Core.top({0, 1, 0}, {0.4, 0.4, 0.4}, nil, true) == 1.4, "sphere top")
+fails(function() Core.place({0, 0, 0}, h, {top = "x"}) end, "support")
+-- Stability tracker.
+local tr = Core.tracker()
+local stable, moving = tr:update(1 / 60, {2, 0})
+assert(not stable and moving == 1, "moving body")
+for _ = 1, 89 do stable = tr:update(1 / 60, {0.01, 0}) end
+assert(not stable, "not stable before 1.5 s")
+stable = tr:update(1 / 60, {0.01})
+assert(stable and tr.moving == 0, "stable after 1.5 s calm")
+tr:update(1 / 60, {0.5})
+assert(not tr.stable and tr.calm == 0, "motion restarts the calm timer")
+tr:update(0.25, {}) ; tr:reset()
+assert(not tr.stable and tr.calm == 0, "reset forgets calm time")
+fails(function() tr:update(1, {}) end, "dt")
+fails(function() tr:update(0.1, {0 / 0}) end, "finite")
+fails(function() Core.tracker({speed = 0}) end, "positive")
+-- Undo history.
+local hist = Core.history(2)
+local layout = {{id = "a", position = {1, 2, 3}}}
+hist:push(layout)
+layout[1].position[1] = 9
+assert(hist.items[1][1].position[1] == 1, "history copies layouts")
+hist:push({}); hist:push({{id = "c"}})
+assert(hist:count() == 2 and hist:pop()[1].id == "c" and #hist:pop() == 0 and hist:pop() == nil,
+       "history caps and pops newest first")
+fails(function() Core.history(0) end, "limit")
+fails(function() hist:push(3) end, "layout")
+-- Stars, names, slugs, ids.
+local stars = Core.suggest_stars({{material = "wood"}, {material = "metal"}}, 2, 4, Rules.MATERIALS, 500, 1000)
+assert(stars[1] >= 500 and stars[2] > stars[1] and stars[3] > stars[2] and stars[1] % 500 == 0,
+       "star suggestion ascends in 500s")
+local empty = Core.suggest_stars({}, 0, 1, Rules.MATERIALS)
+assert(empty[1] == 500 and empty[2] == 1000 and empty[3] == 1500, "empty level stars")
+fails(function() Core.suggest_stars({{material = "lava"}}, 1, 1, Rules.MATERIALS) end, "unknown material")
+fails(function() Core.suggest_stars({}, 1, 0, Rules.MATERIALS) end, "shots")
+assert(Core.name(1) == "Pebble Keep" and Core.name(#Core.NAMES + 2) == "Custom Level 2", "names")
+assert(Core.slug("Pebble Keep") == "pebble_keep" and Core.slug("Custom Level 3!") == "custom_level_3"
+       and Core.slug("Index") == "index_level" and Core.slug("***") == "level", "slugs")
+fails(function() Core.slug("") end, "name")
+assert(Core.unique_id("wood", {wood_1 = true, wood_2 = true}) == "wood_3", "unique ids")
+local p, r = Core.clean_pose({0.70000123, -0.0000004, -17.25049}, {0.0004, 1.5707963, -0.001})
+assert(p[1] == 0.7 and p[2] == 0 and math.type(p[2]) == "float" and 1 / p[2] > 0 and p[3] == -17.25
+       and r[1] == 0 and r[2] == 1.5708 and r[3] == 0, "clean pose")
+assert(select(2, Core.clean_pose({0, 0, 0}, {0.001, 0, -0.001})) == nil, "near-zero rotation dropped")
+local built = Core.build_level({
+  {kind = "block", id = "stone_1", material = "stone", half_extents = {0.25, 0.7, 0.3},
+   position = {0, 0.7, -18}, rotation = {0, 0.5, 0}},
+  {kind = "block", id = "rubber_1", material = "rubber", shape = "sphere", radius = 0.45,
+   position = {2, 0.45, -18}, rotation = {0.3, 0.2, 0.1}},
+  {kind = "target", id = "grump_1", shape = "sphere", radius = 0.45, position = {1, 0.45, -18}},
+}, {name = "Pebble Keep", shots = 3, stars = {500, 1000, 2000}}, {})
+Rules.check_playable(built)
+assert(#built.blocks == 2 and #built.targets == 1 and built.blocks[1].rotation[2] == 0.5
+       and built.blocks[2].radius == 0.45 and not built.blocks[2].half_extents
+       and built.fort_center[1] == 1 and built.targets[1].rotation == nil, "built level")
 
 print("siege_sling_play_modules: ok")

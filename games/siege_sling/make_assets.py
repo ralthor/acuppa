@@ -296,6 +296,10 @@ for name, color, metallic, roughness, texture in [
     ("chip_metal", (0.6, 0.62, 0.66), 1.0, 0.3, None),
     ("chip_rubber", (0.08, 0.08, 0.09), 0.0, 0.9, None),
     ("chip_brick", (0.75, 0.25, 0.1), 0.0, 0.85, None),
+    # Level editor markers: moving/fallen (red), preview (yellow), selection (cyan).
+    ("marker_red", (1.0, 0.05, 0.03), 0.0, 0.4, None),
+    ("marker_preview", (1.0, 0.85, 0.1), 0.0, 0.4, None),
+    ("marker_select", (0.1, 0.85, 1.0), 0.0, 0.4, None),
 ]:
     mesh(name, *box(), color, metallic, roughness, texture)
 

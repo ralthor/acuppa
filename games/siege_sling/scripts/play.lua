@@ -42,9 +42,9 @@ local function axis(negative, positive)
   return math.max(-1, math.min(1, positive - negative))
 end
 
-local function spawn(name, position, mesh, scale, physics, shadows)
+local function spawn(name, position, mesh, scale, physics, shadows, rotation)
   local id = tp.entity_create(name)
-  tp.component_set(id, "transform", {position = position, scale = scale})
+  tp.component_set(id, "transform", {position = position, scale = scale, rotation = rotation})
   tp.component_set(id, "mesh", {mesh = mesh, casts_shadows = shadows ~= false})
   if physics then tp.component_set(id, "physics", physics) end
   return id
@@ -70,7 +70,7 @@ local function spawn_fort()
       physics.shape, physics.half_extents = "box", block.half_extents
       mesh, scale = "assets/" .. block.material .. ".gltf", block.half_extents
     end
-    local id = spawn(block.id, block.position, mesh, scale, physics)
+    local id = spawn(block.id, block.position, mesh, scale, physics, true, block.rotation)
     bodies[id] = {kind = "block", id = block.id, material = block.material, children = {},
                   mass = Rules.block_mass(block)}
   end
@@ -282,11 +282,17 @@ local function show_camera(eye, target)
 end
 
 local function record_result()
-  if game.state ~= "won" then return end
+  if game.state ~= "won" or Session.playtest then return end
   best = Session.record(entry.file, game.score, game.stars)
 end
 
-local function has_next() return Session.index < level_count end
+local function has_next() return not Session.playtest and Session.index < level_count end
+
+-- A play test (Session.playtest holds the editor's draft) returns to the editor.
+local function back_to_editor()
+  Session.playtest = nil
+  tp.scene_switch("editor")
+end
 
 local function next_level()
   if not has_next() then return end
@@ -343,14 +349,19 @@ end
 
 return {
   start = function()
-    if Session.index < 1 or Session.index > #Session.levels() then Session.index = 1 end
-    level, entry, level_count = Session.load(Session.index)
+    if Session.playtest then
+      level = Rules.check_playable(Session.playtest)
+      entry, level_count = {name = level.name or "Custom"}, 0
+    else
+      if Session.index < 1 or Session.index > #Session.levels() then Session.index = 1 end
+      level, entry, level_count = Session.load(Session.index)
+    end
     game = Rules.new_game(level)
     rig = Rig.new({pouch = level.pouch, fort = level.fort_center, look_ahead = 17})
     drag = DragAim.new(Rules)
     debris = Debris.new({cap = 64, life = 1.0, ground = 0.05})
     aim = {yaw = level.aim.yaw, pitch = level.aim.pitch, power = level.aim.power}
-    best = Session.best(entry.file)
+    best = entry.file and Session.best(entry.file) or nil
     spawn_fort()
     local b = level.ball.radius
     pouch_ball = spawn("pouch ball", level.pouch, "assets/ball.gltf", {b, b, b})
@@ -385,7 +396,9 @@ return {
     else
       drag.active, preview = false, nil
       if game:finished() then
-        if edge("fire") then tp.scene_reload() end
+        if edge("fire") then
+          if Session.playtest then back_to_editor() else tp.scene_reload() end
+        end
         if game.state == "won" and edge("next_level") then next_level() end
       else
         held.fire = tp.action("fire") > 0
@@ -403,7 +416,7 @@ return {
 
   update = function(dt)
     if edge("exit") then
-      tp.scene_switch("menu")
+      if Session.playtest then back_to_editor() else tp.scene_switch("menu") end
       return
     end
     if edge("restart") then tp.scene_reload() end
@@ -415,7 +428,8 @@ return {
     local current = shown_aim()
     tp.ui_rect(0, 0, w, 44, 0.05, 0.12, 0.25, 0.38)
     tp.ui_rect(w - 330, h - 30, 330, 30, 0.05, 0.12, 0.25, 0.38)
-    tp.ui_text(w - 316, h - 22, string.format("LEVEL %d  %s", Session.index, entry.name:upper()), 1)
+    tp.ui_text(w - 316, h - 22, Session.playtest and ("PLAY TEST  " .. entry.name:upper()) or
+               string.format("LEVEL %d  %s", Session.index, entry.name:upper()), 1)
     tp.ui_text(18, 12, string.format("SHOTS %d   SCORE %d   GRUMPS %d",
                                      game.shots_left, game.score, game.targets_left), 2)
     if best then
@@ -446,6 +460,11 @@ return {
       tp.ui_text(x + 260, y + 158, best and string.format("BEST %d", best.score) or "NO BEST YET", 2)
       -- Buttons: Enter activates the focused (first) one; Space plays again.
       local bx = x + 40
+      if Session.playtest then
+        if tp.ui_button("editor", bx, y + 222, 200, 50, "BACK TO EDITOR") then back_to_editor() end
+        if tp.ui_button("again", bx + 210, y + 222, 180, 50, "TEST AGAIN") then tp.scene_reload() end
+        return
+      end
       if won and has_next() then
         if tp.ui_button("next", bx, y + 222, 150, 50, "NEXT LEVEL") then next_level() end
         bx = bx + 160

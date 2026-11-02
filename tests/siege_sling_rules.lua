@@ -245,6 +245,11 @@ local function bad_full(change, pattern)
   change(data)
   fails("full level " .. pattern, function() Rules.check_playable(data) end, pattern)
 end
+local turned = full()
+turned.blocks[1].rotation = {0, 1.5708, 0.01}
+check("rotated block valid", Rules.check_playable(turned) == turned)
+bad_full(function(l) l.blocks[1].rotation = {0, 9, 0} end, "rotation[2]")
+bad_full(function(l) l.blocks[1].rotation = {0, 0 / 0, 0} end, "rotation")
 bad_full(function(l) l.blocks[2].radius = nil end, "blocks[2].radius")
 bad_full(function(l) l.blocks[2].radius = 9 end, "blocks[2].radius")
 bad_full(function(l) l.blocks[2].half_extents = {1, 1, 1} end, "only for box")

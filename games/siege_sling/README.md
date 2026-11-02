@@ -16,8 +16,8 @@ so a chain reaction is worth far more than single hits.
 The game opens on a title menu: Play starts the first level you have not
 won yet, Levels lists every level with its best stars and score, and Quit
 exits. Use the mouse, or Up/Down and Enter or Space. The Editor button
-appears only when the game runs from source; the in-game level editor is the
-next step. Two levels ship: Grassy Hill (one connected fortress of 51 wood, stone,
+opens the in-game level editor; it appears only when the game runs from
+source, because exported games cannot write project files. Two levels ship: Grassy Hill (one connected fortress of 51 wood, stone,
 glass, and crate blocks) and Frozen Foundry (brick, ice, metal, and rubber
 towers with a stone boulder perched over a grump).
 
@@ -77,6 +77,9 @@ the fort while blocks settle, then eases back to the sling for the next shot.
   `levels/level2.lua`: shots, star scores, and each fort's blocks and grumps.
 - `scripts/session.lua`: loads levels with `tp.data_read`, remembers the
   chosen level across scene switches, and saves the best result per level.
+- `scenes/editor.scene.lua`, `scripts/editor.lua`, and `scripts/editor_core.lua`:
+  the level editor and its pure placement, stability, undo, and level-building
+  logic.
 - `scripts/catalog.lua`: the editor's shape palette (cube, small cube, plank,
   long plank, pillar, slab, boulder) and material display names and colors.
 - `scripts/rules.lua`: pure aim, launch, arc, damage, shot-flow, and score rules.
@@ -94,6 +97,48 @@ per unused shot on a win. Each level sets its own star scores (level 1:
 big chain or a win with shots to spare.
 
 SSAO is off: on this open meadow it drew visible bands across the grass.
+
+## Level editor
+
+![The Siege Sling level editor: material and shape palette, level settings, and a plank stacked on two pillars](../../docs/images/siege-sling-editor.png)
+
+Choose Editor on the title menu, or run
+`build/acuppa run games/siege_sling --scene editor`. You build in the real
+yard with the sling in view, and physics stays on: blocks fall, stacks
+settle, and a structure that cannot stand topples in front of you. The top
+bar shows STABLE once every body has stayed nearly still for 1.5 s. Otherwise
+it shows UNSTABLE with the number of moving bodies, or SETTLING. Moving or
+toppled blocks get a red marker. The editor snapshots the layout each time it
+becomes stable after an edit, and Reset returns to that snapshot after a
+collapse.
+
+| Action | Control |
+| --- | --- |
+| Place the selected item (a preview follows the cursor) | Left click |
+| Choose a material / shape or grump | 1-8 or palette / Tab or palette |
+| Turn 90 degrees / tip over | R / F |
+| Orbit / pan / zoom the camera | Right-drag or arrows / WASD / Z and X |
+| Reset the view / toggle the player's view | C / V |
+| Select mode: click to select, drag or G to move | Q |
+| Delete the selection / undo | Backspace / Ctrl+Z |
+| Play test / back to the menu | P / Escape (asks again if unsaved) |
+
+Items snap to a 0.25 m grid on the ground. Over a block they rest on its top
+face, centered on the cursor. The right panel cycles the level name through
+generated names (there is no text input) and sets shots and star scores. The
+star scores follow a suggestion from the blocks and grumps until you change
+them. The panel also holds Load next level (it cycles through every indexed
+level, including levels 1 and 2), New level, Save, Play test, Reset, Undo,
+and Clear all (which asks first).
+
+Save writes the settled layout (current positions and rotations, rounded to
+millimeters) to `levels/<name>.lua` and adds or updates its entry in
+`levels/index.lua`. It refuses to save while the layout is not STABLE or has
+no grump, and says why. Play test runs the current layout with the real game
+rules without saving. After a win, a loss, or Escape, you return to the
+editor with the exact layout you left; repeat as often as you like. Undo
+history and the snapshot are kept while you play test. Blocks may carry a
+`rotation = {x, y, z}` field (radians, applied Y, then X, then Z).
 
 ## Adding a level by hand
 
@@ -119,7 +164,10 @@ ctest --test-dir build -R siege_sling --output-on-failure
 
 `siege_sling_rules` and `siege_sling_play_modules` test the pure modules.
 `siege_sling_gameplay` runs the real game headlessly with injected keys and
-mouse drags, including the menu, level select, next level, and per-level
-best results. `siege_sling_capture` checks Vulkan captures of the menu and of the aim and
-follow views. `siege_sling_live_startup` opens the interactive window. `siege_sling_export`
+mouse drags, including the menu, level select, next level, per-level best
+results, a two-shot win on level 2, and the editor. The editor checks cover
+stacking, STABLE/UNSTABLE, Reset, save refusals, saving and validating a
+level, repeated play tests, select/delete/undo, and Load.
+`siege_sling_editor_live_startup` opens the editor window. `siege_sling_capture` checks Vulkan captures of the menu, the aim and follow
+views, and the editor. `siege_sling_live_startup` opens the interactive window. `siege_sling_export`
 and `siege_sling_export_capture` check the exported player.

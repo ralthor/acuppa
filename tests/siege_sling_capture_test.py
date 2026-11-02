@@ -58,4 +58,18 @@ fired = capture("siege_fired.ppm", 50, "--scene", "play", "--hold-key", "space")
 red = count(fired, 0, 1280, 84, 720, lambda r, g, b: r > 100 and r > 3 * g and r > 3 * b)
 assert red > 800, f"follow view does not show the flying ball: {red}"
 assert fired != aim, "firing did not change the view"
-print("Siege Sling menu and aim view rendered sky, UI, fort, and arc")
+# Level editor: palette, settings panel, STABLE badge, and the starter stack
+# (a wood plank on two stone pillars) seen from behind the sling.
+editor = capture("siege_editor.ppm", 120, "--scene", "editor")
+panel = count(editor, 0, 230, 60, 620, lambda r, g, b: b > r and r + g + b < 300)
+assert panel > 40000, f"editor palette panel missing: {panel}"
+swatch = count(editor, 12, 36, 74, 98, lambda r, g, b: r > 180 and 90 < g < 170 and b < 90)
+assert swatch > 300, f"wood palette swatch missing: {swatch}"
+badge = count(editor, 780, 976, 8, 36, lambda r, g, b: g > 120 and g > r + 50 and g > b + 50)
+assert badge > 2500, f"STABLE badge missing: {badge}"
+plank = count(editor, 560, 720, 280, 330, lambda r, g, b: r > 140 and 70 < g < 170 and b < 100)
+pillars = count(editor, 560, 720, 300, 370, lambda r, g, b: 120 < r < 220 and abs(r - g) < 15 and b >= r)
+assert plank > 300 and pillars > 300, f"starter stack missing: plank={plank} pillars={pillars}"
+sling = count(editor, 580, 700, 560, 700, lambda r, g, b: r > 120 and 50 < g < 130 and b < 60)
+assert sling > 1500, f"sling missing from the editor view: {sling}"
+print("Siege Sling menu, aim, and editor views rendered sky, UI, fort, arc, and palette")

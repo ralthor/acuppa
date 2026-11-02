@@ -61,9 +61,11 @@ The Lua-authored car game uses a Jolt four-wheel vehicle, collision and checkpoi
 
 ### Siege Sling
 
-A 3D slingshot game: pull back the sling with the mouse (or aim with keys or a gamepad) to launch a ball along a dotted arc at a textured fortress of wood, stone, glass, and explosive crates hiding round grumps. Toppled blocks crush grumps, crates blast their neighbors, chain reactions build combo multipliers, blocks break into debris, and material impact sounds, camera shake, scoring, stars, and a saved best result per level complete each level. A title menu offers Play, Levels (with best stars per level), and Quit; two levels ship, and new levels are plain data files listed in `levels/index.lua`. Blocks come in eight materials (adding ice, metal, rubber, and brick) as boxes of any size or round boulders. It uses Jolt material bodies with continuous collision, the gradient sky, an HDRI, and a shadowed sun. See [its README](games/siege_sling/README.md).
+A 3D slingshot game: pull back the sling with the mouse (or aim with keys or a gamepad) to launch a ball along a dotted arc at a textured fortress of wood, stone, glass, and explosive crates hiding round grumps. Toppled blocks crush grumps, crates blast their neighbors, chain reactions build combo multipliers, blocks break into debris, and material impact sounds, camera shake, scoring, stars, and a saved best result per level complete each level. A title menu offers Play, Levels (with best stars per level), and Quit; two levels ship, and new levels are plain data files listed in `levels/index.lua`. Blocks come in eight materials (adding ice, metal, rubber, and brick) as boxes of any size or round boulders. An in-game level editor (source runs only) builds levels with physics running and a live STABLE check, play-tests them repeatedly, and saves them as level data through `tp.data_write`. It uses Jolt material bodies with continuous collision, the gradient sky, an HDRI, and a shadowed sun. See [its README](games/siege_sling/README.md).
 
 ![Siege Sling aim view: a sling on a grassy hill, a dotted arc, and a three-tower fort under a blue sky](docs/images/siege-sling.png)
+
+![Siege Sling level editor: palette, level settings, and a small stacked fort](docs/images/siege-sling-editor.png)
 
 ### Falling Blocks
 

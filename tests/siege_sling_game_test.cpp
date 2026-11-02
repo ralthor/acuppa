@@ -91,6 +91,55 @@ void key(LuaProject& game, const char* name, float value) {
     game.inject({InputDevice::Keyboard, name, value});
 }
 
+void tap(LuaProject& game, const char* name) {
+    key(game, name, 1);
+    game.step(tick);
+    key(game, name, 0);
+    game.step(tick);
+}
+
+SceneFrame click(LuaProject& game, double x, double y) {
+    game.set_pointer(x, y);
+    game.step(tick);
+    game.inject({InputDevice::MouseButton, "left", 1});
+    game.step(tick);
+    game.inject({InputDevice::MouseButton, "left", 0});
+    return game.step(tick);
+}
+
+std::string ui_dump(const SceneFrame& frame) {
+    std::string all;
+    for (const auto& item : frame.ui) all += item.text + " | ";
+    return all;
+}
+
+// Block meshes (any material or boulder) by entity id: position.
+std::map<uint64_t, glm::vec3> blocks(const SceneFrame& frame) {
+    std::map<uint64_t, glm::vec3> found;
+    for (const auto& item : frame.imported)
+        for (const char* mesh : {"assets/wood.gltf", "assets/stone.gltf", "assets/brick.gltf", "assets/glass.gltf",
+                                 "assets/ice.gltf", "assets/metal.gltf", "assets/rubber.gltf", "assets/tnt.gltf",
+                                 "assets/boulder_", "assets/grump.gltf"})
+            if (uses(item, mesh)) found[item.id] = glm::vec3(item.transform[3]);
+    return found;
+}
+
+bool is_stable(const SceneFrame& frame) {
+    for (const auto& item : frame.ui)
+        if (item.text == "STABLE") return true;
+    return false;
+}
+
+// Runs until the editor shows STABLE (or the tick budget ends).
+SceneFrame until_stable(LuaProject& game, int ticks) {
+    SceneFrame frame;
+    for (int i = 0; i < ticks; ++i) {
+        frame = game.step(tick);
+        if (is_stable(frame)) break;
+    }
+    return frame;
+}
+
 // Fires with `release`, then checks the ball follows the dots shown just
 // before it. Dot i is the predicted position i * 0.07 s after launch.
 SceneFrame check_flight(LuaProject& game, const std::vector<glm::vec3>& predicted,
@@ -409,6 +458,11 @@ int main(int argc, char* argv[]) {
             frame = run(next, 300);
             expect(hud_number(frame, "SCORE") == 0 && hud_number(frame, "GRUMPS") == 5,
                    "level 2 fort scored or lost grumps while resting");
+            // Level 2 can be won: two shots found by a search over aims.
+            frame = shoot(next, {8, -12, 6});
+            frame = shoot(next, {-16, -12, 20});
+            expect(has_text(frame, "VICTORY!") && hud_number(frame, "GRUMPS") == 0,
+                   "level 2 was not won by its known two-shot solution");
             key(next, "escape", 1);
             next.step(tick);
             key(next, "escape", 0);
@@ -451,7 +505,7 @@ int main(int argc, char* argv[]) {
         menu.inject({InputDevice::MouseButton, "left", 0});
         frame = run(menu, 2);
         expect(has_text(frame, "CHOOSE A LEVEL") && has_text(frame, "1  GRASSY HILL") &&
-                   has_text(frame, "2  FROZEN FOUNDRY") && has_text(frame, "NEW"),
+                   has_text(frame, "2  FROZEN FOUNDRY") && !has_text(frame, "NEW"),
                "level select did not list both levels");
         bool best_shown = false;
         for (const auto& item : frame.ui) best_shown |= item.text.find_first_not_of("0123456789") ==
@@ -471,6 +525,170 @@ int main(int argc, char* argv[]) {
         expect(has_text(frame, "QUIT") && !frame.quit, "Escape did not return to the title menu");
         key(menu, "escape", 1);
         expect(menu.step(tick).quit, "Escape on the title menu did not quit");
+    }
+
+    // Level editor: opened from the menu; physics stays on while building.
+    {
+        LuaProject ed(work, "menu", LuaProject::Mode::Game, false);
+        ed.step(0);
+        ed.step(tick);
+        frame = click(ed, 640, 438);  // EDITOR
+        frame = run(ed, 2);
+        expect(has_text(frame, "LEVEL EDITOR") && has_text(frame, "BLOCKS 3  GRUMPS 1"),
+               "editor did not open with its starter layout: " + ui_dump(frame));
+        auto row = [](int i) { return 56 + i * 36 + 15; };
+        click(ed, 1160, row(12));  // CLEAR ALL asks first
+        frame = run(ed, 2);
+        expect(has_text(frame, "CLICK CLEAR ALL AGAIN") && has_text(frame, "BLOCKS 3"),
+               "clear all did not ask for confirmation");
+        click(ed, 1160, row(12));
+        frame = run(ed, 2);
+        expect(has_text(frame, "BLOCKS 0  GRUMPS 0"), "confirmed clear all left blocks");
+
+        // A stone pillar on the ground, then a long wood plank stacked on it.
+        tap(ed, "2");
+        for (int i = 0; i < 4; ++i) tap(ed, "tab");
+        frame = click(ed, 640, 360);
+        frame = run(ed, 30);
+        auto only = [](const SceneFrame& f, const char* mesh) {
+            std::vector<glm::vec3> found;
+            for (const auto& item : f.imported)
+                if (uses(item, mesh)) found.push_back(glm::vec3(item.transform[3]));
+            return found;
+        };
+        ed.set_pointer(100, 100);  // over the palette: no preview mesh
+        frame = run(ed, 2);
+        auto pillar = only(frame, "assets/stone.gltf");
+        expect(pillar.size() == 1 && std::abs(pillar[0].y - 0.7f) < 0.01f &&
+                   std::fmod(std::abs(pillar[0].x) + 1e-4f, 0.25f) < 1e-3f,
+               "pillar did not rest on the ground at a grid position");
+        tap(ed, "1");
+        click(ed, 130, 362 + 3 * 34 + 14);  // LONG PLANK
+        frame = click(ed, 640, 360);
+        ed.set_pointer(100, 100);
+        frame = run(ed, 30);
+        auto plank = only(frame, "assets/wood.gltf");
+        expect(plank.size() == 1 && std::abs(plank[0].y - 1.52f) < 0.01f &&
+                   std::abs(plank[0].x - pillar[0].x) < 0.3f,
+               "plank did not stack on the pillar's top face");
+        frame = until_stable(ed, 240);
+        expect(is_stable(frame), "pillar and plank never became STABLE");
+
+        // Refusals: no grump yet.
+        click(ed, 1160, row(8));  // SAVE
+        frame = run(ed, 2);
+        expect(has_text(frame, "CANNOT SAVE: ADD AT LEAST ONE GRUMP"), "saved a level without grumps");
+
+        // A heavy stone cube on the plank's end tips it: UNSTABLE, then Reset.
+        tap(ed, "2");
+        click(ed, 130, 362 + 14);  // CUBE
+        frame = click(ed, 670, 313);
+        bool unstable = false;
+        for (int i = 0; i < 120 && !unstable; ++i) unstable = has_text(ed.step(tick), "UNSTABLE (");
+        expect(unstable, "an overhanging cube did not make the layout UNSTABLE");
+        frame = run(ed, 180);
+        click(ed, 1160, row(10));  // RESET
+        ed.set_pointer(100, 100);
+        frame = until_stable(ed, 240);
+        plank = only(frame, "assets/wood.gltf");
+        expect(has_text(frame, "BLOCKS 2") && plank.size() == 1 && std::abs(plank[0].y - 1.52f) < 0.01f &&
+                   is_stable(frame),
+               "reset did not restore the stable pillar and plank: " + ui_dump(frame));
+
+        // A grump beside the pillar; saving right away is refused until stable.
+        click(ed, 130, 362 + 7 * 34 + 14);  // GRUMP
+        frame = click(ed, 560, 380);
+        click(ed, 1160, row(8));
+        frame = run(ed, 2);
+        expect(has_text(frame, "GRUMPS 1") && has_text(frame, "CANNOT SAVE: WAIT UNTIL STABLE"),
+               "saved while unstable: " + ui_dump(frame));
+        ed.set_pointer(100, 100);
+        frame = until_stable(ed, 300);
+        click(ed, 1160, row(8));
+        frame = run(ed, 2);
+        expect(has_text(frame, "SAVED LEVELS/PEBBLE_KEEP.LUA"), "editor did not save: " + ui_dump(frame));
+        std::ifstream saved_file(work / "levels/pebble_keep.lua");
+        std::string saved_text(std::istreambuf_iterator<char>{saved_file}, {});
+        std::ifstream index_file(work / "levels/index.lua");
+        std::string index_text(std::istreambuf_iterator<char>{index_file}, {});
+        expect(saved_text.rfind("return {", 0) == 0 && saved_text.find("half_extents = {1.1, 0.12, 0.4}") !=
+                   std::string::npos && index_text.find("levels/pebble_keep.lua") != std::string::npos &&
+                   index_text.find("Pebble Keep") != std::string::npos,
+               "saved level or index entry is wrong:\n" + saved_text + index_text);
+
+        // Play test twice; each return restores the exact pre-test layout.
+        const auto layout = blocks(frame);
+        expect(layout.size() == 3, "editor layout should hold two blocks and a grump");
+        for (int round = 0; round < 2; ++round) {
+            tap(ed, "p");
+            frame = run(ed, 2);
+            expect(has_text(frame, "PLAY TEST  PEBBLE KEEP") && hud_number(frame, "GRUMPS") == 1 &&
+                       hud_number(frame, "SHOTS") == 4,
+                   "P did not play-test the editor layout");
+            frame = run(ed, 30);
+            tap(ed, "escape");
+            ed.set_pointer(100, 100);
+            frame = run(ed, 1);
+            expect(has_text(frame, "LEVEL EDITOR"), "Escape in a play test did not return to the editor");
+            const auto back = blocks(frame);
+            std::vector<glm::vec3> a, b;
+            for (const auto& [id, p] : layout) a.push_back(p);
+            for (const auto& [id, p] : back) b.push_back(p);
+            bool same = a.size() == b.size();
+            for (size_t i = 0; same && i < a.size(); ++i) same = glm::length(a[i] - b[i]) < 1e-3f;  // contact settling only
+            expect(same, "play test did not restore the exact editor layout");
+        }
+
+        // Undo removes the last edit (the grump).
+        key(ed, "left_control", 1);
+        tap(ed, "z");
+        key(ed, "left_control", 0);
+        frame = run(ed, 2);
+        expect(has_text(frame, "GRUMPS 0") && has_text(frame, "BLOCKS 2"), "Ctrl+Z did not undo: " + ui_dump(frame));
+
+        // Select mode: click the pillar, Backspace deletes it, Ctrl+Z restores.
+        tap(ed, "q");
+        click(ed, 640, 362);
+        frame = run(ed, 2);
+        expect(has_text(frame, "SELECT: CLICK A BLOCK"), "Q did not switch to select mode");
+        tap(ed, "backspace");
+        frame = run(ed, 2);
+        expect(has_text(frame, "BLOCKS 1"), "Backspace did not delete the selected block: " + ui_dump(frame));
+        key(ed, "left_control", 1);
+        tap(ed, "z");
+        key(ed, "left_control", 0);
+        frame = run(ed, 2);
+        expect(has_text(frame, "BLOCKS 2"), "undo did not restore the deleted block");
+        tap(ed, "q");
+
+        // Load cycles through indexed levels; level 1 opens with its whole fort.
+        click(ed, 1160, row(6));
+        frame = run(ed, 2);
+        expect(has_text(frame, "LOADED GRASSY HILL") && has_text(frame, "BLOCKS 51  GRUMPS 4"),
+               "Load did not open level 1: " + ui_dump(frame));
+        frame = until_stable(ed, 300);
+        expect(is_stable(frame), "level 1 was not STABLE in the editor");
+        click(ed, 640, 300);  // one more block makes the level dirty
+
+        // Escape warns about unsaved changes, a second Escape leaves.
+        tap(ed, "escape");
+        frame = run(ed, 2);
+        expect(has_text(frame, "UNSAVED CHANGES") && has_text(frame, "LEVEL EDITOR"), "no unsaved-changes warning");
+        tap(ed, "escape");
+        frame = run(ed, 2);
+        expect(has_text(frame, "LEVELS") && has_text(frame, "QUIT"), "second Escape did not leave the editor");
+
+        // The saved level is listed and playable.
+        click(ed, 640, 368);  // LEVELS
+        frame = run(ed, 2);
+        expect(has_text(frame, "3  PEBBLE KEEP"), "saved level missing from level select");
+        click(ed, 540, 221 + 2 * 66 + 26);
+        frame = run(ed, 2);
+        expect(has_text(frame, "LEVEL 3  PEBBLE KEEP") && hud_number(frame, "GRUMPS") == 1,
+               "saved level did not play: " + ui_dump(frame));
+        frame = run(ed, 300);
+        expect(hud_number(frame, "GRUMPS") == 1 && hud_number(frame, "SCORE") == 0,
+               "saved level did not start at rest");
     }
 
     key(mouse, "escape", 1);

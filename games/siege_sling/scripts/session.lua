@@ -6,7 +6,9 @@
 local tp = require("acuppa")
 local Rules = require("scripts.rules")
 
-local Session = {index = 1, INDEX = "levels/index.lua", SLOT = "progress"}
+-- Session.editor keeps the level editor's state while a play test runs, and
+-- Session.playtest holds the draft level the play scene should test.
+local Session = {index = 1, INDEX = "levels/index.lua", SLOT = "progress", editor = nil, playtest = nil}
 
 -- Ordered {file, name} entries from levels/index.lua, validated.
 function Session.levels()

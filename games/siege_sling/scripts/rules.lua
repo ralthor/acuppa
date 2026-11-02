@@ -371,7 +371,7 @@ local LEVEL_FIELDS = {name = true, shots = true, stars = true, kill_y = true, po
                       aim = true, fort_center = true, ball = true, target_radius = true,
                       blocks = true, targets = true}
 local BLOCK_FIELDS = {id = true, material = true, shape = true, position = true,
-                      half_extents = true, radius = true}
+                      half_extents = true, radius = true, rotation = true}
 local TARGET_FIELDS = {id = true, position = true}
 local BALL_FIELDS = {radius = true, density = true, friction = true, restitution = true}
 
@@ -468,6 +468,11 @@ function Rules.validate_level(level)
     local shape = block.shape or "box"
     if shape ~= "box" and shape ~= "sphere" then fail(where, name .. ".shape must be box or sphere") end
     if block.position ~= nil then check_point(where, name .. ".position", block.position) end
+    if block.rotation ~= nil then
+      -- Euler angles in radians, applied Y (yaw), then X, then Z, as in transforms.
+      check_vec3(where, name .. ".rotation", block.rotation)
+      for k = 1, 3 do check_number(where, name .. ".rotation[" .. k .. "]", block.rotation[k], -7, 7) end
+    end
     if shape == "box" then
       if block.radius ~= nil then fail(where, name .. ".radius is only for sphere blocks") end
       if block.half_extents ~= nil then

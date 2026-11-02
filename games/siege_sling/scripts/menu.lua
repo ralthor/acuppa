@@ -68,9 +68,7 @@ local function title_screen(w, h)
   end
   y = y + 70
   if not Session.exported() then
-    if button("editor", x, y, 300, 56, "EDITOR") then
-      note = "THE LEVEL EDITOR ARRIVES IN THE NEXT UPDATE"
-    end
+    if button("editor", x, y, 300, 56, "EDITOR") then tp.scene_switch("editor") end
     y = y + 70
   end
   if button("quit", x, y, 300, 56, "QUIT") then tp.quit() end
