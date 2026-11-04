@@ -15,7 +15,7 @@ import subprocess
 import neat
 
 PROTOCOL = "acuppa-rocket 1"
-SCENARIO_COUNT = 8
+SCENARIO_COUNT = 24  # Flights every genome flies per generation.
 SCORE_PARTS = ("center", "landing", "soft", "fuel", "speed")
 FRAME_FIELDS = 12  # x y z rx ry rz throttle gimbal_x gimbal_z fuel wind_x wind_z
 # Ranges for the random start state and weather drawn for every generation, in
@@ -52,15 +52,18 @@ def _number(value):
 
 # Ranges that keep their full size at every difficulty.
 FIXED_RANGES = ("y", "wind_heading", "gust_period")
+# Start offsets never shrink below this share of their range (about 2.4 m),
+# so even the easiest flights reward steering toward the pad.
+MIN_OFFSET_LEVEL = 0.3
 
 
-def next_difficulty(level, champion_landed, step):
-    """Adaptive curriculum: once the champion lands at least 6 of 8 flights,
-    the next generation gets harder by `step`; at 1 or fewer it eases by a
-    third of that. Level 0 starts above the pad in calm air; 1 is full size."""
-    if champion_landed >= 6:
+def next_difficulty(level, landed_share, step):
+    """Adaptive curriculum: once the champion lands at least 75% of its
+    flights, the next generation gets harder by `step`; at 15% or less it
+    eases by a third of that. Level 0 starts in calm air; 1 is full size."""
+    if landed_share >= 0.75:
         return min(1.0, level + step)
-    if champion_landed <= 1:
+    if landed_share <= 0.15:
         return max(0.0, level - step / 3)
     return level
 
@@ -68,7 +71,8 @@ def next_difficulty(level, champion_landed, step):
 def random_scenarios(seed, generation, count=SCENARIO_COUNT, level=1.0):
     """The start states and weather every genome of one generation flies.
     Reproducible from (seed, generation); different for each generation.
-    Offsets, speeds, tilts, and wind shrink toward zero as `level` drops."""
+    Speeds, tilts, and wind shrink toward zero as `level` drops; start
+    offsets shrink only to MIN_OFFSET_LEVEL of their range."""
     rng = random.Random(seed * 1_000_003 + generation)
     scenarios = []
     for _ in range(count):
@@ -77,10 +81,36 @@ def random_scenarios(seed, generation, count=SCENARIO_COUNT, level=1.0):
             value = rng.uniform(low, high)
             if name not in FIXED_RANGES:
                 center = min(max(0.0, low), high)
-                value = center + level * (value - center)
+                share = max(level, MIN_OFFSET_LEVEL) if name in ("x", "z") else level
+                value = center + share * (value - center)
             scenario[name] = round(value, 4)
         scenarios.append(scenario)
     return scenarios
+
+
+# Two innate behaviors every first-generation rocket starts with. Keys are
+# (input, output) links. Balance: TILT X and SPIN Z drive GIMBAL X, and TILT Z
+# and SPIN X drive GIMBAL Z, so the engine swings under the rocket and holds
+# it upright like a hand balancing a broom. Descent: HEIGHT and VY lower the
+# throttle as the rocket falls slower or higher, giving a gentle straight
+# descent. Steering toward the pad, wind, and fuel use are left to evolve.
+INNATE_LINKS = {(-7, 1): 4.0, (-10, 1): -2.0, (-8, 2): 4.0, (-9, 2): 2.0,
+                (-3, 0): -5.0, (-5, 0): -3.0}
+
+
+def seed_reflex(population, reflex=INNATE_LINKS):
+    """Gives every genome of a new population the innate links, with all other
+    starting links and output biases at 0, so no engine starts swiveled.
+    Mutation then explores from that working rocket; evolution may change or
+    drop the innate links too."""
+    for genome in population.values():
+        # Every other starting link begins at 0: a random FUEL weight, for
+        # example, acts like an engine stuck at an angle and flips the rocket.
+        for key, gene in genome.connections.items():
+            gene.weight = reflex.get(key, 0.0)
+            gene.enabled = True
+        for output in (0, 1, 2):
+            genome.nodes[output].bias = 0.0
 
 
 def encode_batch(entries, config, scenarios, trace_scenario=0, threads=0):
@@ -233,8 +263,10 @@ def to_lua(value, indent=0):
     raise ValueError(f"unsupported value {type(value).__name__}")
 
 
-def pack_rows(rows):
-    return ";".join(",".join(row) for row in rows)
+def pack_rows(rows, digits=4):
+    """Packs rows of numbers into one string, rounded to `digits` significant
+    digits so three replayed flights stay well under the 1 MiB file limit."""
+    return ";".join(",".join(f"{float(v):.{digits}g}" for v in row) for row in rows)
 
 
 def write_lua(path, value):
@@ -266,12 +298,16 @@ def view_landers(population, species_set, best):
     return [(role, genome, species_of.get(genome.key, 0)) for role, genome in picks]
 
 
-def build_run(generation, scenario, weather, config, population, species_set, best, picks,
-              traces, landed, landing_rate, history, rate_history, level=1.0):
-    """One viewer file: the generation's statistics, the champion network,
-    and the recorded flights on the display scenario `weather`."""
-    fitnesses = [g.fitness for g in population.values() if g.fitness is not None]
-    champion = traces[best.key]
+VIEW_FLIGHTS = 3  # Flights replayed per generation, each from a different start.
+
+
+def view_flight_indices(generation, count=SCENARIO_COUNT, shown=VIEW_FLIGHTS):
+    """Which of a generation's flights the viewer replays: evenly spread and
+    rotating each generation, so they start from different places."""
+    return [(generation - 1 + k * count // shown) % count for k in range(shown)]
+
+
+def build_flight(index, weather, picks, traces, champion_key):
     landers = []
     for role, genome, sid in picks:
         trace = traces[genome.key]
@@ -282,13 +318,20 @@ def build_run(generation, scenario, weather, config, population, species_set, be
                         "score": {k: round(v, 2) for k, v in trace["score"].items()},
                         "run_score": round(trace["fitness"], 2),
                         "frames": pack_rows(trace["frames"])})
+    return {"scenario": index + 1, "weather": dict(weather),
+            "acts": pack_rows(traces[champion_key]["acts"], 3), "landers": landers}
+
+
+def build_run(generation, flights, node_keys, config, population, species_set, best, landed,
+              landing_rate, history, rate_history, level=1.0):
+    """One viewer file: the generation's statistics, the champion network,
+    and the recorded flights (from build_flight) the viewer replays in turn."""
+    fitnesses = [g.fitness for g in population.values() if g.fitness is not None]
     return {
-        "format": 2,
+        "format": 3,
         "generation": generation,
-        "scenario": scenario + 1,
         "scenarios": SCENARIO_COUNT,
         "difficulty": round(level, 3),
-        "weather": dict(weather),
         "population": len(population),
         "species_count": len(species_set.species),
         "best_fitness": round(best.fitness, 3),
@@ -298,7 +341,6 @@ def build_run(generation, scenario, weather, config, population, species_set, be
         "history": [round(v, 2) for v in history[-HISTORY_LENGTH:]],
         "rate_history": [round(v, 4) for v in rate_history[-HISTORY_LENGTH:]],
         "network": layout_network(best, config),
-        "node_keys": champion["node_keys"],
-        "champion_acts": pack_rows(champion["acts"]),
-        "landers": landers,
+        "node_keys": node_keys,
+        "flights": flights,
     }

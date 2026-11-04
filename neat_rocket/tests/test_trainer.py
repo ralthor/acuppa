@@ -98,13 +98,15 @@ class ScenarioTest(unittest.TestCase):
 
 
 class DifficultyTest(unittest.TestCase):
-    def test_level_zero_starts_above_the_pad_in_calm_air(self):
+    def test_level_zero_is_calm_with_a_small_offset(self):
         for scenario in lab.random_scenarios(2, 4, level=0.0):
             for name in lab.SCENARIO_RANGES:
-                if name in lab.FIXED_RANGES:
+                if name in lab.FIXED_RANGES or name in ("x", "z"):
                     continue
                 self.assertEqual(scenario[name], 0.0, name)
             self.assertTrue(12 <= scenario["y"] <= 18)
+            limit = 8 * lab.MIN_OFFSET_LEVEL + 1e-3
+            self.assertTrue(abs(scenario["x"]) <= limit and abs(scenario["z"]) <= limit)
         half = lab.random_scenarios(2, 4, level=0.5)
         full = lab.random_scenarios(2, 4, level=1.0)
         for a, b in zip(half, full):
@@ -113,11 +115,32 @@ class DifficultyTest(unittest.TestCase):
             self.assertEqual(a["wind_heading"], b["wind_heading"])
 
     def test_difficulty_follows_the_champion(self):
-        self.assertAlmostEqual(lab.next_difficulty(0.2, 6, 0.06), 0.26)
-        self.assertEqual(lab.next_difficulty(0.2, 4, 0.06), 0.2)
-        self.assertAlmostEqual(lab.next_difficulty(0.2, 1, 0.06), 0.18)
-        self.assertEqual(lab.next_difficulty(0.99, 8, 0.06), 1.0)
-        self.assertEqual(lab.next_difficulty(0.01, 0, 0.06), 0.0)
+        self.assertAlmostEqual(lab.next_difficulty(0.2, 0.75, 0.06), 0.26)
+        self.assertEqual(lab.next_difficulty(0.2, 0.5, 0.06), 0.2)
+        self.assertAlmostEqual(lab.next_difficulty(0.2, 0.1, 0.06), 0.18)
+        self.assertEqual(lab.next_difficulty(0.99, 1.0, 0.06), 1.0)
+        self.assertEqual(lab.next_difficulty(0.01, 0.0, 0.06), 0.0)
+
+    def test_replayed_flights_are_spread_and_rotate(self):
+        self.assertEqual(lab.view_flight_indices(1), [0, 8, 16])
+        self.assertEqual(lab.view_flight_indices(2), [1, 9, 17])
+        self.assertEqual(lab.view_flight_indices(24), [23, 7, 15])
+
+
+class InnateTest(unittest.TestCase):
+    def test_first_rockets_balance_and_descend_and_nothing_else(self):
+        config = lab.load_config(os.path.join(LAB, "trainer", "neat.cfg"))
+        population = lab.neat.Population(config, seed=3).population
+        lab.seed_reflex(population)
+        for genome in population.values():
+            for key, gene in genome.connections.items():
+                self.assertEqual(gene.weight, lab.INNATE_LINKS.get(key, 0.0), key)
+                self.assertTrue(gene.enabled)
+            self.assertEqual([genome.nodes[k].bias for k in (0, 1, 2)], [0.0, 0.0, 0.0])
+
+    def test_pack_rows_rounds(self):
+        self.assertEqual(lab.pack_rows([["1.234567", "-0.0001236"], [2, 3]]),
+                         "1.235,-0.0001236;2,3")
 
 
 class TrainingRunTest(unittest.TestCase):
@@ -142,6 +165,7 @@ class TrainingRunTest(unittest.TestCase):
             self.assertTrue(text.startswith("return {"))
             self.assertIn(f"generation = {generation},", text)
             self.assertIn(f"scenario = {generation},", text)
+            self.assertEqual(text.count("acts = "), lab.VIEW_FLIGHTS)
             self.assertIn('role = "champion"', text)
             frames = re.search(r'frames = "([^"]*)"', text).group(1).split(";")
             self.assertGreater(len(frames), 10)

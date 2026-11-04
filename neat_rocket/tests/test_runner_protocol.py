@@ -102,7 +102,7 @@ class RunnerProtocolTest(unittest.TestCase):
             "acuppa-rocket 1 threads x": "thread count",
             "acuppa-rocket 2 threads 1": "version",
             "acuppa-lander 2 threads 1": "acuppa-rocket",
-            good.replace("scenarios 8", "scenarios 0", 1): "scenario count",
+            good.replace(f"scenarios {len(SCENARIOS)}", "scenarios 0", 1): "scenario count",
             good.replace("end\n", ""): "missing end",
             good.replace(" tanh ", " softmax ", 1): "activation",
             good + "junk": "after 'end'",
@@ -130,7 +130,7 @@ class RunnerProtocolTest(unittest.TestCase):
 
     def test_encode_rejects_bad_values(self):
         with self.assertRaises(ValueError):
-            lab.encode_batch([], self.config, SCENARIOS, trace_scenario=8)
+            lab.encode_batch([], self.config, SCENARIOS, trace_scenario=len(SCENARIOS))
         with self.assertRaises(ValueError):
             lab.encode_batch([], self.config, [])
         genome = mutated_population(self.config, 1, rounds=0)[0]

@@ -8,8 +8,8 @@ gusts drawn from --seed and the generation number) in one rocket_runner call.
 Scenarios start easy, above the pad in calm air, and grow toward full size
 whenever the champion lands at least 6 of its 8 flights (see --ramp-step).
 Afterwards the champion and the best member of each species are replayed on
-one of those scenarios, and the result is written to <out>/gen_NNNN.lua with
-<out>/status.lua listing the available generations.
+3 of those flights, from different starts, and the result is written to
+<out>/gen_NNNN.lua with <out>/status.lua listing the available generations.
 """
 
 import argparse
@@ -48,28 +48,33 @@ class ViewerPublisher(neat.reporting.BaseReporter):
     def post_evaluate(self, config, population, species_set, best):
         self.history.append(best.fitness)
         self.rate_history.append(self.landing_rate)
-        scenario = (self.generation - 1) % lab.SCENARIO_COUNT
         picks = lab.view_landers(population, species_set, best)
-        text = lab.encode_batch(((g.key, g, True) for _role, g, _sid in picks), config,
-                                self.scenarios, trace_scenario=scenario,
-                                threads=self.args.threads)
-        results, traces = lab.run_batch(self.args.runner, text)
-        landed = results[best.key][1]
-        run = lab.build_run(self.generation, scenario, self.scenarios[scenario], config,
-                            population, species_set, best, picks, traces, landed,
-                            self.landing_rate, self.history, self.rate_history, self.level)
+        flights, landed, node_keys = [], 0, None
+        for index in lab.view_flight_indices(self.generation):
+            text = lab.encode_batch(((g.key, g, True) for _role, g, _sid in picks), config,
+                                    self.scenarios, trace_scenario=index,
+                                    threads=self.args.threads)
+            results, traces = lab.run_batch(self.args.runner, text)
+            landed = results[best.key][1]
+            flights.append(lab.build_flight(index, self.scenarios[index], picks, traces,
+                                            best.key))
+            node_keys = traces[best.key]["node_keys"]
+        run = lab.build_run(self.generation, flights, node_keys, config, population,
+                            species_set, best, landed, self.landing_rate, self.history,
+                            self.rate_history, self.level)
         name = f"gen_{self.generation:04d}.lua"
         lab.write_lua(os.path.join(self.args.out, name), run)
         self.published.append(self.generation)
         lab.write_lua(os.path.join(self.args.out, "status.lua"),
                       {"format": 1, "latest": self.generation,
                        "generations": self.published, "running": True})
-        print(f"gen {self.generation:4d}  best {best.fitness:7.2f}  landed {landed}/8  "
+        print(f"gen {self.generation:4d}  best {best.fitness:7.2f}  landed {landed:2d}/{lab.SCENARIO_COUNT}  "
               f"population {100 * self.landing_rate:5.1f}%  difficulty {self.level:4.2f}  "
               f"species {len(species_set.species):2d}  nodes {len(best.nodes):2d}  "
               f"conns {sum(c.enabled for c in best.connections.values()):3d}", flush=True)
         if self.args.ramp_step > 0:
-            self.level = lab.next_difficulty(self.level, landed, self.args.ramp_step)
+            self.level = lab.next_difficulty(self.level, landed / lab.SCENARIO_COUNT,
+                                             self.args.ramp_step)
         if self.args.pace > 0:
             remaining = self.args.pace - (time.monotonic() - self.started)
             if remaining > 0:
@@ -106,6 +111,9 @@ def parse_args(argv):
     parser.add_argument("--pace", type=float, default=0.0,
                         help="minimum seconds per generation, to watch each one live")
     parser.add_argument("--pop-size", type=int, help="override the config population size")
+    parser.add_argument("--no-reflex", action="store_true",
+                        help="start from fully random networks without the innate balance "
+                             "and descent links")
     parser.add_argument("--ramp-step", type=float, default=0.05,
                         help="difficulty added after a generation whose champion lands 6 of 8 "
                              "(0 starts at full difficulty)")
@@ -127,6 +135,8 @@ def main(argv=None):
     for path in glob.glob(os.path.join(args.out, "gen_*.lua")):
         os.remove(path)
     population = neat.Population(config, seed=args.seed)
+    if not args.no_reflex:
+        lab.seed_reflex(population.population)
     publisher = ViewerPublisher(args, config, population)
     population.add_reporter(publisher)
     try:

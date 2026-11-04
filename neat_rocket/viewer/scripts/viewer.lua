@@ -58,16 +58,25 @@ local function find_status()
   end
 end
 
+-- A run file holds several replayed flights of one generation, each from a
+-- different start; the viewer plays them one after another.
 local function decode(data)
-  if data.format ~= 2 then error("unsupported run format " .. tostring(data.format)) end
-  if type(data.landers) ~= "table" or #data.landers == 0 then error("run has no landers") end
-  for i, lander in ipairs(data.landers) do
-    lander.track = Replay.decode(lander.frames, FRAME_WIDTH, "lander " .. i .. " frames")
-    lander.ends = Replay.duration(lander.track)
+  if data.format ~= 3 then error("unsupported run format " .. tostring(data.format)) end
+  if type(data.flights) ~= "table" or #data.flights == 0 then error("run has no flights") end
+  for f, flight in ipairs(data.flights) do
+    if type(flight.landers) ~= "table" or #flight.landers == 0 then
+      error("flight " .. f .. " has no rockets")
+    end
+    flight.duration = 0
+    for i, lander in ipairs(flight.landers) do
+      lander.track = Replay.decode(lander.frames, FRAME_WIDTH,
+                                   "flight " .. f .. " rocket " .. i .. " frames")
+      lander.ends = Replay.duration(lander.track)
+      flight.duration = math.max(flight.duration, lander.ends)
+    end
+    flight.acts = Replay.decode(flight.acts, #data.node_keys,
+                                "flight " .. f .. " champion activations")
   end
-  data.acts = Replay.decode(data.champion_acts, #data.node_keys, "champion activations")
-  data.duration = 0
-  for _, lander in ipairs(data.landers) do data.duration = math.max(data.duration, lander.ends) end
   return data
 end
 
@@ -81,7 +90,7 @@ local function reset_slot(slot, lander)
   for _, piece in ipairs(slot.debris) do show(piece, false) end
   show(slot.flash, false)
   show(slot.beacon, false)
-  for _, part in ipairs({slot.hull, slot.cabin, slot.bell}) do show(part, lander ~= nil) end
+  for _, part in ipairs({slot.hull, slot.bell}) do show(part, lander ~= nil) end
   if not lander then
     for _, part in ipairs({slot.bell, slot.flame}) do show(part, false) end
   end
@@ -90,6 +99,26 @@ end
 local function restart_replay()
   clock, wind_offset = 0, {0, 0}
   for i, slot in ipairs(slots) do reset_slot(slot, run and run.landers[i]) end
+end
+
+-- Makes flight `number` of the loaded generation the one being replayed.
+local function use_flight(number)
+  local flight = run.flights[number]
+  run.flight, run.landers, run.acts = number, flight.landers, flight.acts
+  run.weather, run.scenario, run.duration = flight.weather, flight.scenario, flight.duration
+  for i, slot in ipairs(slots) do
+    local lander = run.landers[i]
+    if lander then
+      local color = i == 1 and "champion" or
+                    string.format("ghost_%d", (lander.species - 1) % GHOST_COLORS + 1)
+      tp.component_set(slot.hull, "mesh", {mesh = "assets/rocket_" .. color .. ".gltf"})
+      for p, piece in ipairs(slot.debris) do
+        tp.component_set(piece, "mesh", {mesh = p % 2 == 0 and "assets/scorch.gltf" or
+                                                  "assets/" .. color .. ".gltf"})
+      end
+    end
+  end
+  restart_replay()
 end
 
 local function load_generation(new_index)
@@ -105,18 +134,7 @@ local function load_generation(new_index)
     return false
   end
   run, index, problem = result, new_index, nil
-  for i, slot in ipairs(slots) do
-    local lander = run.landers[i]
-    if lander then
-      local look = i == 1 and "assets/champion.gltf" or
-                   string.format("assets/ghost_%d.gltf", (lander.species - 1) % GHOST_COLORS + 1)
-      tp.component_set(slot.hull, "mesh", {mesh = look})
-      for p, piece in ipairs(slot.debris) do
-        tp.component_set(piece, "mesh", {mesh = p % 2 == 0 and "assets/scorch.gltf" or look})
-      end
-    end
-  end
-  restart_replay()
+  use_flight(1)
   return true
 end
 
@@ -154,14 +172,14 @@ local function pose(slot, frame)
     show(slot.flame, false)
   else
     show(slot.flame, true)
-    tp.component_set(slot.flame, "transform", {position = {0, -0.2 - l, 0}, scale = {0.12, l, 0.12}})
+    tp.component_set(slot.flame, "transform", {position = {0, -0.3 - l, 0}, scale = {0.12, l, 0.12}})
   end
 end
 
 local function explode(slot, frame, champion)
   slot.exploded = true
   slot.blast = {frame[1], frame[2], frame[3]}
-  for _, part in ipairs({slot.hull, slot.cabin, slot.bell, slot.flame}) do
+  for _, part in ipairs({slot.hull, slot.bell, slot.flame}) do
     show(part, false)
   end
   for _, piece in ipairs(slot.debris) do show(piece, true) end
@@ -197,11 +215,10 @@ local function make_slot(i)
   tp.component_set(pivot, "transform", {parent = root, position = {0, -0.9, 0}})
   local slot = {
     root = root,
-    hull = part("hull", "assets/champion.gltf", {0, 0, 0}, {0.5, 0.9, 0.5}, root),
-    cabin = part("nose", "assets/cabin.gltf", {0, 1.05, 0}, {0.3, 0.15, 0.3}, root),
+    hull = part("hull", "assets/rocket_champion.gltf", {0, 0, 0}, {0.5, 0.9, 0.5}, root),
     beacon = part("beacon", "assets/beacon.gltf", {0, 1.32, 0}, {0.08, 0.12, 0.08}, root),
     pivot = pivot,
-    bell = part("engine bell", "assets/scorch.gltf", {0, -0.1, 0}, {0.2, 0.12, 0.2}, pivot),
+    bell = part("engine bell", "assets/bell.gltf", {0, -0.15, 0}, {0.24, 0.15, 0.24}, pivot),
     flame = part("flame", "assets/flame.gltf", {0, -0.5, 0}, {0.12, 0.3, 0.12}, pivot),
     flash = part("flash", "assets/flame.gltf", {0, -20, 0}, {1, 1, 1}, 0),
     debris = {},
@@ -285,15 +302,15 @@ end
 
 local RULES = {
   "HOW A FLIGHT IS SCORED (MAX ABOUT 260)",
-  "CENTER   UP TO 60 FOR ENDING CLOSE TO THE PAD",
-  "LANDING  100 LANDED, 40 MISSED PAD, 0-40 CRASH (SLOWER = MORE)",
+  "CENTER   60 ON THE PAD, 22 AT 3 M, 8 AT 6 M",
+  "LANDING  100 LANDED, 20 MISSED PAD, 0-40 CRASH (SLOWER = MORE)",
   "         20 TIPPED OR OUT OF TIME, 0-20 TUMBLED (LONGER = MORE)",
   "SOFT     UP TO 30 FOR TOUCHING DOWN BELOW 2 M/S",
   "FUEL     UP TO 40 FOR FUEL LEFT AFTER LANDING",
   "SPEED    UP TO 30 FOR LANDING SOONER (12 S LIMIT)",
   "LANDED: UPRIGHT WITHIN 15 DEG, ON THE 3 M SQUARE PAD",
-  "FITNESS = MEAN OF 8 RANDOM FLIGHTS. DIFFICULTY GROWS WHEN",
-  "THE CHAMPION LANDS 6 OF 8 (OFFSETS, SPEED, TILT, WIND)",
+  "FITNESS = MEAN OF 24 RANDOM FLIGHTS; 3 ARE REPLAYED.",
+  "DIFFICULTY GROWS WHEN THE CHAMPION LANDS 75% OF THEM",
 }
 
 return {
@@ -330,7 +347,7 @@ return {
     if pressed("replay") and run then restart_replay() end
     -- In live mode, jump to the newest generation as soon as the replay ends.
     if go_live or (live and status and run and index < #status.generations and
-                   clock > run.duration + HOLD_SECONDS) then
+                   run.flight == #run.flights and clock > run.duration + HOLD_SECONDS) then
       refresh_status()
       if status then load_generation(#status.generations) end
     end
@@ -346,8 +363,14 @@ return {
     end
     local step = dt * speed
     clock = clock + step
-    if clock > run.duration + HOLD_SECONDS and not (live and index < #status.generations) then
-      restart_replay()
+    -- After each flight, play the next one; after the last, start over
+    -- (or, in live mode, the jump above moves on to a newer generation).
+    if clock > run.duration + HOLD_SECONDS then
+      if run.flight < #run.flights then
+        use_flight(run.flight + 1)
+      elseif not (live and index < #status.generations) then
+        use_flight(1)
+      end
     end
 
     local wind_x, wind_z = 0, 0
@@ -411,8 +434,8 @@ return {
     end
 
     local newest = status.generations[#status.generations]
-    text(16, 8, string.format("NEAT ROCKET  GEN %d  FLIGHT %d/%d  SPECIES %d  DIFFICULTY %d%%",
-                              run.generation, run.scenario, run.scenarios, run.species_count,
+    text(16, 8, string.format("NEAT ROCKET  GEN %d  FLIGHT %d OF %d  SPECIES %d  DIFFICULTY %d%%",
+                              run.generation, run.flight, #run.flights, run.species_count,
                               math.floor((run.difficulty or 1) * 100 + 0.5)), 2)
     local state = status.running and string.format("TRAINING IS AT GEN %d", newest) or
                   string.format("TRAINING FINISHED AT GEN %d", newest)

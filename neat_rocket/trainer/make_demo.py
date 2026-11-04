@@ -15,8 +15,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import lab  # noqa: E402
 import train  # noqa: E402
 
-GENERATIONS = 400
-KEEP = [1, 3, 5, 10, 20, 40, 80, 120, 200, 300, 400]
+GENERATIONS = 200
+KEEP = [1, 3, 5, 10, 20, 40, 60, 80, 120, 160, 200]
 DEMO = os.path.join(train.LAB, "viewer", "demo")
 
 

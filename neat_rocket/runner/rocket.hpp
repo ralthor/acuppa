@@ -65,8 +65,8 @@ struct Frame {
 
 // Fitness is the sum of these parts; README.md lists the rules.
 struct Score {
-    double center = 0;   // Up to 60 for ending close to the pad.
-    double landing = 0;  // Landed 100, off pad 40, crash 0..40, tipped/tumbled/timeout up to 20.
+    double center = 0;   // 60 * exp(-distance / 3 m): steep, so every meter closer pays.
+    double landing = 0;  // Landed 100, crash 0..40, off pad/tipped/tumbled/timeout up to 20.
     double soft = 0;     // Up to 30 for a gentle touchdown that did not crash.
     double fuel = 0;     // Up to 40 for fuel left after a landing.
     double speed = 0;    // Up to 30 for landing sooner.

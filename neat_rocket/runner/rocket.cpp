@@ -20,8 +20,9 @@ double clamp(double value, double low, double high) {
     return std::max(low, std::min(high, value));
 }
 
+// Steep near the pad, so every meter closer pays: 60 on the centre, 22 at 3 m.
 double proximity(float x, float z) {
-    return 60.0 * std::max(0.0, 1.0 - std::sqrt(double(x) * x + double(z) * z) / 15.0);
+    return 60.0 * std::exp(-std::sqrt(double(x) * x + double(z) * z) / 3.0);
 }
 
 // Thrust direction in the rocket's frame: each gimbal axis swivels up to 30 degrees.
@@ -51,7 +52,7 @@ Score score_of(const FlightResult& result) {
         score.fuel = 40.0 * result.fuel;
         score.speed = 30.0 * std::max(0.0, 1.0 - result.touch_time * 60.0 / kMaxTicks);
         break;
-    case Outcome::OffPad: score = {near, 40.0, gentle}; break;
+    case Outcome::OffPad: score = {near, 20.0, gentle}; break;
     case Outcome::Tipped: score = {near, 20.0, gentle}; break;
     case Outcome::Crashed:
         // Partial credit falls from 40 near the safe speed to 0 at a 14 m/s hit,
