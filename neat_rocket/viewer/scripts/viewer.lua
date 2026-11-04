@@ -21,6 +21,14 @@ local FRAME_WIDTH = 12
 local MAX_GIMBAL = math.rad(30)
 local CAMERA = {eye = {16, 13, 24}, target = {3.5, 6, 0}, up = {0, 1, 0}, fov = 50,
                 near = 0.1, far = 200}
+-- The onboard camera sits on the champion's side at the base of the fins, looks
+-- down past the engine bell at the ground, and is drawn in the bottom-right
+-- corner. Positions are in the rocket's frame, in meters.
+local ONBOARD = {eye = {0.75, -0.85, 0}, target = {-2.3, -4.55, 0}, up = {-1, 0, 0}, fov = 80,
+                 near = 0.03, far = 200}
+local INSET_W, INSET_H = 320, 240
+local NOISE_RECTS = 36
+local GROUND_MARKS = 140
 local OUTCOME_TEXT = {landed = "LANDED", off_pad = "MISSED PAD", crashed = "CRASHED",
                       tipped = "TIPPED OVER", tumbled = "TUMBLED", timeout = "OUT OF TIME",
                       out_of_bounds = "FLEW AWAY"}
@@ -176,6 +184,42 @@ local function pose(slot, frame)
   end
 end
 
+-- Rotates a vector from the rocket's frame into the world the way the engine
+-- applies a transform rotation: about Z first, then X, then Y.
+local function rotate(v, rx, ry, rz)
+  local x, y, z = v[1], v[2], v[3]
+  local c, s = math.cos(rz), math.sin(rz)
+  x, y = c * x - s * y, s * x + c * y
+  c, s = math.cos(rx), math.sin(rx)
+  y, z = c * y - s * z, s * y + c * z
+  c, s = math.cos(ry), math.sin(ry)
+  x, z = c * x + s * z, -s * x + c * z
+  return {x, y, z}
+end
+
+local function inset_rect()
+  local w, h = tp.viewport_size()
+  return math.floor(w - INSET_W - 12), math.floor(h - INSET_H - 34)
+end
+
+-- Rides along with the champion; the camera is lost when the rocket explodes.
+local function update_onboard(frame)
+  if not frame then
+    tp.set_inset(nil)
+    return
+  end
+  local x, y, z, rx, ry, rz = table.unpack(frame)
+  local function world(v)
+    local r = rotate(v, rx, ry, rz)
+    return {x + r[1], y + r[2], z + r[3]}
+  end
+  local eye = world(ONBOARD.eye)
+  local ix, iy = inset_rect()
+  tp.set_inset({eye = eye, target = world(ONBOARD.target),
+                up = rotate(ONBOARD.up, rx, ry, rz), fov = ONBOARD.fov, near = ONBOARD.near,
+                far = ONBOARD.far, x = ix, y = iy, width = INSET_W, height = INSET_H})
+end
+
 local function explode(slot, frame, champion)
   slot.exploded = true
   slot.blast = {frame[1], frame[2], frame[3]}
@@ -220,7 +264,7 @@ local function make_slot(i)
     pivot = pivot,
     bell = part("engine bell", "assets/bell.gltf", {0, -0.15, 0}, {0.24, 0.15, 0.24}, pivot),
     flame = part("flame", "assets/flame.gltf", {0, -0.5, 0}, {0.12, 0.3, 0.12}, pivot),
-    flash = part("flash", "assets/flame.gltf", {0, -20, 0}, {1, 1, 1}, 0),
+    flash = part("flash", "assets/blast.gltf", {0, -20, 0}, {1, 1, 1}, 0),
     debris = {},
   }
   for p = 1, Effects.PIECES do
@@ -229,6 +273,29 @@ local function make_slot(i)
                           {size, size * 0.7, size}, 0)
   end
   return slot
+end
+
+-- Small flat squares and triangles scattered over the ground, so the onboard
+-- camera shows the ground rushing up. A fixed generator keeps them in place.
+local function scatter_marks()
+  local seed = 12345
+  local function random()
+    seed = (seed * 1103515245 + 12345) % 2147483648
+    return seed / 2147483648
+  end
+  local placed = 0
+  while placed < GROUND_MARKS do
+    local x, z = (random() - 0.5) * 50, (random() - 0.5) * 50
+    local size, turn, shape = 0.12 + random() * 0.25, random() * math.pi, random()
+    if math.abs(x) > 2.2 or math.abs(z) > 2.2 then  -- Keep the pad clear.
+      placed = placed + 1
+      local id = tp.entity_create("ground mark " .. placed)
+      tp.component_set(id, "transform", {position = {x, 0.004, z}, rotation = {0, turn, 0},
+                                         scale = {size, 0.003, size}})
+      tp.component_set(id, "mesh", {mesh = shape < 0.5 and "assets/mark.gltf" or
+                                            "assets/mark_triangle.gltf", casts_shadows = false})
+    end
+  end
 end
 
 local function step_generation(delta)
@@ -300,6 +367,60 @@ local function draw_graph(x, y, width, height)
   return items
 end
 
+-- The onboard view's frame and label, throttle and engine-swivel gauges at
+-- its left, and static with SIGNAL LOST once the champion has exploded.
+-- Returns the number of UI items drawn.
+local function draw_onboard(frame, lost)
+  local x, y = inset_rect()
+  local items = 0
+  local function rect(...)
+    items = items + 1
+    tp.ui_rect(...)
+  end
+  local function text(...)
+    items = items + 1
+    tp.ui_text(...)
+  end
+  rect(x - 2, y - 20, INSET_W + 4, 20, 0.02, 0.03, 0.06, 0.85)
+  text(x + 6, y - 16, lost and "ONBOARD CAMERA - NO SIGNAL" or "ONBOARD CAMERA - ENGINE", 1)
+  rect(x - 2, y, 2, INSET_H, 0.3, 0.35, 0.45, 1)
+  rect(x + INSET_W, y, 2, INSET_H, 0.3, 0.35, 0.45, 1)
+  rect(x - 2, y + INSET_H, INSET_W + 4, 2, 0.3, 0.35, 0.45, 1)
+  if lost then
+    rect(x, y, INSET_W, INSET_H, 0.04, 0.04, 0.05, 1)
+    for _ = 1, NOISE_RECTS do
+      local v = math.random() * 0.8
+      local nw = math.random(8, 90)
+      rect(x + math.random(0, INSET_W - nw), y + math.random(0, INSET_H - 6), nw,
+           math.random(2, 6), v, v, v, 1)
+    end
+    rect(x + INSET_W / 2 - 92, y + INSET_H / 2 - 18, 184, 36, 0, 0, 0, 0.85)
+    text(x + INSET_W / 2 - 80, y + INSET_H / 2 - 10, "SIGNAL LOST", 2)
+  end
+
+  -- Throttle: a bar that fills from the bottom.
+  local gx = x - 150
+  local throttle = lost and 0 or frame[7]
+  rect(gx, y, 30, INSET_H, 0.02, 0.03, 0.06, 0.85)
+  local fill = (INSET_H - 24) * math.max(0, math.min(1, throttle))
+  if fill >= 1 then rect(gx + 6, y + INSET_H - 4 - fill, 18, fill, 1.0, 0.55, 0.12, 0.95) end
+  text(gx - 2, y - 16, string.format("THR %3.0f%%", throttle * 100), 1)
+
+  -- Engine swivel: the dot shows where the engine points, up to 30 degrees
+  -- each way (X across, Z up and down).
+  local size = 100
+  local bx, by = x - 110, y + 40
+  rect(bx, by, size, size, 0.02, 0.03, 0.06, 0.85)
+  rect(bx + size / 2, by, 1, size, 0.3, 0.35, 0.45, 1)
+  rect(bx, by + size / 2, size, 1, 0.3, 0.35, 0.45, 1)
+  local sx, sz = lost and 0 or frame[8], lost and 0 or frame[9]
+  rect(bx + size / 2 * (1 + sx) - 4, by + size / 2 * (1 - sz) - 4, 8, 8, 0.3, 1.0, 0.5, 1)
+  text(bx, by - 16, "ENGINE SWIVEL", 1)
+  text(bx, by + size + 6, string.format("X %+3.0f", sx * 30), 1)
+  text(bx, by + size + 22, string.format("Z %+3.0f DEG", sz * 30), 1)
+  return items
+end
+
 local RULES = {
   "HOW A FLIGHT IS SCORED (MAX ABOUT 260)",
   "CENTER   60 ON THE PAD, 22 AT 3 M, 8 AT 6 M",
@@ -323,6 +444,7 @@ return {
                 ground = {0.05, 0.05, 0.06}, sun_direction = {0.35, 1, 0.45},
                 sun_color = {0.8, 0.85, 1}, sun_size = 0.02})
     tp.set_ssao(2, 0.4, 1.2)
+    scatter_marks()
     for i = 1, SLOTS do slots[i] = make_slot(i) end
     for i = 1, Effects.STREAKS do
       streaks[i] = tp.entity_create("wind streak " .. i)
@@ -359,6 +481,7 @@ return {
     end
     if not run then
       for _, streak in ipairs(streaks) do show(streak, false) end
+      update_onboard(nil)
       return
     end
     local step = dt * speed
@@ -394,6 +517,8 @@ return {
         end
       end
     end
+
+    update_onboard(not slots[1].exploded and Replay.sample(run.landers[1].track, clock) or nil)
 
     -- Streaks drift along the wind and point the way it blows.
     wind_offset[1] = wind_offset[1] + wind_x * 2.5 * step
@@ -486,6 +611,7 @@ return {
     text(16, h - 22, "N NETWORK  H SCORING  LEFT/RIGHT OLDER/NEWER GEN  L LIVE  R REPLAY  "
                      .. "F SPEED  ESC QUIT", 1)
     items = items + draw_graph(16, h - 140, 320, 108)
+    items = items + draw_onboard(frame, slots[1].exploded)
     if show_net then
       local values = {}
       local acts = run.acts[math.min(#run.acts, math.floor(clock * Replay.FPS) + 1)]

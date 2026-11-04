@@ -61,6 +61,7 @@ box("ground", (0.06, 0.06, 0.07), 0.0, 0.95)
 box("pad", (0.05, 0.5, 0.22), 0.1, 0.5, (0.01, 0.12, 0.04))
 box("beacon", (0.1, 1.0, 0.35), 0.0, 0.4, (0.3, 3.0, 0.9))
 box("scorch", (0.03, 0.025, 0.02), 0.0, 1.0)
+box("mark", (0.3, 0.32, 0.36), 0.0, 0.9, (0.03, 0.035, 0.045))
 box("streak", (0.7, 0.75, 0.85), 0.0, 1.0, (0.25, 0.27, 0.32))
 GHOSTS = [(0.15, 0.45, 0.75), (0.65, 0.2, 0.6), (0.35, 0.6, 0.15), (0.75, 0.35, 0.12),
           (0.4, 0.3, 0.75), (0.1, 0.55, 0.5), (0.7, 0.25, 0.3)]
@@ -92,7 +93,7 @@ def shape(bin_name, triangles):
     low = [min(p[i] for p in pos) for i in range(3)]
     high = [max(p[i] for p in pos) for i in range(3)]
 
-    def write(name, color, metallic=0.0, roughness=0.6, emissive=(0, 0, 0)):
+    def write(name, color, metallic=0.0, roughness=0.6, emissive=(0, 0, 0), alpha=1):
         asset = {
             "asset": {"version": "2.0", "generator": "ACuppa NEAT rocket viewer source"},
             "buffers": [{"uri": bin_name, "byteLength": len(data)}],
@@ -105,12 +106,14 @@ def shape(bin_name, triangles):
                 {"bufferView": 2, "componentType": 5123, "count": len(idx), "type": "SCALAR"},
             ],
             "materials": [{"pbrMetallicRoughness": {
-                "baseColorFactor": [*color, 1], "metallicFactor": metallic,
+                "baseColorFactor": [*color, alpha], "metallicFactor": metallic,
                 "roughnessFactor": roughness}, "emissiveFactor": list(emissive)}],
             "meshes": [{"primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1},
                                        "indices": 2, "material": 0}]}],
             "nodes": [{"mesh": 0}], "scenes": [{"nodes": [0]}], "scene": 0,
         }
+        if alpha < 1:
+            asset["materials"][0]["alphaMode"] = "BLEND"
         (output / f"{name}.gltf").write_text(json.dumps(asset, indent=2) + "\n")
     return write
 
@@ -167,6 +170,21 @@ for index, color in enumerate(GHOSTS, 1):
 # The engine bell flares toward its open bottom, in unit space (y from -1 to 1).
 shape("bell.bin", lathe([(1.0, -1.0), (0.45, 1.0), (0.0, 1.0)]))(
     "bell", (0.12, 0.12, 0.13), 0.8, 0.35)
+
+# The explosion flash: a sphere about 38% see-through, so the rocket's last
+# moment and the ground show through it.
+shape("sphere.bin", lathe([(math.sin(math.pi * k / 12), -math.cos(math.pi * k / 12))
+                           for k in range(13)]))(
+    "blast", (1.0, 0.45, 0.1), 0.0, 0.9, (0.9, 0.3, 0.04), alpha=0.62)
+# A flat ground mark shaped like a triangle, in unit space (y from -1 to 1).
+corners = [(math.cos(a), math.sin(a)) for a in (math.pi / 2, math.pi * 7 / 6, math.pi * 11 / 6)]
+top = [(x, 1.0, z) for x, z in corners]
+bottom = [(x, -1.0, z) for x, z in corners]
+prism = [(top[0], top[2], top[1]), (bottom[0], bottom[1], bottom[2])]
+for k in range(3):
+    a, b = k, (k + 1) % 3
+    prism += [(bottom[a], top[a], bottom[b]), (bottom[b], top[a], top[b])]
+shape("triangle.bin", prism)("mark_triangle", (0.3, 0.32, 0.36), 0.0, 0.9, (0.03, 0.035, 0.045))
 
 
 def rgbe(rgb):

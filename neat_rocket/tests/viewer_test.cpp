@@ -3,6 +3,8 @@
 // generation browsing, live updates, and damaged run files.
 #include "acuppa/lua_project.hpp"
 
+#include <glm/glm.hpp>
+
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
@@ -113,6 +115,24 @@ int main(int argc, char* argv[]) {
                   has_text(frame, "SCORE ") && has_text(frame, "+ SPEED "),
               "wind, engine, difficulty, and the champion's score parts should show");
         check(count(frame, "bell.gltf") >= 1, "rockets should show their engine bells");
+        check(count(frame, "mark.gltf") + count(frame, "mark_triangle.gltf") == 140 &&
+                  count(frame, "mark.gltf") > 0 && count(frame, "mark_triangle.gltf") > 0,
+              "small square and triangle marks should cover the ground");
+        // The onboard camera rides just above the champion's engine, looks
+        // down, and sits in the bottom-right corner with its gauges.
+        check(frame.inset.has_value() && has_text(frame, "ONBOARD CAMERA - ENGINE") &&
+                  has_text(frame, "THR ") && has_text(frame, "ENGINE SWIVEL"),
+              "the champion's onboard camera and gauges should show");
+        if (frame.inset && start) {
+            const auto& view = frame.inset->camera;
+            const auto rocket = glm::vec3(start->transform[3]);
+            check(glm::length(view.eye - rocket) < 1.2f && view.target.y < view.eye.y - 2.0f,
+                  "the onboard camera should sit on the rocket and look down");
+            check(frame.inset->x + frame.inset->width <= 1280 &&
+                      frame.inset->y + frame.inset->height <= 720 && frame.inset->x > 640 &&
+                      frame.inset->y > 360,
+                  "the onboard view should sit in the bottom-right corner");
+        }
         const float y0 = start ? start->transform[3].y : 0;
         frame = run(game, 60);
         const auto* later = find(frame, "rocket_champion.gltf");
@@ -176,6 +196,10 @@ int main(int argc, char* argv[]) {
                       count(frame, "rocket_champion.gltf") == 0;
         }
         check(wrecked, "a failed rocket should be replaced by debris and labeled");
+        check(count(frame, "blast.gltf") >= 1, "the explosion should show its see-through sphere");
+        check(!frame.inset && has_text(frame, "SIGNAL LOST") &&
+                  has_text(frame, "ONBOARD CAMERA - NO SIGNAL"),
+              "the onboard camera should lose its signal when the champion explodes");
         for (int i = 0; i < 8; ++i) frame = tap(game, "right");
         check(has_text(frame, "GEN 200") && has_text(frame, "(11 OF 11"),
               "right arrow should reach the newest generation");

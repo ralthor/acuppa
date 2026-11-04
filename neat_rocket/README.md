@@ -7,7 +7,7 @@ jets: to move sideways it must tip over and then straighten up again before
 touchdown. The engine pushes through `apply_force_at`, the engine API added
 for this, so a swiveled engine both pushes and turns the rocket.
 
-![Generation 200: the champion rocket leans 26 degrees and swivels its engine to steer toward the pad through gusty wind, with its network on the right](docs/viewer.png)
+![Generation 200: the champion rocket steers toward the pad; its network is on the right and its onboard camera, throttle, and engine swivel gauges are at the bottom right](docs/viewer.png)
 
 ## Run
 
@@ -31,6 +31,20 @@ Each generation is scored over **24 random flights**, each with a different
 start position, speed, tilt, and wind; fitness is the mean. The viewer replays
 **3 of them in turn** ("FLIGHT 1 OF 3"), spread across the 24, so you can see
 whether a rocket lands from different places or only got lucky once.
+
+## Onboard camera
+
+The bottom-right corner shows the champion's **onboard camera**. It is fixed
+to the rocket's side at the base of the fins and looks down past the engine
+bell, so you see the bell swivel, the flame grow with the throttle, and the pad
+and the ground marks rush closer. Beside it, a bar shows the throttle and a
+dot shows where the engine points (up to 30° each way). When the champion
+explodes the camera is lost: the view turns to static with **SIGNAL LOST**.
+The blast is an orange sphere you can see through (about 38% transparent),
+using the engine's new glTF alpha blending; the camera view uses the engine's
+new `tp.set_inset`.
+
+![Generation 5's champion misses the pad and explodes in a see-through orange sphere; the onboard camera shows SIGNAL LOST](docs/signal_lost.png)
 
 ## The task
 
@@ -124,7 +138,9 @@ the viewer usually shows only the champion.
   - the HUD (wind heading, engine angles, difficulty) and engine bells with flames
   - the 3 replayed flights playing one after another
   - network and scoring toggles, and browsing back to live
-  - crash debris, live updates, and damaged files
+  - crash debris and the blast sphere, live updates, and damaged files
+  - the onboard camera riding on the champion in the bottom-right corner,
+    its gauges, the ground marks, and SIGNAL LOST after a crash
 
 The rocket's runner protocol is the lander's with the header
 `acuppa-rocket 1`. A scenario has 12 values:
