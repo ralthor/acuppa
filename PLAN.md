@@ -212,3 +212,5 @@ For each public call, add a runnable Lua example, invalid-input behavior, and an
 - Update `tests/feature_scene/` whenever a component or scripting API is added. Its manifest lists every feature and its test so coverage can be audited.
 - A release must build from a clean checkout using pinned dependencies, export both code-only sample games, and run them without editor clicks or manual asset placement.
 - Record implementation status honestly. Source files in the current 2D prototype are not evidence that a 3D phase passed.
+
+**NEAT lab (2026-11-04):** A separate [NEAT lander experiment](neat_lab/README.md) trains networks headlessly against `acuppa_core` and replays them in a viewer project. It is not an engine phase. It adds no engine source, API, or feature-scene entry, and its tests run from its own `build-neat/` tree under the `neat_lab` CTest label.
