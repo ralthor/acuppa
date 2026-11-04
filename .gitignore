@@ -6,3 +6,4 @@ __pycache__/
 saves/
 /tests/feature_scene/levels/generated/
 /neat_lab/viewer/runs/
+/neat_rocket/viewer/runs/

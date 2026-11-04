@@ -113,6 +113,8 @@ The `acuppa-editor` CLI can list and inspect entities, add entities, change comp
 
 [neat_lab/](neat_lab/README.md) is a separate experiment built on the unchanged engine. It uses neat-python 2.0.0 to evolve small neural networks that land a thruster craft in random gusty wind, in a Jolt world with no window. Each generation is replayed in an ACuppa viewer game with no player: failed landers explode, and a network panel you can hide or show displays the champion's network. Build it with `bash neat_lab/configure.sh`, watch it with `build/acuppa run neat_lab/viewer`, and train with `.tools/neat-venv/bin/python neat_lab/trainer/train.py`. It links `acuppa_core` and adds no engine code or API.
 
+[neat_rocket/](neat_rocket/README.md) is a harder copy: a 3D rocket with one engine that swivels ±30° on two axes, built on the new `physics_apply_force_at` call. It learns to land from straight above but has not yet learned to steer.
+
 ## Implementation plan
 
 The requirements above are the source of truth. [PLAN.md](PLAN.md) maps each requirement to small, testable phases and records the current state. The existing SDL3/Lua program is a 2D prototype; it does not satisfy the 3D renderer or physics requirements. The first visible 3D demo is complete in Phase 3, and the first Lua-authored 3D demo is complete in Phase 4.
