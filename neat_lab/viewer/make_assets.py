@@ -1,10 +1,12 @@
-"""Generate the NEAT lander viewer's checked-in glTF boxes and HDRI from code."""
+"""Generate the NEAT lander viewer's checked-in glTF boxes, HDRI, and sounds from code."""
 
 import json
 import math
 from pathlib import Path
+import random
 import struct
 import sys
+import wave
 
 output = Path(sys.argv[1]) if len(sys.argv) == 2 else Path(__file__).parent / "assets"
 output.mkdir(parents=True, exist_ok=True)
@@ -58,6 +60,9 @@ box("cabin", (0.82, 0.86, 0.9), 0.1, 0.25)
 box("flame", (1.0, 0.45, 0.08), 0.0, 0.9, (4.0, 1.4, 0.2))
 box("ground", (0.06, 0.06, 0.07), 0.0, 0.95)
 box("pad", (0.05, 0.5, 0.22), 0.1, 0.5, (0.01, 0.12, 0.04))
+box("beacon", (0.1, 1.0, 0.35), 0.0, 0.4, (0.3, 3.0, 0.9))
+box("scorch", (0.03, 0.025, 0.02), 0.0, 1.0)
+box("streak", (0.7, 0.75, 0.85), 0.0, 1.0, (0.25, 0.27, 0.32))
 # One muted color per species ghost; the viewer cycles through them by species ID.
 for index, color in enumerate([(0.15, 0.45, 0.75), (0.65, 0.2, 0.6), (0.35, 0.6, 0.15),
                                (0.75, 0.35, 0.12), (0.4, 0.3, 0.75), (0.1, 0.55, 0.5),
@@ -90,3 +95,25 @@ with (output / "night.hdr").open("wb") as file:
         file.write(bytes((2, 2, 0, width)))
         for channel in range(4):
             file.write(bytes((width, *(pixel[channel] for pixel in row))))
+
+
+def sound(name, seconds, sample):
+    frames = bytearray()
+    rate = 24000
+    for index in range(int(seconds * rate)):
+        frames += struct.pack("<h", int(max(-1, min(1, sample(index / rate))) * 25000))
+    with wave.open(str(output / f"{name}.wav"), "wb") as file:
+        file.setnchannels(1)
+        file.setsampwidth(2)
+        file.setframerate(rate)
+        file.writeframes(frames)
+
+
+noise = random.Random(7)
+rumble = [noise.uniform(-1, 1) for _ in range(24000)]
+# A crash: a noise burst with a low thump, decaying over 0.9 s.
+sound("boom", 0.9, lambda t: math.exp(-5 * t) * (0.55 * rumble[int(t * 24000) % 24000] +
+      0.5 * math.sin(2 * math.pi * (70 - 30 * t) * t)))
+# A landing: two rising chime notes.
+sound("chime", 0.5, lambda t: 0.4 * math.exp(-6 * t) * (math.sin(2 * math.pi * 660 * t) +
+      (math.sin(2 * math.pi * 990 * t) if t > 0.12 else 0)))

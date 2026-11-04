@@ -7,6 +7,7 @@ return {
   scenes = {main = "scenes/main.scene.lua"},
   input = {
     toggle_net = {keyboard = "n", gamepad_button = "y"},
+    rules = {keyboard = "h", gamepad_button = "left_bumper"},
     previous = {keyboard = "left", gamepad_button = "dpad_left"},
     next = {keyboard = "right", gamepad_button = "dpad_right"},
     live = {keyboard = "l", gamepad_button = "x"},

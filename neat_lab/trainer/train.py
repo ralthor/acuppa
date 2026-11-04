@@ -3,9 +3,10 @@ to the ACuppa viewer.
 
     .tools/neat-venv/bin/python neat_lab/trainer/train.py --generations 150
 
-Every generation is scored by one lander_runner call. Afterwards the champion
-and the best member of each species are replayed on one scenario (rotating
-through all eight), and the result is written to <out>/gen_NNNN.lua with
+Every generation flies 8 new random scenarios (start state, steady wind, and
+gusts drawn from --seed and the generation number) in one lander_runner call.
+Afterwards the champion and the best member of each species are replayed on
+one of those scenarios, and the result is written to <out>/gen_NNNN.lua with
 <out>/status.lua listing the available generations.
 """
 
@@ -28,24 +29,31 @@ class ViewerPublisher(neat.reporting.BaseReporter):
     def __init__(self, args, config, population):
         self.args, self.config, self.population = args, config, population
         self.generation = 0
+        self.scenarios = []
+        self.landing_rate = 0.0
         self.history = []
+        self.rate_history = []
         self.published = []
         self.started = time.monotonic()
 
     def start_generation(self, generation):
         self.generation = generation + 1
+        self.scenarios = lab.random_scenarios(self.args.seed, self.generation)
         self.started = time.monotonic()
 
     def post_evaluate(self, config, population, species_set, best):
         self.history.append(best.fitness)
+        self.rate_history.append(self.landing_rate)
         scenario = (self.generation - 1) % lab.SCENARIO_COUNT
         picks = lab.view_landers(population, species_set, best)
         text = lab.encode_batch(((g.key, g, True) for _role, g, _sid in picks), config,
-                                trace_scenario=scenario, threads=self.args.threads)
+                                self.scenarios, trace_scenario=scenario,
+                                threads=self.args.threads)
         results, traces = lab.run_batch(self.args.runner, text)
         landed = results[best.key][1]
-        run = lab.build_run(self.generation, scenario, config, population, species_set,
-                            best, picks, traces, landed, self.history)
+        run = lab.build_run(self.generation, scenario, self.scenarios[scenario], config,
+                            population, species_set, best, picks, traces, landed,
+                            self.landing_rate, self.history, self.rate_history)
         name = f"gen_{self.generation:04d}.lua"
         lab.write_lua(os.path.join(self.args.out, name), run)
         self.published.append(self.generation)
@@ -53,6 +61,7 @@ class ViewerPublisher(neat.reporting.BaseReporter):
                       {"format": 1, "latest": self.generation,
                        "generations": self.published, "running": True})
         print(f"gen {self.generation:4d}  best {best.fitness:7.2f}  landed {landed}/8  "
+              f"population {100 * self.landing_rate:5.1f}%  "
               f"species {len(species_set.species):2d}  nodes {len(best.nodes):2d}  "
               f"conns {sum(c.enabled for c in best.connections.values()):3d}", flush=True)
         if self.args.pace > 0:
@@ -67,13 +76,16 @@ class ViewerPublisher(neat.reporting.BaseReporter):
                            "generations": self.published, "running": False})
 
 
-def evaluator(args):
+def evaluator(args, publisher):
     def evaluate(genomes, config):
         text = lab.encode_batch(((key, genome, False) for key, genome in genomes), config,
-                                threads=args.threads)
+                                publisher.scenarios, threads=args.threads)
         results, _ = lab.run_batch(args.runner, text)
+        landed = 0
         for key, genome in genomes:
-            genome.fitness = results[key][0]
+            genome.fitness, count = results[key]
+            landed += count
+        publisher.landing_rate = landed / max(1, len(genomes) * lab.SCENARIO_COUNT)
     return evaluate
 
 
@@ -109,7 +121,7 @@ def main(argv=None):
     publisher = ViewerPublisher(args, config, population)
     population.add_reporter(publisher)
     try:
-        winner = population.run(evaluator(args), args.generations)
+        winner = population.run(evaluator(args, publisher), args.generations)
     finally:
         publisher.finish()
     print(f"best genome {winner.key}: fitness {winner.fitness:.2f}, "

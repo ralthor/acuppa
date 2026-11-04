@@ -53,10 +53,13 @@ class LayoutTest(unittest.TestCase):
         config = lab.load_config(os.path.join(LAB, "trainer", "neat.cfg"))
         genome = config.genome_type(1)
         genome.nodes = {}
-        for key in (0, 1, 10, 11):
+        for key in (0, 1, 10, 11, 12, 13):
             genome.nodes[key] = config.genome_config.node_gene_type(key)
             genome.nodes[key].init_attributes(config.genome_config)
-        links = {(-1, 10): True, (10, 11): True, (11, 0): True, (-2, 1): False}
+        # Node 12 only has a disabled link and node 13 is a dead end, so the panel
+        # leaves both out but still counts them.
+        links = {(-1, 10): True, (10, 11): True, (11, 0): True, (-2, 1): False, (12, 1): False,
+                 (-3, 13): True}
         for innovation, ((source, target), enabled) in enumerate(links.items(), 1):
             gene = config.genome_config.connection_gene_type((source, target), innovation)
             gene.init_attributes(config.genome_config)
@@ -70,8 +73,26 @@ class LayoutTest(unittest.TestCase):
         self.assertTrue(0 < nodes[10]["x"] < 1 and 0 < nodes[11]["x"] < 1)
         self.assertEqual(nodes[-5]["label"], "FUEL")
         self.assertEqual(nodes[1]["label"], "SIDE")
+        self.assertNotIn(12, nodes)
+        self.assertNotIn(13, nodes)
+        self.assertEqual((view["genome_nodes"], view["genome_links"]), (11, 4))
+        self.assertNotIn((-3, 13), [(c["from"], c["to"]) for c in view["connections"]])
         disabled = [c for c in view["connections"] if not c["enabled"]]
         self.assertEqual([(c["from"], c["to"]) for c in disabled], [(-2, 1)])
+
+
+class ScenarioTest(unittest.TestCase):
+    def test_random_scenarios_are_reproducible_per_generation(self):
+        first = lab.random_scenarios(3, 10)
+        self.assertEqual(first, lab.random_scenarios(3, 10))
+        self.assertNotEqual(first, lab.random_scenarios(3, 11))
+        self.assertNotEqual(first, lab.random_scenarios(4, 10))
+        self.assertEqual(len(first), lab.SCENARIO_COUNT)
+        many = [s for g in range(1, 60) for s in lab.random_scenarios(1, g)]
+        for name, (low, high) in lab.SCENARIO_RANGES.items():
+            values = [s[name] for s in many]
+            self.assertTrue(all(low <= v <= high for v in values), name)
+            self.assertGreater(max(values) - min(values), 0.8 * (high - low), name)
 
 
 class TrainingRunTest(unittest.TestCase):
@@ -99,7 +120,10 @@ class TrainingRunTest(unittest.TestCase):
             self.assertIn('role = "champion"', text)
             frames = re.search(r'frames = "([^"]*)"', text).group(1).split(";")
             self.assertGreater(len(frames), 10)
-            self.assertEqual(len(frames[0].split(",")), 8)
+            self.assertEqual(len(frames[0].split(",")), lab.FRAME_FIELDS)
+            self.assertIn("weather = {", text)
+            self.assertIn("rate_history = {", text)
+            self.assertIn("speed = ", text)
             self.assertLess(len(text), 1024 * 1024, "viewer files must stay under 1 MiB")
         # The same seed reproduces the same run.
         first = read(os.path.join(out, "gen_0003.lua"))

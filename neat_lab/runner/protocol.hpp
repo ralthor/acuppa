@@ -17,7 +17,8 @@ struct GenomeSpec {
 
 struct Batch {
     int threads = 0;  // 0 uses every hardware thread.
-    int trace_scenario = 0;
+    std::vector<Scenario> scenarios;
+    int trace_scenario = 0;  // Index into scenarios.
     std::vector<GenomeSpec> genomes;
 };
 
@@ -34,7 +35,8 @@ struct GenomeResult {
 };
 
 Batch read_batch(std::istream& in);  // Throws std::invalid_argument naming the problem.
-GenomeResult evaluate(const GenomeSpec& genome, int trace_scenario);
+GenomeResult evaluate(const GenomeSpec& genome, const std::vector<Scenario>& scenarios,
+                      int trace_scenario);
 std::vector<GenomeResult> evaluate_batch(const Batch& batch);
 void write_results(std::ostream& out, const Batch& batch, const std::vector<GenomeResult>& results);
 

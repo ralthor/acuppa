@@ -60,13 +60,31 @@ private:
 Batch read_batch(std::istream& in) {
     Reader read(in);
     read.expect("acuppa-lander");
-    if (read.integer("protocol version", 0, 1000) != 1)
+    if (read.integer("protocol version", 0, 1000) != 2)
         throw std::invalid_argument("unsupported protocol version");
     Batch batch;
     read.expect("threads");
     batch.threads = int(read.integer("thread count", 0, 1024));
+    read.expect("scenarios");
+    const auto scenario_count = read.integer("scenario count", 1, kMaxScenarios);
+    for (long long s = 0; s < scenario_count; ++s) {
+        read.expect("scenario");
+        Scenario scenario;
+        scenario.x = float(read.number("scenario x"));
+        scenario.y = float(read.number("scenario y"));
+        scenario.vx = float(read.number("scenario vx"));
+        scenario.vy = float(read.number("scenario vy"));
+        scenario.wind = float(read.number("scenario wind"));
+        scenario.gust = float(read.number("scenario gust"));
+        scenario.gust_period = float(read.number("scenario gust period"));
+        if (std::abs(scenario.x) >= kBoundsX || scenario.y <= kLanderHalfHeight ||
+            scenario.y >= kBoundsY || scenario.gust_period <= 0.0f)
+            throw std::invalid_argument("scenario " + std::to_string(s + 1) +
+                                        " starts out of bounds or has a nonpositive gust period");
+        batch.scenarios.push_back(scenario);
+    }
     read.expect("trace_scenario");
-    batch.trace_scenario = int(read.integer("trace scenario", 0, kScenarioCount - 1));
+    batch.trace_scenario = int(read.integer("trace scenario", 0, scenario_count - 1));
     read.expect("genomes");
     const auto count = read.integer("genome count", 0, kMaxGenomes);
     for (long long g = 0; g < count; ++g) {
@@ -105,19 +123,20 @@ Batch read_batch(std::istream& in) {
     return batch;
 }
 
-GenomeResult evaluate(const GenomeSpec& genome, int trace_scenario) {
+GenomeResult evaluate(const GenomeSpec& genome, const std::vector<Scenario>& scenarios,
+                      int trace_scenario) {
     Network network(kInputCount, kOutputCount, genome.nodes);
     const Controller controller = [&](const std::array<double, kInputCount>& inputs) {
         const auto out = network.activate({inputs.begin(), inputs.end()});
         return thrust_from_outputs(out[0], out[1]);
     };
     GenomeResult result;
-    for (const auto& scenario : scenarios()) {
+    for (const auto& scenario : scenarios) {
         result.episodes.push_back(run_episode(scenario, controller));
         result.fitness += result.episodes.back().fitness;
         if (result.episodes.back().outcome == Outcome::Landed) ++result.landed;
     }
-    result.fitness /= kScenarioCount;
+    result.fitness /= double(scenarios.size());
     if (genome.trace) {
         Network replay(kInputCount, kOutputCount, genome.nodes);
         const Controller traced = [&](const std::array<double, kInputCount>& inputs) {
@@ -125,7 +144,7 @@ GenomeResult evaluate(const GenomeSpec& genome, int trace_scenario) {
             return thrust_from_outputs(out[0], out[1]);
         };
         result.node_keys = replay.keys();
-        result.traced = run_episode(scenarios()[trace_scenario], traced, &result.frames,
+        result.traced = run_episode(scenarios.at(trace_scenario), traced, &result.frames,
                                     [&] { result.activations.push_back(replay.values()); });
     }
     return result;
@@ -142,7 +161,7 @@ std::vector<GenomeResult> evaluate_batch(const Batch& batch) {
     auto work = [&] {
         for (size_t i = next++; i < batch.genomes.size(); i = next++) {
             try {
-                results[i] = evaluate(batch.genomes[i], batch.trace_scenario);
+                results[i] = evaluate(batch.genomes[i], batch.scenarios, batch.trace_scenario);
             } catch (...) {
                 std::lock_guard<std::mutex> guard(failure_lock);
                 if (!failure) failure = std::current_exception();
@@ -159,21 +178,26 @@ std::vector<GenomeResult> evaluate_batch(const Batch& batch) {
 
 void write_results(std::ostream& out, const Batch& batch, const std::vector<GenomeResult>& results) {
     char line[128];
-    out << "acuppa-lander 1\n";
+    out << "acuppa-lander 2\n";
     for (size_t i = 0; i < results.size(); ++i) {
         const auto& r = results[i];
         std::snprintf(line, sizeof line, "%.9g %d", r.fitness, r.landed);
         out << "result " << batch.genomes[i].key << ' ' << line << '\n';
         if (!batch.genomes[i].trace) continue;
-        std::snprintf(line, sizeof line, "%s %.4f %.4f %zu %zu", outcome_name(r.traced.outcome),
-                      r.traced.impact, r.traced.fitness, r.frames.size(), r.node_keys.size());
+        const auto& t = r.traced;
+        std::snprintf(line, sizeof line, "%s %.4f %.4f %.4f", outcome_name(t.outcome), t.impact,
+                      t.touch_time, t.fitness);
         out << "trace " << batch.genomes[i].key << ' ' << line;
+        std::snprintf(line, sizeof line, " %.4f %.4f %.4f %.4f %.4f %zu %zu", t.score.center,
+                      t.score.landing, t.score.soft, t.score.fuel, t.score.speed,
+                      r.frames.size(), r.node_keys.size());
+        out << line;
         for (int key : r.node_keys) out << ' ' << key;
         out << '\n';
         for (size_t f = 0; f < r.frames.size(); ++f) {
             const auto& fr = r.frames[f];
-            std::snprintf(line, sizeof line, "f %.4f %.4f %.4f %.4f %.4f %.3f %.3f %.3f", fr.x,
-                          fr.y, fr.rx, fr.ry, fr.rz, fr.main, fr.side, fr.fuel);
+            std::snprintf(line, sizeof line, "f %.4f %.4f %.4f %.4f %.4f %.3f %.3f %.3f %.3f",
+                          fr.x, fr.y, fr.rx, fr.ry, fr.rz, fr.main, fr.side, fr.fuel, fr.wind);
             out << line;
             for (double value : r.activations[f]) {
                 std::snprintf(line, sizeof line, " %.3f", value);

@@ -34,18 +34,27 @@ function Panel.draw(tp, net, values, x, y, width, height, budget)
   end
   local node_count, link_count = counts(net)
   rect(x, y, width, height, 0.02, 0.03, 0.06, 0.88)
-  text(x + 12, y + 10, string.format("CHAMPION NETWORK  %d NODES  %d LINKS",
-                                     node_count, link_count), 1)
-
-  local left, right = x + 70, x + width - 62
-  local top, bottom = y + 34, y + height - 16
-  local place = {}
-  for _, node in ipairs(net.nodes) do
-    place[node.key] = {left + node.x * (right - left), top + node.y * (bottom - top), node}
+  text(x + 12, y + 10, string.format("CHAMPION NETWORK  %d NODES  %d LINKS IN USE", node_count,
+                                     link_count), 1)
+  if net.genome_nodes and net.genome_nodes > node_count then
+    text(x + 12, y + height - 14, string.format("GENOME HAS %d NODES; %d DEAD ENDS NOT SHOWN",
+                                                net.genome_nodes, net.genome_nodes - node_count), 1)
   end
 
+  local left, right = x + 70, x + width - 62
+  local top, bottom = y + 34, y + height - 22
+  local place, column = {}, {}
+  local crowd = 1
+  for _, node in ipairs(net.nodes) do
+    place[node.key] = {left + node.x * (right - left), top + node.y * (bottom - top), node}
+    column[node.x] = (column[node.x] or 0) + 1
+    crowd = math.max(crowd, column[node.x])
+  end
+  -- Shrink nodes when a column is crowded so neighbors stay apart.
+  local size = math.max(5, math.min(NODE, math.floor((bottom - top) / (crowd + 1)) - 2))
+
   -- Nodes and labels are drawn last but reserved first, so links never crowd them out.
-  local reserved = node_count
+  local reserved = node_count + 1
   for _, node in ipairs(net.nodes) do
     if node.label ~= "" then reserved = reserved + 1 end
   end
@@ -83,7 +92,7 @@ function Panel.draw(tp, net, values, x, y, width, height, budget)
     local p = place[node.key]
     local base = KIND_COLOR[node.kind] or KIND_COLOR.hidden
     local level = 0.3 + 0.7 * math.min(1, math.abs(values[node.key] or 0))
-    rect(p[1] - NODE / 2, p[2] - NODE / 2, NODE, NODE,
+    rect(p[1] - size / 2, p[2] - size / 2, size, size,
          base[1] * level, base[2] * level, base[3] * level, 1)
     if node.label ~= "" then
       if node.kind == "input" then text(p[1] - 66, p[2] - 4, node.label, 1)

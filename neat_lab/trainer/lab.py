@@ -8,13 +8,20 @@ data files allow at most 10,000 table entries.
 
 import math
 import os
+import random
 import re
 import subprocess
 
 import neat
 
-PROTOCOL = "acuppa-lander 1"
+PROTOCOL = "acuppa-lander 2"
 SCENARIO_COUNT = 8
+SCORE_PARTS = ("center", "landing", "soft", "fuel", "speed")
+FRAME_FIELDS = 9  # x y rx ry rz main side fuel wind
+# Ranges for the random start state and weather drawn for every generation.
+SCENARIO_RANGES = {"x": (-12, 12), "y": (9, 15), "vx": (-3, 3), "vy": (-2, 0.5),
+                   "wind": (-4, 4), "gust": (0, 2.5), "gust_period": (1.5, 5)}
+SCENARIO_FIELDS = tuple(SCENARIO_RANGES)
 INPUT_LABELS = {-1: "DX", -2: "HEIGHT", -3: "VX", -4: "VY", -5: "FUEL"}
 OUTPUT_LABELS = {0: "MAIN", 1: "SIDE"}
 MAX_VIEW_LANDERS = 8
@@ -37,13 +44,25 @@ def _number(value):
     return repr(value)
 
 
-def encode_batch(entries, config, trace_scenario=0, threads=0):
+def random_scenarios(seed, generation, count=SCENARIO_COUNT):
+    """The start states and weather every genome of one generation flies.
+    Reproducible from (seed, generation); different for each generation."""
+    rng = random.Random(seed * 1_000_003 + generation)
+    return [{name: round(rng.uniform(low, high), 4)
+             for name, (low, high) in SCENARIO_RANGES.items()} for _ in range(count)]
+
+
+def encode_batch(entries, config, scenarios, trace_scenario=0, threads=0):
     """entries: iterable of (key, genome, trace) -> runner input text."""
-    if not 0 <= trace_scenario < SCENARIO_COUNT:
-        raise ValueError(f"trace scenario must be 0..{SCENARIO_COUNT - 1}")
+    if not scenarios:
+        raise ValueError("at least one scenario is required")
+    if not 0 <= trace_scenario < len(scenarios):
+        raise ValueError(f"trace scenario must be 0..{len(scenarios) - 1}")
     entries = list(entries)
-    lines = [f"{PROTOCOL}", f"threads {int(threads)}", f"trace_scenario {trace_scenario}",
-             f"genomes {len(entries)}"]
+    lines = [f"{PROTOCOL}", f"threads {int(threads)}", f"scenarios {len(scenarios)}"]
+    for scenario in scenarios:
+        lines.append("scenario " + " ".join(_number(scenario[f]) for f in SCENARIO_FIELDS))
+    lines += [f"trace_scenario {trace_scenario}", f"genomes {len(entries)}"]
     for key, genome, trace in entries:
         net = neat.nn.FeedForwardNetwork.create(genome, config)
         lines.append(f"genome {int(key)} {1 if trace else 0} {len(net.node_evals)}")
@@ -60,7 +79,8 @@ def encode_batch(entries, config, trace_scenario=0, threads=0):
 
 def parse_results(text):
     """Returns (results, traces): results[key] = (fitness, landed) and
-    traces[key] = dict(outcome, impact, fitness, node_keys, frames, acts)."""
+    traces[key] = dict(outcome, impact, touch_time, fitness, score, node_keys,
+    frames, acts)."""
     lines = text.splitlines()
     if not lines or lines[0] != PROTOCOL:
         raise RunnerError("runner output has no protocol header")
@@ -73,23 +93,24 @@ def parse_results(text):
         if parts[0] == "result" and len(parts) == 4:
             results[int(parts[1])] = (float(parts[2]), int(parts[3]))
             i += 1
-        elif parts[0] == "trace" and len(parts) >= 7:
-            key, frame_count, node_count = int(parts[1]), int(parts[5]), int(parts[6])
-            node_keys = [int(k) for k in parts[7:]]
+        elif parts[0] == "trace" and len(parts) >= 13:
+            key, frame_count, node_count = int(parts[1]), int(parts[11]), int(parts[12])
+            node_keys = [int(k) for k in parts[13:]]
             if len(node_keys) != node_count:
                 raise RunnerError(f"trace {key} lists the wrong number of nodes")
             frames, acts = [], []
             for row in lines[i + 1:i + 1 + frame_count]:
                 values = row.split()
-                if values[0] != "f" or len(values) != 9 + node_count:
+                if values[0] != "f" or len(values) != 1 + FRAME_FIELDS + node_count:
                     raise RunnerError(f"trace {key} has a malformed frame")
-                frames.append(values[1:9])
-                acts.append(values[9:])
+                frames.append(values[1:1 + FRAME_FIELDS])
+                acts.append(values[1 + FRAME_FIELDS:])
             if len(frames) != frame_count:
                 raise RunnerError(f"trace {key} is missing frames")
             traces[key] = {"outcome": parts[2], "impact": float(parts[3]),
-                           "fitness": float(parts[4]), "node_keys": node_keys,
-                           "frames": frames, "acts": acts}
+                           "touch_time": float(parts[4]), "fitness": float(parts[5]),
+                           "score": dict(zip(SCORE_PARTS, map(float, parts[6:11]))),
+                           "node_keys": node_keys, "frames": frames, "acts": acts}
             i += 1 + frame_count
         else:
             raise RunnerError(f"unexpected runner line: {lines[i][:80]}")
@@ -105,12 +126,15 @@ def run_batch(runner, text, timeout=600):
 
 
 def layout_network(genome, config):
-    """Places every node of a genome on a unit square, inputs left, outputs
+    """Places the working nodes of a genome on a unit square, inputs left, outputs
     right, and hidden nodes in columns by their longest path from an input."""
     inputs = list(config.genome_config.input_keys)
     outputs = list(config.genome_config.output_keys)
-    hidden = sorted(k for k in genome.nodes if k not in outputs)
     enabled = [key for key, gene in genome.connections.items() if gene.enabled]
+    # Draw only hidden nodes that feed an output, the ones the network evaluates.
+    # Mutations also leave dead-end nodes in the genome; those are only counted.
+    required = neat.graphs.required_for_output(inputs, outputs, enabled)
+    hidden = sorted(k for k in genome.nodes if k not in outputs and k in required)
     depth = {k: 0 for k in inputs}
     # Feed-forward genomes are acyclic, so relaxing once per node settles depths.
     for _ in range(len(hidden) + 1):
@@ -137,10 +161,13 @@ def layout_network(genome, config):
         x, y = placed[key]
         nodes.append({"key": key, "kind": kind, "label": label,
                       "x": round(x, 4), "y": round(y, 4)})
+    shown = set(inputs) | set(outputs) | set(hidden)
     connections = [{"from": source, "to": target, "weight": round(gene.weight, 4),
                     "enabled": bool(gene.enabled)}
-                   for (source, target), gene in sorted(genome.connections.items())]
-    return {"nodes": nodes, "connections": connections}
+                   for (source, target), gene in sorted(genome.connections.items())
+                   if source in shown and target in shown]
+    return {"nodes": nodes, "connections": connections, "genome_nodes": len(genome.nodes) +
+            len(inputs), "genome_links": sum(gene.enabled for gene in genome.connections.values())}
 
 
 _NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -208,8 +235,10 @@ def view_landers(population, species_set, best):
     return [(role, genome, species_of.get(genome.key, 0)) for role, genome in picks]
 
 
-def build_run(generation, scenario, config, population, species_set, best, picks, traces,
-              landed, history):
+def build_run(generation, scenario, weather, config, population, species_set, best, picks,
+              traces, landed, landing_rate, history, rate_history):
+    """One viewer file: the generation's statistics, the champion network,
+    and the recorded flights on the display scenario `weather`."""
     fitnesses = [g.fitness for g in population.values() if g.fitness is not None]
     champion = traces[best.key]
     landers = []
@@ -218,18 +247,24 @@ def build_run(generation, scenario, config, population, species_set, best, picks
         landers.append({"role": role, "species": sid, "genome": genome.key,
                         "fitness": round(genome.fitness, 3), "outcome": trace["outcome"],
                         "impact": round(trace["impact"], 3),
+                        "touch_time": round(trace["touch_time"], 3),
+                        "score": {k: round(v, 2) for k, v in trace["score"].items()},
+                        "run_score": round(trace["fitness"], 2),
                         "frames": pack_rows(trace["frames"])})
     return {
-        "format": 1,
+        "format": 2,
         "generation": generation,
         "scenario": scenario + 1,
         "scenarios": SCENARIO_COUNT,
+        "weather": dict(weather),
         "population": len(population),
         "species_count": len(species_set.species),
         "best_fitness": round(best.fitness, 3),
         "mean_fitness": round(sum(fitnesses) / max(1, len(fitnesses)), 3),
         "landed": landed,
+        "landing_rate": round(landing_rate, 4),
         "history": [round(v, 2) for v in history[-HISTORY_LENGTH:]],
+        "rate_history": [round(v, 4) for v in rate_history[-HISTORY_LENGTH:]],
         "network": layout_network(best, config),
         "node_keys": champion["node_keys"],
         "champion_acts": pack_rows(champion["acts"]),

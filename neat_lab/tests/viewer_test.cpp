@@ -99,7 +99,8 @@ int main(int argc, char* argv[]) {
         const auto work = fresh_copy(source, work_root / "demo");
         acuppa::LuaProject game(work, "main", acuppa::LuaProject::Mode::Game, false);
         auto frame = run(game, 2);
-        check(has_text(frame, "(DEMO RUN)") && has_text(frame, "GEN 150"),
+        check(has_text(frame, "DEMO RUN") && has_text(frame, "GEN 150") &&
+                  has_text(frame, "LIVE: SHOWING THE NEWEST"),
               "viewer should start live on the newest demo generation");
         check(has_text(frame, "CHAMPION NETWORK") && has_text(frame, "FUEL") &&
                   has_text(frame, "MAIN"), "network panel should show by default");
@@ -107,11 +108,27 @@ int main(int argc, char* argv[]) {
         const auto* start = find(frame, "champion.gltf");
         check(start != nullptr, "champion lander should be visible");
         check(count(frame, "ghost_") >= 1, "species ghosts should be visible");
+        check(has_text(frame, "WIND <<<") && has_text(frame, "SCORE ") &&
+                  has_text(frame, "+ SPEED "), "wind and the champion's score parts should show");
+        check(count(frame, "streak.gltf") > 10, "a strong wind should show streaks");
         const float y0 = start ? start->transform[3].y : 0;
         frame = run(game, 60);
         const auto* later = find(frame, "champion.gltf");
         check(later && std::abs(later->transform[3].y - y0) > 0.5f,
               "champion should move during the replay");
+        // The gen 150 champion lands: its beacon blinks and the label says so.
+        bool beacon = false, landed_label = false;
+        for (int i = 0; i < 60 * 9; ++i) {
+            frame = game.step(1.0 / 60.0);
+            beacon = beacon || count(frame, "beacon.gltf") > 0;
+            landed_label = landed_label || has_text(frame, "LANDED") && !has_text(frame, "CRASHED");
+        }
+        check(beacon && landed_label, "a landed champion should light its beacon and label");
+        frame = tap(game, "h");
+        check(has_text(frame, "HOW A FLIGHT IS SCORED") && has_text(frame, "SPEED    UP TO 30"),
+              "H should show the scoring rules");
+        frame = tap(game, "h");
+        check(!has_text(frame, "HOW A FLIGHT IS SCORED"), "H should hide the scoring rules");
 
         frame = tap(game, "n");
         check(!has_text(frame, "CHAMPION NETWORK") && has_text(frame, "SHOW NETWORK"),
@@ -129,11 +146,31 @@ int main(int argc, char* argv[]) {
         check(!has_text(frame, "CHAMPION NETWORK"), "clicking the corner button should hide the panel");
 
         frame = tap(game, "left");
-        check(has_text(frame, "GEN 100") && has_text(frame, "BROWSING 10/11"),
-              "left arrow should step back one listed generation");
+        check(has_text(frame, "GEN 100") && has_text(frame, "REWATCHING GEN 100 (10 OF 11") &&
+                  has_text(frame, "L: BACK TO LIVE"),
+              "left arrow should step back one listed generation and say how to return");
         for (int i = 0; i < 12; ++i) frame = tap(game, "left");
-        check(has_text(frame, "GEN 1 ") && has_text(frame, "BROWSING 1/11"),
+        check(has_text(frame, "GEN 1 ") && has_text(frame, "(1 OF 11"),
               "browsing should stop at the first generation");
+        // Gen 2's only lander crashes: it is blown into debris and labeled.
+        frame = tap(game, "right");
+        check(has_text(frame, "GEN 2 "), "right arrow should step to a newer generation");
+        bool wrecked = false;
+        for (int i = 0; i < 60 * 10 && !wrecked; ++i) {
+            frame = game.step(1.0 / 60.0);
+            // Six debris pieces (three in the lander's color, three scorched)
+            // replace the hull, cabin, and jets.
+            wrecked = count(frame, "champion.gltf") == 3 && count(frame, "scorch.gltf") == 3 &&
+                      !find(frame, "cabin.gltf") && has_text(frame, "CRASHED");
+        }
+        check(wrecked, "a crashed lander should be replaced by debris and a CRASHED label");
+        for (int i = 0; i < 9; ++i) frame = tap(game, "right");
+        check(has_text(frame, "GEN 150") && has_text(frame, "(11 OF 11"),
+              "right arrow should reach the newest generation");
+        frame = tap(game, "right");
+        check(has_text(frame, "LIVE: SHOWING THE NEWEST"),
+              "right arrow past the newest generation should return to live mode");
+        frame = tap(game, "left");
         frame = tap(game, "l");
         check(has_text(frame, "GEN 150") && has_text(frame, "LIVE"), "L should return to live");
         frame = tap(game, "f");
@@ -150,7 +187,8 @@ int main(int argc, char* argv[]) {
               "return {format = 1, latest = 1, generations = {1}, running = true}\n");
         acuppa::LuaProject game(work, "main", acuppa::LuaProject::Mode::Game, false);
         auto frame = run(game, 2);
-        check(has_text(frame, "GEN 1 ") && !has_text(frame, "DEMO"), "runs/ should replace the demo");
+        check(has_text(frame, "GEN 1 ") && !has_text(frame, "DEMO") &&
+                  has_text(frame, "TRAINING IS AT GEN 1"), "runs/ should replace the demo");
         write(work / "runs" / "status.lua",
               "return {format = 1, latest = 2, generations = {1, 2}, running = true}\n");
         frame = tap(game, "f");  // Triple speed keeps the wait for the replay end short.
