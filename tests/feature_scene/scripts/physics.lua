@@ -1,6 +1,7 @@
 local tp = require("acuppa")
-local ground, falling, trigger
+local ground, falling, trigger, spinner
 local saw_trigger, saw_ground, saw_exit = false, false, false
+local spin_ticks = 0
 
 return {
   start = function()
@@ -27,6 +28,17 @@ return {
     tp.physics_apply_force(falling, {0, 1, 0})
     tp.physics_apply_impulse(falling, {0, 0.01, 0})
     tp.physics_move(trigger, {0, 2, 0})
+    -- An off-screen rod checks off-center forces and torque without changing the shot.
+    spinner = tp.entity_create("spinner")
+    tp.component_set(spinner, "transform", {position = {-50, 50, 0}})
+    tp.component_set(spinner, "physics", {motion = "dynamic", shape = "box",
+                                          half_extents = {0.2, 1, 0.2}})
+    assert(tp.physics_state(spinner).angular_velocity[3] == 0)
+    assert(not pcall(tp.physics_apply_force_at, ground, {1, 0, 0}, {0, 0, 0}))
+    assert(not pcall(tp.physics_apply_force_at, spinner, {1, 0, 0}, {0, math.huge, 0}))
+    assert(not pcall(tp.physics_apply_force_at, spinner, {1, 0, 0}))
+    assert(not pcall(tp.physics_apply_torque, ground, {0, 1, 0}))
+    assert(not pcall(tp.physics_apply_torque, spinner, {0 / 0, 0, 0}))
     local temp = tp.entity_create("temporary body")
     tp.component_set(temp, "transform", {position = {10, 1, 0}})
     tp.component_set(temp, "physics", {motion = "kinematic", shape = "sphere", radius = 0.5})
@@ -42,6 +54,16 @@ return {
     tp.entity_destroy(temp)
   end,
   fixed_update = function()
+    spin_ticks = spin_ticks + 1
+    if spin_ticks == 1 then
+      -- Pushing +X below the center turns about +Z; the torque turns about -Y.
+      tp.physics_apply_force_at(spinner, {2000, 0, 0}, {-50, 49, 0})
+      tp.physics_apply_torque(spinner, {0, -300, 0})
+    elseif spin_ticks == 2 then
+      local spin = tp.physics_state(spinner).angular_velocity
+      assert(spin[3] > 0.1 and spin[2] < -0.1, "off-center force or torque did not turn the rod")
+      tp.entity_destroy(spinner)
+    end
     for _, event in ipairs(tp.physics_contacts()) do
       if event.trigger and event.began and
          (event.first == trigger or event.second == trigger) then saw_trigger = true end

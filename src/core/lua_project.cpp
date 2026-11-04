@@ -87,6 +87,8 @@ struct LuaProject::Impl {
     static int physics_move(lua_State* lua);
     static int physics_set_pose(lua_State* lua);
     static int physics_apply_force(lua_State* lua);
+    static int physics_apply_force_at(lua_State* lua);
+    static int physics_apply_torque(lua_State* lua);
     static int physics_apply_impulse(lua_State* lua);
     static int physics_raycast(lua_State* lua);
     static int physics_overlap_sphere(lua_State* lua);
@@ -812,6 +814,8 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("physics_move", &physics_move);
     add_function("physics_set_pose", &physics_set_pose);
     add_function("physics_apply_force", &physics_apply_force);
+    add_function("physics_apply_force_at", &physics_apply_force_at);
+    add_function("physics_apply_torque", &physics_apply_torque);
     add_function("physics_apply_impulse", &physics_apply_impulse);
     add_function("physics_raycast", &physics_raycast);
     add_function("physics_overlap_sphere", &physics_overlap_sphere);
@@ -1509,11 +1513,12 @@ int LuaProject::Impl::physics_state(lua_State* lua) {
     if (lua_gettop(lua) != 1) return luaL_error(lua, "physics_state() expects an ID");
     const auto body = context(lua).physics->state(checked_id(lua, 1));
     if (!body) { lua_pushnil(lua); return 1; }
-    lua_createtable(lua, 0, 4);
+    lua_createtable(lua, 0, 5);
     push_vec3(lua, body->position); lua_setfield(lua, -2, "position");
     push_vec3(lua, context(lua).world.transform(checked_id(lua, 1))->rotation);
     lua_setfield(lua, -2, "rotation");
     push_vec3(lua, body->velocity); lua_setfield(lua, -2, "velocity");
+    push_vec3(lua, body->angular_velocity); lua_setfield(lua, -2, "angular_velocity");
     lua_pushboolean(lua, body->active); lua_setfield(lua, -2, "active");
     return 1;
 }
@@ -1559,6 +1564,23 @@ int LuaProject::Impl::physics_set_pose(lua_State* lua) {
 int LuaProject::Impl::physics_apply_force(lua_State* lua) {
     if (lua_gettop(lua) != 2) return luaL_error(lua, "physics_apply_force() expects ID and vector");
     try { context(lua).physics->apply_force(checked_id(lua, 1), vector_arg(lua, 2, false)); }
+    catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::physics_apply_force_at(lua_State* lua) {
+    if (lua_gettop(lua) != 3)
+        return luaL_error(lua, "physics_apply_force_at() expects ID, force, and world point");
+    try {
+        context(lua).physics->apply_force_at(checked_id(lua, 1), vector_arg(lua, 2, false),
+                                             vector_arg(lua, 3, false));
+    } catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
+    return 0;
+}
+
+int LuaProject::Impl::physics_apply_torque(lua_State* lua) {
+    if (lua_gettop(lua) != 2) return luaL_error(lua, "physics_apply_torque() expects ID and vector");
+    try { context(lua).physics->apply_torque(checked_id(lua, 1), vector_arg(lua, 2, false)); }
     catch (const std::exception& error) { return luaL_error(lua, "%s", error.what()); }
     return 0;
 }

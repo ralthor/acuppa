@@ -296,6 +296,26 @@ void PhysicsWorld::apply_force(uint64_t id, glm::vec3 force) {
     impl_->system.GetBodyInterface().AddForce(it->second, JPH::Vec3(force.x, force.y, force.z));
 }
 
+void PhysicsWorld::apply_force_at(uint64_t id, glm::vec3 force, glm::vec3 point) {
+    if (!finite(force) || !finite(point))
+        throw std::invalid_argument("physics force and point must be finite");
+    const auto it = impl_->bodies.find(id);
+    if (it == impl_->bodies.end()) throw std::invalid_argument("unknown physics body ID");
+    if (impl_->system.GetBodyInterface().GetMotionType(it->second) != JPH::EMotionType::Dynamic)
+        throw std::invalid_argument("force requires a dynamic physics body");
+    impl_->system.GetBodyInterface().AddForce(it->second, JPH::Vec3(force.x, force.y, force.z),
+                                              JPH::RVec3(point.x, point.y, point.z));
+}
+
+void PhysicsWorld::apply_torque(uint64_t id, glm::vec3 torque) {
+    if (!finite(torque)) throw std::invalid_argument("physics torque must be finite");
+    const auto it = impl_->bodies.find(id);
+    if (it == impl_->bodies.end()) throw std::invalid_argument("unknown physics body ID");
+    if (impl_->system.GetBodyInterface().GetMotionType(it->second) != JPH::EMotionType::Dynamic)
+        throw std::invalid_argument("torque requires a dynamic physics body");
+    impl_->system.GetBodyInterface().AddTorque(it->second, JPH::Vec3(torque.x, torque.y, torque.z));
+}
+
 void PhysicsWorld::apply_impulse(uint64_t id, glm::vec3 impulse) {
     if (!finite(impulse)) throw std::invalid_argument("physics impulse must be finite");
     const auto it = impl_->bodies.find(id);
@@ -442,9 +462,11 @@ std::optional<PhysicsBodyState> PhysicsWorld::state(uint64_t id) const {
     const auto p = iface.GetPosition(it->second);
     const auto r = iface.GetRotation(it->second);
     const auto v = iface.GetLinearVelocity(it->second);
+    const auto w = iface.GetAngularVelocity(it->second);
     return PhysicsBodyState{{p.GetX(), p.GetY(), p.GetZ()},
                             {r.GetW(), r.GetX(), r.GetY(), r.GetZ()},
-                            {v.GetX(), v.GetY(), v.GetZ()}, iface.IsActive(it->second)};
+                            {v.GetX(), v.GetY(), v.GetZ()}, iface.IsActive(it->second),
+                            {w.GetX(), w.GetY(), w.GetZ()}};
 }
 
 void PhysicsWorld::step() {

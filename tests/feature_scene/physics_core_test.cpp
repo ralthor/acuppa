@@ -1,5 +1,7 @@
 #include "acuppa/physics_world.hpp"
 
+#include <glm/geometric.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -362,6 +364,61 @@ int main() {
     expect(std::abs(driven.state(8)->position.x - 2) < 0.001f,
            "moving a body did not update its position");
     rejects([&] { driven.apply_force(999, {0, 1, 0}); }, "unknown force target accepted");
+
+    // An off-center force turns a body; the same force through the center only moves it.
+    PhysicsWorld turning;
+    PhysicsBodyDesc rod;
+    rod.motion = PhysicsMotion::Dynamic;
+    rod.half_extents = {0.2f, 1.0f, 0.2f};
+    rod.id = 20;
+    rod.position = {0, 10, 0};
+    turning.add(rod);
+    rod.id = 21;
+    rod.position = {5, 10, 0};
+    turning.add(rod);
+    rod.id = 22;
+    rod.position = {-5, 10, 0};
+    turning.add(rod);
+    expect(glm::length(turning.state(20)->angular_velocity) == 0.0f,
+           "a new body should not be turning");
+    turning.apply_force_at(20, {2000, 0, 0}, {0, 9, 0});  // At the bottom end.
+    turning.apply_force(21, {2000, 0, 0});
+    // A couple: equal and opposite pushes at both ends turn without moving.
+    turning.apply_force_at(22, {1500, 0, 0}, {-5, 9, 0});
+    turning.apply_force_at(22, {-1500, 0, 0}, {-5, 11, 0});
+    turning.step();
+    const auto pushed_low = *turning.state(20), pushed_center = *turning.state(21),
+               coupled = *turning.state(22);
+    // r x F = (0, -1, 0) x (2000, 0, 0) points along +Z.
+    expect(pushed_low.angular_velocity.z > 0.1f &&
+               std::abs(pushed_low.angular_velocity.x) < 1e-4f &&
+               std::abs(pushed_low.angular_velocity.y) < 1e-4f,
+           "a force below the center did not turn the body about +Z");
+    expect(glm::length(pushed_center.angular_velocity) < 1e-5f,
+           "a force through the center turned the body");
+    expect(std::abs(pushed_low.velocity.x - pushed_center.velocity.x) < 1e-4f,
+           "an off-center force changed the linear push");
+    expect(coupled.angular_velocity.z > 0.1f && std::abs(coupled.velocity.x) < 1e-4f,
+           "a force couple should turn the body without moving it sideways");
+    turning.apply_torque(21, {0, -300, 0});
+    turning.step();
+    expect(turning.state(21)->angular_velocity.y < -0.1f &&
+               std::abs(turning.state(21)->velocity.x - pushed_center.velocity.x) < 1e-4f,
+           "a torque should turn the body without pushing it");
+    rejects([&] { turning.apply_force_at(999, {1, 0, 0}, {0, 0, 0}); },
+            "unknown off-center force target accepted");
+    rejects([&] { turning.apply_force_at(20, {1, 0, 0}, {NAN, 0, 0}); },
+            "nonfinite force point accepted");
+    rejects([&] { turning.apply_force_at(20, {INFINITY, 0, 0}, {0, 0, 0}); },
+            "nonfinite off-center force accepted");
+    rejects([&] { turning.apply_torque(20, {0, NAN, 0}); }, "nonfinite torque accepted");
+    rejects([&] { turning.apply_torque(999, {0, 1, 0}); }, "unknown torque target accepted");
+    rod.id = 23;
+    rod.motion = PhysicsMotion::Kinematic;
+    turning.add(rod);
+    rejects([&] { turning.apply_torque(23, {0, 1, 0}); }, "torque on a kinematic body accepted");
+    rejects([&] { turning.apply_force_at(23, {1, 0, 0}, {0, 0, 0}); },
+            "off-center force on a kinematic body accepted");
     rejects([&] { driven.raycast({0, 0, 0}, {0, 0, 0}, 1); }, "zero ray accepted");
     rejects([&] { driven.overlap_sphere({0, 0, 0}, 0); }, "zero overlap radius accepted");
 

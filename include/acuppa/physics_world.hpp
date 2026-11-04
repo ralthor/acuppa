@@ -37,6 +37,7 @@ struct PhysicsBodyState {
     glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 velocity{0.0f};
     bool active = false;
+    glm::vec3 angular_velocity{0.0f};  // World-space axis times radians per second.
 };
 
 struct PhysicsContact {
@@ -95,6 +96,11 @@ public:
     void move(uint64_t id, glm::vec3 position);
     void set_pose(uint64_t id, glm::vec3 position, glm::quat rotation);
     void apply_force(uint64_t id, glm::vec3 force);
+    // Applies a world-space force at a world-space point for the next step; an
+    // off-center point also turns the body. Requires a dynamic body.
+    void apply_force_at(uint64_t id, glm::vec3 force, glm::vec3 point);
+    // Applies a world-space torque (N m) for the next step. Requires a dynamic body.
+    void apply_torque(uint64_t id, glm::vec3 torque);
     void apply_impulse(uint64_t id, glm::vec3 impulse);
     void add_vehicle(uint64_t id, const VehicleConfig& config = {});
     void set_vehicle_input(uint64_t id, float throttle, float steer, float brake,
