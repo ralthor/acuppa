@@ -65,6 +65,7 @@ struct LuaProject::Impl {
     static int pointer(lua_State* lua);
     static int ray(lua_State* lua);
     static int set_camera(lua_State* lua);
+    static int set_inset(lua_State* lua);
     static int set_exposure(lua_State* lua);
     static int set_ssao(lua_State* lua);
     static int set_environment(lua_State* lua);
@@ -535,6 +536,7 @@ SceneFrame LuaProject::Impl::snapshot() {
     scene.environment = frame.environment;
     scene.environment_intensity = frame.environment_intensity;
     scene.sky = frame.sky;
+    scene.inset = frame.inset;
     scene.ui = frame.ui;
     for (auto& instance : scene.imported) instance.asset = ensure_asset(instance.source);
     return scene;
@@ -647,6 +649,7 @@ void LuaProject::Impl::load_scene(const std::string& name) {
     frame.environment.reset();
     frame.environment_intensity = 0.0f;
     frame.sky.reset();
+    frame.inset.reset();
     frame.ui.clear();
     previous_ui_buttons.clear();
     current_ui_buttons.clear();
@@ -792,6 +795,7 @@ int LuaProject::Impl::open_module(lua_State* lua) {
     add_function("pointer", &pointer);
     add_function("screen_ray", &ray);
     add_function("set_camera", &set_camera);
+    add_function("set_inset", &set_inset);
     add_function("set_exposure", &set_exposure);
     add_function("set_ssao", &set_ssao);
     add_function("set_environment", &set_environment);
@@ -988,6 +992,47 @@ int LuaProject::Impl::set_camera(lua_State* lua) {
         } else {
             state.frame.camera = camera;
         }
+    } catch (const std::invalid_argument& error) {
+        return luaL_error(lua, "%s", error.what());
+    }
+    return 0;
+}
+
+int LuaProject::Impl::set_inset(lua_State* lua) {
+    if (lua_gettop(lua) != 1) return luaL_error(lua, "set_inset() expects one table or nil");
+    Impl& state = context(lua);
+    if (lua_isnil(lua, 1)) {
+        state.frame.inset.reset();
+        return 0;
+    }
+    luaL_checktype(lua, 1, LUA_TTABLE);
+    try {
+        // Omitted fields keep the current inset's values, or the main camera's.
+        InsetView inset;
+        if (state.frame.inset) inset = *state.frame.inset;
+        else inset.camera = state.frame.camera;
+        inset.camera.eye = vector_field(lua, 1, "eye", inset.camera.eye, false);
+        inset.camera.target = vector_field(lua, 1, "target", inset.camera.target, false);
+        inset.camera.up = vector_field(lua, 1, "up", inset.camera.up, false);
+        inset.camera.vertical_fov_degrees =
+            optional_number(lua, 1, "fov", inset.camera.vertical_fov_degrees, "inset");
+        inset.camera.near_plane = optional_number(lua, 1, "near", inset.camera.near_plane, "inset");
+        inset.camera.far_plane = optional_number(lua, 1, "far", inset.camera.far_plane, "inset");
+        auto pixels = [&](const char* field, int fallback) {
+            const float value = optional_number(lua, 1, field, float(fallback), "inset");
+            if (value != std::floor(value) || std::abs(value) > 16384.0f)
+                throw std::invalid_argument(std::string("inset ") + field +
+                                            " must be a whole number of pixels");
+            return int(value);
+        };
+        inset.x = pixels("x", inset.x);
+        inset.y = pixels("y", inset.y);
+        inset.width = pixels("width", inset.width);
+        inset.height = pixels("height", inset.height);
+        if (inset.width < 16 || inset.height < 16 || inset.width > 4096 || inset.height > 4096)
+            throw std::invalid_argument("inset width and height must be 16 to 4096 pixels");
+        inset.camera.view_projection(float(inset.width) / float(inset.height));
+        state.frame.inset = inset;
     } catch (const std::invalid_argument& error) {
         return luaL_error(lua, "%s", error.what());
     }

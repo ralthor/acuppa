@@ -513,6 +513,12 @@ if(BUILD_TESTING)
     add_test(NAME sky_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:acuppa>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene" "sky")
+    add_test(NAME views_capture COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/views_capture_test.py" $<TARGET_FILE:acuppa>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene")
+    add_test(NAME views_live_startup COMMAND "${Python3_EXECUTABLE}"
+             "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:acuppa>
+             "${PROJECT_SOURCE_DIR}/tests/feature_scene" "views")
     add_test(NAME audio_live_startup COMMAND "${Python3_EXECUTABLE}"
              "${PROJECT_SOURCE_DIR}/tests/lua_live_start_test.py" $<TARGET_FILE:acuppa>
              "${PROJECT_SOURCE_DIR}/tests/feature_scene" "audio")

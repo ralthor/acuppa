@@ -17,6 +17,7 @@ layout(push_constant) uniform Settings {
     float ssao_strength;
     mat4 inverse_view_projection;
     vec4 camera_focal;
+    vec4 inset_rect;  // Inset view in UV space (x0, y0, x1, y1); empty when x1 <= x0.
 } settings;
 
 float depth_at(vec2 coordinate) {
@@ -31,6 +32,9 @@ vec3 world_at(vec2 coordinate, float depth) {
 
 float ambient_occlusion(vec2 coordinate) {
     if (settings.ssao_quality == 0 || settings.ssao_strength == 0.0) return 1.0;
+    // SSAO is computed from the main camera's depth, so it does not apply inside the inset.
+    if (all(greaterThanEqual(coordinate, settings.inset_rect.xy)) &&
+        all(lessThan(coordinate, settings.inset_rect.zw))) return 1.0;
     float center_depth = depth_at(coordinate);
     if (center_depth >= 0.99999) return 1.0;
     vec3 center = world_at(coordinate, center_depth);

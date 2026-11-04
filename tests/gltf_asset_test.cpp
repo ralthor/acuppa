@@ -49,6 +49,13 @@ int main(int argc, char* argv[]) {
     expect(textured.primitives[0].vertices[0].normal[2] == 1.0f &&
            textured.primitives[0].vertices[0].uv[1] == 1.0f,
            "glTF normals or UVs were not imported");
+    // alphaMode BLEND loads as a see-through material; OPAQUE stays opaque.
+    const auto glass = acuppa::load_gltf(root, "assets/blend_quad.gltf");
+    const auto wall = acuppa::load_gltf(root, "assets/red_quad.gltf");
+    if (!glass.primitives.at(0).material.alpha_blend ||
+        glass.primitives.at(0).material.base_color[3] != 0.4f ||
+        wall.primitives.at(0).material.alpha_blend || wall.primitives.at(0).material.alpha_mask)
+        throw std::runtime_error("glTF alpha blend mode was not imported");
     const auto spheres = acuppa::load_gltf(root, "assets/material_spheres.gltf");
     expect(spheres.primitives.size() == 3 &&
            spheres.primitives[0].material.metallic < 0.1f &&

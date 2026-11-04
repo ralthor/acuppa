@@ -20,6 +20,7 @@ return {
             ssao_low = "scenes/ssao.scene.lua", ssao_shift = "scenes/ssao.scene.lua",
             sky = "scenes/sky.scene.lua", sky_off = "scenes/sky.scene.lua",
             sky_clear = "scenes/sky.scene.lua", sky_switch = "scenes/sky.scene.lua",
+            views = "scenes/views.scene.lua", views_off = "scenes/views.scene.lua",
             physics = "scenes/physics.scene.lua",
             physics_materials = "scenes/physics_materials.scene.lua",
             vehicle = "scenes/vehicle.scene.lua",

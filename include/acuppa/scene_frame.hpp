@@ -52,8 +52,16 @@ struct UiElement {
     bool focused = false;
 };
 
+// A second camera drawn into a rectangle of the window (pixels from the top
+// left), over the main view and under the UI.
+struct InsetView {
+    PerspectiveCamera camera;
+    int x = 0, y = 0, width = 0, height = 0;
+};
+
 struct SceneFrame {
     PerspectiveCamera camera;
+    std::optional<InsetView> inset;
     float exposure = 1.0f;
     int ssao_quality = 0;
     float ssao_radius = 0.35f;

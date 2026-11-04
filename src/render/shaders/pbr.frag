@@ -171,5 +171,6 @@ void main() {
         ? image_based_light(normal, view, albedo, metallic, roughness, f0) *
           frame.environment_params.x * occlusion
         : 0.03 * albedo * (1.0 - metallic) * occlusion;
-    out_color = vec4(lighting + ambient + emissive, 1.0);
+    // Opaque pipelines ignore alpha; the blended pipeline uses it as opacity.
+    out_color = vec4(lighting + ambient + emissive, base.a);
 }

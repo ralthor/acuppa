@@ -23,6 +23,7 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/geometric.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -33,6 +34,16 @@
 #include <vector>
 
 namespace acuppa {
+
+struct CubeDemo::PbrFrame {
+    float camera[4]{};
+    float light_position_type[8][4]{};
+    float light_color_intensity[8][4]{};
+    int32_t light_count[4]{};
+    float environment_params[4]{};
+};
+static_assert(sizeof(CubeDemo::PbrFrame) == 304);
+
 namespace {
 
 struct Vertex {
@@ -47,15 +58,6 @@ struct PbrVertex {
     float uv[2];
 };
 static_assert(sizeof(PbrVertex) == sizeof(GltfVertex));
-
-struct PbrFrame {
-    float camera[4]{};
-    float light_position_type[8][4]{};
-    float light_color_intensity[8][4]{};
-    int32_t light_count[4]{};
-    float environment_params[4]{};
-};
-static_assert(sizeof(PbrFrame) == 304);
 
 struct PbrMaterial {
     float base_color[4]{};
@@ -85,8 +87,9 @@ struct TonemapSettings {
     float ssao_strength = 2.0f;
     glm::mat4 inverse_view_projection{1.0f};
     glm::vec4 camera_focal{0.0f};
+    glm::vec4 inset_rect{0.0f};  // UV space x0, y0, x1, y1; empty when x1 <= x0.
 };
-static_assert(sizeof(TonemapSettings) == 96);
+static_assert(sizeof(TonemapSettings) == 112);
 
 struct SkyFrame {
     glm::mat4 inverse_view_projection{1.0f};
@@ -542,6 +545,7 @@ void CubeDemo::prepare(const SceneFrame& scene) {
             values.maps0[3] = material.occlusion_image >= 0;
             values.maps1[0] = material.emissive_image >= 0;
             values.maps1[1] = material.alpha_mask;
+            part.blend = material.alpha_blend;
             nvrhi::BufferDesc material_desc;
             material_desc.byteSize = sizeof(PbrMaterial);
             material_desc.isConstantBuffer = true;
@@ -587,6 +591,7 @@ void CubeDemo::release_size_dependent() {
     tonemap_binding_set_ = nullptr;
     pipeline_ = nullptr;
     pbr_pipeline_ = nullptr;
+    pbr_blend_pipeline_ = nullptr;
     tonemap_pipeline_ = nullptr;
     ssao_pipeline_ = nullptr;
     sky_pipeline_ = nullptr;
@@ -694,6 +699,16 @@ void CubeDemo::resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t 
     pbr_pipeline_ = device_->createGraphicsPipeline(
         pbr_desc, hdr_framebuffer_->getFramebufferInfo());
     require(pbr_pipeline_, "create PBR graphics pipeline");
+    // Blended surfaces mix over what is behind them and leave the depth buffer alone.
+    pbr_desc.renderState.depthStencilState.disableDepthWrite();
+    pbr_desc.renderState.blendState.targets[0].enableBlend()
+        .setSrcBlend(nvrhi::BlendFactor::SrcAlpha)
+        .setDestBlend(nvrhi::BlendFactor::InvSrcAlpha)
+        .setSrcBlendAlpha(nvrhi::BlendFactor::One)
+        .setDestBlendAlpha(nvrhi::BlendFactor::InvSrcAlpha);
+    pbr_blend_pipeline_ = device_->createGraphicsPipeline(
+        pbr_desc, hdr_framebuffer_->getFramebufferInfo());
+    require(pbr_blend_pipeline_, "create blended PBR graphics pipeline");
     nvrhi::GraphicsPipelineDesc ssao_pipeline_desc;
     ssao_pipeline_desc.setVertexShader(tonemap_vertex_shader_)
         .setFragmentShader(ssao_fragment_shader_)
@@ -762,6 +777,7 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
                 shadows.transforms[i * 6 + face] = shadow_matrix(light, face);
         }
     }
+    // Shadow draws bind the same material sets, which include the frame constants.
     commands->writeBuffer(pbr_frame_buffer_, &frame, sizeof(frame));
     if (has_shadows) {
         if (!shadow_atlas_ || !shadow_framebuffer_ ||
@@ -799,6 +815,7 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
                     if (found == imported_.end())
                         throw std::runtime_error("shadow caster mesh was not prepared");
                     for (const auto& primitive : found->second.primitives) {
+                        if (primitive.blend) continue;  // See-through surfaces cast no shadow.
                         nvrhi::GraphicsState imported_state;
                         imported_state.setPipeline(shadow_pbr_pipeline_)
                             .setFramebuffer(shadow_framebuffer_);
@@ -823,67 +840,8 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
     commands->clearTextureFloat(hdr_color_, nvrhi::AllSubresources,
                                 nvrhi::Color(0.08f, 0.18f, 0.38f, 1.0f));
     commands->clearDepthStencilTexture(depth_, nvrhi::AllSubresources, true, 1.0f, false, 0);
-    const glm::mat4 view_projection = scene.camera.view_projection(
-        float(width_) / float(height_));
-    if (scene.sky) {
-        // The sky fills the HDR target first; geometry then depth-tests over it.
-        const SkyGradient& sky = *scene.sky;
-        const SkySunShape sun = sky_sun_shape(sky.sun_size);
-        SkyFrame sky_frame;
-        sky_frame.inverse_view_projection = glm::inverse(view_projection);
-        sky_frame.eye = glm::vec4(scene.camera.eye, 1.0f);
-        sky_frame.zenith = glm::vec4(sky.zenith, 1.0f);
-        sky_frame.horizon = glm::vec4(sky.horizon, 1.0f);
-        sky_frame.ground = glm::vec4(sky.ground, 1.0f);
-        sky_frame.sun_direction = glm::vec4(glm::normalize(sky.sun_direction),
-                                            sky.sun_size > 0.0f ? 1.0f : 0.0f);
-        sky_frame.sun_color = glm::vec4(sky.sun_color, 1.0f);
-        sky_frame.sun_shape = glm::vec4(sun.outer_cos, sun.inner_cos, sun.halo_sharpness,
-                                        sun.halo_strength);
-        commands->writeBuffer(sky_frame_buffer_, &sky_frame, sizeof(sky_frame));
-        nvrhi::GraphicsState sky_state;
-        sky_state.setPipeline(sky_pipeline_).setFramebuffer(hdr_framebuffer_);
-        sky_state.viewport.addViewportAndScissorRect(
-            nvrhi::Viewport(float(width_), float(height_)));
-        sky_state.addBindingSet(sky_binding_set_);
-        commands->setGraphicsState(sky_state);
-        commands->draw(nvrhi::DrawArguments().setVertexCount(3));
-    }
-    nvrhi::GraphicsState state;
-    state.setPipeline(pipeline_).setFramebuffer(hdr_framebuffer_);
-    state.viewport.addViewportAndScissorRect(nvrhi::Viewport(float(width_), float(height_)));
-    state.addBindingSet(binding_set_)
-        .addVertexBuffer(nvrhi::VertexBufferBinding().setBuffer(vertices_).setSlot(0).setOffset(0))
-        .setIndexBuffer(nvrhi::IndexBufferBinding().setBuffer(indices_)
-            .setFormat(nvrhi::Format::R16_UINT).setOffset(0));
-    commands->setGraphicsState(state);
-    for (const CubeInstance& cube : scene.cubes) {
-        const glm::mat4 mvp = view_projection * cube_model(cube);
-        commands->setPushConstants(glm::value_ptr(mvp), sizeof(mvp));
-        commands->drawIndexed(nvrhi::DrawArguments().setVertexCount(36));
-    }
-    for (const auto& instance : scene.imported) {
-        const auto found = imported_.find(instance.asset.get());
-        if (found == imported_.end()) throw std::runtime_error("glTF mesh was not prepared");
-        for (const auto& primitive : found->second.primitives) {
-            nvrhi::GraphicsState imported_state;
-            imported_state.setPipeline(pbr_pipeline_).setFramebuffer(hdr_framebuffer_);
-            imported_state.viewport.addViewportAndScissorRect(
-                nvrhi::Viewport(float(width_), float(height_)));
-            imported_state.addBindingSet(primitive.binding_set)
-                .addBindingSet(environment_binding_set_)
-                .addBindingSet(shadow_binding_set_)
-                .addVertexBuffer(nvrhi::VertexBufferBinding().setBuffer(primitive.vertices)
-                    .setSlot(0).setOffset(0))
-                .setIndexBuffer(nvrhi::IndexBufferBinding().setBuffer(primitive.indices)
-                    .setFormat(nvrhi::Format::R32_UINT).setOffset(0));
-            commands->setGraphicsState(imported_state);
-            const glm::mat4 model = instance.transform * primitive.node_transform;
-            const PbrTransform transform{view_projection * model, model};
-            commands->setPushConstants(&transform, sizeof(transform));
-            commands->drawIndexed(nvrhi::DrawArguments().setVertexCount(primitive.index_count));
-        }
-    }
+    const glm::mat4 view_projection =
+        draw_view(commands, hdr_framebuffer_, width_, height_, scene.camera, scene, frame);
     TonemapSettings settings;
     settings.exposure = scene.exposure;
     settings.ssao_quality = scene.ssao_quality;
@@ -902,6 +860,31 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
         commands->setPushConstants(&settings, sizeof(settings));
         commands->draw(nvrhi::DrawArguments().setVertexCount(3));
     }
+    if (scene.inset) {
+        // The inset is drawn into its own targets with its own camera, then copied
+        // over the main image; the window clips a rectangle that extends past it.
+        const InsetView& inset = *scene.inset;
+        const int x0 = std::max(0, inset.x), y0 = std::max(0, inset.y);
+        const int x1 = std::min(int(width_), inset.x + inset.width);
+        const int y1 = std::min(int(height_), inset.y + inset.height);
+        if (x1 > x0 && y1 > y0) {
+            prepare_inset(uint32_t(inset.width), uint32_t(inset.height));
+            commands->clearTextureFloat(inset_color_, nvrhi::AllSubresources,
+                                        nvrhi::Color(0.08f, 0.18f, 0.38f, 1.0f));
+            commands->clearDepthStencilTexture(inset_depth_, nvrhi::AllSubresources, true, 1.0f,
+                                               false, 0);
+            draw_view(commands, inset_framebuffer_, inset_width_, inset_height_, inset.camera,
+                      scene, frame);
+            commands->copyTexture(hdr_color_,
+                nvrhi::TextureSlice().setOrigin(uint32_t(x0), uint32_t(y0))
+                    .setWidth(uint32_t(x1 - x0)).setHeight(uint32_t(y1 - y0)),
+                inset_color_,
+                nvrhi::TextureSlice().setOrigin(uint32_t(x0 - inset.x), uint32_t(y0 - inset.y))
+                    .setWidth(uint32_t(x1 - x0)).setHeight(uint32_t(y1 - y0)));
+            settings.inset_rect = glm::vec4(float(x0) / float(width_), float(y0) / float(height_),
+                                            float(x1) / float(width_), float(y1) / float(height_));
+        }
+    }
     nvrhi::GraphicsState tonemap_state;
     tonemap_state.setPipeline(tonemap_pipeline_).setFramebuffer(framebuffers_[image_index]);
     tonemap_state.viewport.addViewportAndScissorRect(
@@ -910,6 +893,119 @@ void CubeDemo::record(nvrhi::ICommandList* commands, uint32_t image_index,
     commands->setGraphicsState(tonemap_state);
     commands->setPushConstants(&settings, sizeof(settings));
     commands->draw(nvrhi::DrawArguments().setVertexCount(3));
+}
+
+void CubeDemo::prepare_inset(uint32_t width, uint32_t height) {
+    if (inset_framebuffer_ && inset_width_ == width && inset_height_ == height) return;
+    nvrhi::TextureDesc depth_desc;
+    depth_desc.width = width;
+    depth_desc.height = height;
+    depth_desc.format = nvrhi::Format::D32;
+    depth_desc.isRenderTarget = true;
+    depth_desc.debugName = "inset depth";
+    depth_desc.enableAutomaticStateTracking(nvrhi::ResourceStates::DepthWrite);
+    inset_depth_ = device_->createTexture(depth_desc);
+    nvrhi::TextureDesc color_desc;
+    color_desc.width = width;
+    color_desc.height = height;
+    color_desc.format = nvrhi::Format::RGBA16_FLOAT;
+    color_desc.isRenderTarget = true;
+    color_desc.debugName = "inset HDR color";
+    color_desc.enableAutomaticStateTracking(nvrhi::ResourceStates::RenderTarget);
+    inset_color_ = device_->createTexture(color_desc);
+    require(inset_depth_ && inset_color_, "create inset images");
+    inset_framebuffer_ = device_->createFramebuffer(
+        nvrhi::FramebufferDesc().addColorAttachment(inset_color_).setDepthAttachment(inset_depth_));
+    require(inset_framebuffer_, "create inset framebuffer");
+    inset_width_ = width;
+    inset_height_ = height;
+}
+
+glm::mat4 CubeDemo::draw_view(nvrhi::ICommandList* commands, nvrhi::IFramebuffer* framebuffer,
+                              uint32_t width, uint32_t height, const PerspectiveCamera& camera,
+                              const SceneFrame& scene, PbrFrame& frame) {
+    frame.camera[0] = camera.eye.x;
+    frame.camera[1] = camera.eye.y;
+    frame.camera[2] = camera.eye.z;
+    commands->writeBuffer(pbr_frame_buffer_, &frame, sizeof(frame));
+    const auto viewport = nvrhi::Viewport(float(width), float(height));
+    const glm::mat4 view_projection = camera.view_projection(float(width) / float(height));
+    if (scene.sky) {
+        // The sky fills the HDR target first; geometry then depth-tests over it.
+        const SkyGradient& sky = *scene.sky;
+        const SkySunShape sun = sky_sun_shape(sky.sun_size);
+        SkyFrame sky_frame;
+        sky_frame.inverse_view_projection = glm::inverse(view_projection);
+        sky_frame.eye = glm::vec4(camera.eye, 1.0f);
+        sky_frame.zenith = glm::vec4(sky.zenith, 1.0f);
+        sky_frame.horizon = glm::vec4(sky.horizon, 1.0f);
+        sky_frame.ground = glm::vec4(sky.ground, 1.0f);
+        sky_frame.sun_direction = glm::vec4(glm::normalize(sky.sun_direction),
+                                            sky.sun_size > 0.0f ? 1.0f : 0.0f);
+        sky_frame.sun_color = glm::vec4(sky.sun_color, 1.0f);
+        sky_frame.sun_shape = glm::vec4(sun.outer_cos, sun.inner_cos, sun.halo_sharpness,
+                                        sun.halo_strength);
+        commands->writeBuffer(sky_frame_buffer_, &sky_frame, sizeof(sky_frame));
+        nvrhi::GraphicsState sky_state;
+        sky_state.setPipeline(sky_pipeline_).setFramebuffer(framebuffer);
+        sky_state.viewport.addViewportAndScissorRect(viewport);
+        sky_state.addBindingSet(sky_binding_set_);
+        commands->setGraphicsState(sky_state);
+        commands->draw(nvrhi::DrawArguments().setVertexCount(3));
+    }
+    nvrhi::GraphicsState state;
+    state.setPipeline(pipeline_).setFramebuffer(framebuffer);
+    state.viewport.addViewportAndScissorRect(viewport);
+    state.addBindingSet(binding_set_)
+        .addVertexBuffer(nvrhi::VertexBufferBinding().setBuffer(vertices_).setSlot(0).setOffset(0))
+        .setIndexBuffer(nvrhi::IndexBufferBinding().setBuffer(indices_)
+            .setFormat(nvrhi::Format::R16_UINT).setOffset(0));
+    commands->setGraphicsState(state);
+    for (const CubeInstance& cube : scene.cubes) {
+        const glm::mat4 mvp = view_projection * cube_model(cube);
+        commands->setPushConstants(glm::value_ptr(mvp), sizeof(mvp));
+        commands->drawIndexed(nvrhi::DrawArguments().setVertexCount(36));
+    }
+    struct Blended {
+        float distance;
+        const ImportedInstance* instance;
+        const GpuPrimitive* primitive;
+    };
+    std::vector<Blended> blended;
+    auto draw_primitive = [&](const ImportedInstance& instance, const GpuPrimitive& primitive) {
+        nvrhi::GraphicsState imported_state;
+        imported_state.setPipeline(primitive.blend ? pbr_blend_pipeline_ : pbr_pipeline_)
+            .setFramebuffer(framebuffer);
+        imported_state.viewport.addViewportAndScissorRect(viewport);
+        imported_state.addBindingSet(primitive.binding_set)
+            .addBindingSet(environment_binding_set_)
+            .addBindingSet(shadow_binding_set_)
+            .addVertexBuffer(nvrhi::VertexBufferBinding().setBuffer(primitive.vertices)
+                .setSlot(0).setOffset(0))
+            .setIndexBuffer(nvrhi::IndexBufferBinding().setBuffer(primitive.indices)
+                .setFormat(nvrhi::Format::R32_UINT).setOffset(0));
+        commands->setGraphicsState(imported_state);
+        const glm::mat4 model = instance.transform * primitive.node_transform;
+        const PbrTransform transform{view_projection * model, model};
+        commands->setPushConstants(&transform, sizeof(transform));
+        commands->drawIndexed(nvrhi::DrawArguments().setVertexCount(primitive.index_count));
+    };
+    for (const auto& instance : scene.imported) {
+        const auto found = imported_.find(instance.asset.get());
+        if (found == imported_.end()) throw std::runtime_error("glTF mesh was not prepared");
+        for (const auto& primitive : found->second.primitives) {
+            if (!primitive.blend) {
+                draw_primitive(instance, primitive);
+                continue;
+            }
+            const glm::vec3 center(instance.transform * primitive.node_transform[3]);
+            blended.push_back({glm::length(center - camera.eye), &instance, &primitive});
+        }
+    }
+    std::stable_sort(blended.begin(), blended.end(),
+                     [](const Blended& a, const Blended& b) { return a.distance > b.distance; });
+    for (const Blended& item : blended) draw_primitive(*item.instance, *item.primitive);
+    return view_projection;
 }
 
 }  // namespace acuppa

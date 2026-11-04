@@ -38,6 +38,7 @@ local invalid = {
   set_camera = function() tp.set_camera() end,
   set_environment = function() tp.set_environment() end,
   set_exposure = function() tp.set_exposure() end,
+  set_inset = function() tp.set_inset() end,
   set_rotation = function() tp.set_rotation() end,
   set_ssao = function() tp.set_ssao() end,
   set_sky = function() tp.set_sky() end,

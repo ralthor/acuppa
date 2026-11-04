@@ -37,6 +37,9 @@ struct GltfMaterial {
     bool double_sided = false;
     bool alpha_mask = false;
     float alpha_cutoff = 0.5f;
+    // glTF alphaMode BLEND: base color alpha sets opacity. Such surfaces are
+    // drawn after opaque ones, back to front, without writing depth or casting shadows.
+    bool alpha_blend = false;
 };
 
 struct GltfPrimitive {

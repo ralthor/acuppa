@@ -165,9 +165,8 @@ GltfMaterial read_material(const cgltf_material* source, const cgltf_data& data)
     GltfMaterial result;
     if (!source) return result;
     if (source->has_pbr_specular_glossiness || source->unlit || source->has_clearcoat ||
-        source->has_transmission || source->has_volume || source->has_sheen ||
-        source->alpha_mode == cgltf_alpha_mode_blend)
-        throw std::runtime_error("material extension or alpha blend is not yet supported");
+        source->has_transmission || source->has_volume || source->has_sheen)
+        throw std::runtime_error("material extension is not yet supported");
     if (source->has_pbr_metallic_roughness) {
         const auto& pbr = source->pbr_metallic_roughness;
         for (int i = 0; i < 4; ++i) result.base_color[i] = pbr.base_color_factor[i];
@@ -184,6 +183,7 @@ GltfMaterial read_material(const cgltf_material* source, const cgltf_data& data)
     result.emissive_image = image_index(source->emissive_texture, data);
     result.double_sided = source->double_sided;
     result.alpha_mask = source->alpha_mode == cgltf_alpha_mode_mask;
+    result.alpha_blend = source->alpha_mode == cgltf_alpha_mode_blend;
     result.alpha_cutoff = source->alpha_cutoff;
     for (float value : result.base_color) if (!std::isfinite(value))
         throw std::runtime_error("nonfinite material base color");

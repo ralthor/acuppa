@@ -14,6 +14,7 @@ namespace acuppa {
 
 class CubeDemo {
 public:
+    struct PbrFrame;  // Per-view lighting constants, defined in cube_demo.cpp.
     explicit CubeDemo(nvrhi::IDevice* device);
     void release_size_dependent();
     void resize(const std::vector<nvrhi::TextureHandle>& colors, uint32_t width,
@@ -79,6 +80,7 @@ private:
         glm::mat4 node_transform{1.0f};
         nvrhi::BufferHandle material_buffer;
         nvrhi::BindingSetHandle binding_set;
+        bool blend = false;
     };
     struct GpuAsset {
         std::shared_ptr<const GltfAsset> source;
@@ -94,12 +96,26 @@ private:
     bool ui_had_draws_ = false;
     nvrhi::GraphicsPipelineHandle pipeline_;
     nvrhi::GraphicsPipelineHandle pbr_pipeline_;
+    nvrhi::GraphicsPipelineHandle pbr_blend_pipeline_;
     nvrhi::GraphicsPipelineHandle tonemap_pipeline_;
     nvrhi::GraphicsPipelineHandle ssao_pipeline_;
     nvrhi::GraphicsPipelineHandle sky_pipeline_;
     nvrhi::FramebufferHandle hdr_framebuffer_;
     nvrhi::FramebufferHandle ssao_framebuffer_;
     std::vector<nvrhi::FramebufferHandle> framebuffers_;
+    // Inset view targets, sized to the inset and recreated when it changes.
+    nvrhi::TextureHandle inset_color_;
+    nvrhi::TextureHandle inset_depth_;
+    nvrhi::FramebufferHandle inset_framebuffer_;
+    uint32_t inset_width_ = 0;
+    uint32_t inset_height_ = 0;
+
+    void prepare_inset(uint32_t width, uint32_t height);
+    // Draws the sky and all geometry seen from `camera` into `framebuffer`:
+    // opaque surfaces first, then alpha-blended ones from far to near.
+    glm::mat4 draw_view(nvrhi::ICommandList* commands, nvrhi::IFramebuffer* framebuffer,
+                        uint32_t width, uint32_t height, const PerspectiveCamera& camera,
+                        const SceneFrame& scene, PbrFrame& frame);
 };
 
 }  // namespace acuppa
