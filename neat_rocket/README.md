@@ -9,6 +9,8 @@ for this, so a swiveled engine both pushes and turns the rocket.
 
 ![Generation 200: the champion rocket steers toward the pad; its network is on the right and its onboard camera, throttle, and engine swivel gauges are at the bottom right](docs/viewer.png)
 
+![A generation 200 landing seen from outside and from the onboard engine camera, then a generation 5 crash that cuts the camera signal](docs/rocket.gif)
+
 ## Run
 
 ```bash

@@ -17,6 +17,14 @@ compete with the whole population.
 
 ![Generation 150 of the demo run: the champion and two species leaders fly through a strong left wind, with the champion's score parts and network shown](docs/viewer.png)
 
+**Next step: [the NEAT rocket](../neat_rocket/README.md).** The same lab with
+a 3D rocket that steers with one swiveling engine. Below, the generation 200
+champion lands on the pad while its onboard camera watches the engine; then a
+generation 5 rocket misses the pad, explodes in a see-through blast, and its
+camera shows SIGNAL LOST.
+
+![The NEAT rocket: a landing seen from outside and from the onboard engine camera, then a crash that cuts the camera signal](../neat_rocket/docs/rocket.gif)
+
 ## How it fits together
 
 | Part | Language | Role |
